@@ -50,22 +50,29 @@ function path(root: string, value: unknown, field: string, kind: "file" | "direc
 
 export const SETTINGS_KEYS = ["schema_version", "repository", "hostname", "repositories", "discovery_organizations", "excluded_repositories",
   "bot_authors", "bot_inventory_terms", "dashboards", "generated_mirrors", "source_references", "backlog_references",
-  "report_dir", "history_dir", "project_procedure", "security_policy", "surface_expectations", "security_settings", "security_settings_keep_off"];
+  "report_dir", "history_dir", "project_procedure", "security_policy", "surface_expectations", "security_settings", "security_settings_keep_off", "security_settings_apply_only"];
 
-/** Validates the two security settings keys against the repositories a settings file may name. */
-export function securitySettings(input: Record<string, unknown>, allowed: string[]): Pick<Settings, "security_settings" | "security_settings_keep_off"> {
+function writableSettings(value: unknown, field: string): WritableSecuritySetting[] {
+  const names = strings(value, field);
+  if (!names.length || names.some(name => !(WRITABLE_SECURITY_SETTINGS as readonly string[]).includes(name))) fail(field);
+  return names as WritableSecuritySetting[];
+}
+
+/** Validates security settings against the repositories a settings file may name. */
+export function securitySettings(input: Record<string, unknown>, allowed: string[]): Pick<Settings, "security_settings" | "security_settings_keep_off" | "security_settings_apply_only"> {
   if (input.security_settings !== undefined && input.security_settings !== "apply" && input.security_settings !== "check") fail("security_settings must be apply or check");
+  const applyOnly = input.security_settings_apply_only === undefined ? undefined : writableSettings(input.security_settings_apply_only, "security_settings_apply_only");
   const rows: SecurityKeepOff[] = list(input.security_settings_keep_off, "security_settings_keep_off").map(value => {
     const item = object(value, "security_settings_keep_off"); keys(item, ["repository", "settings", "reason"], "security_settings_keep_off");
     const repo = repository(item.repository, "security_settings_keep_off repository");
     if (!allowed.includes(repo)) fail("security_settings_keep_off repository outside configured scope");
-    const names = strings(item.settings, "security_settings_keep_off settings");
-    if (!names.length || names.some(name => !(WRITABLE_SECURITY_SETTINGS as readonly string[]).includes(name))) fail("security_settings_keep_off settings");
-    return { repository: repo, settings: names as WritableSecuritySetting[], reason: text(item.reason, "security_settings_keep_off reason") };
+    const settings = writableSettings(item.settings, "security_settings_keep_off settings");
+    return { repository: repo, settings, reason: text(item.reason, "security_settings_keep_off reason") };
   });
   unique(rows.map(row => row.repository), "security_settings_keep_off");
   return { ...(input.security_settings === undefined ? {} : { security_settings: input.security_settings }),
-    ...(input.security_settings_keep_off === undefined ? {} : { security_settings_keep_off: rows }) };
+    ...(input.security_settings_keep_off === undefined ? {} : { security_settings_keep_off: rows }),
+    ...(applyOnly === undefined ? {} : { security_settings_apply_only: applyOnly }) };
 }
 
 export function normalizeLogin(login: string): string {

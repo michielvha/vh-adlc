@@ -44,6 +44,12 @@ Then attack the design and the criteria: what does the artifact look like when e
 ticked, and does the original problem survive? Look for contradictions, unobservable criteria, missing
 Test Plan rows and anything the binary would read differently from the author.
 
+Weigh the design against its harm statement in Context: who is harmed, how often, how badly, whether it
+heals on its own, and the simplest alternative without machinery it rejected, with the reason. A missing
+harm statement or rejected alternative is a factual finding. Machinery out of proportion to the stated
+harm is a judgement finding: name the alternative that would cover it. Rate both should-fix, or nit in a
+document whose status is past `draft`.
+
 Where the design changes state, runs concurrently, or crosses a process or network boundary, ask what
 happens under concurrent requests, partial failure, retry or replay, and upgrade or rollback from the
 previous version. A path the document leaves undefined is a finding. A design that changes no state and
@@ -55,7 +61,8 @@ name every location in that finding's `WHERE`. When a finding traces to a change
 made, say so in its `EVIDENCE`. When a nit only widens a free-text pattern row that has passed review,
 say so in its `EVIDENCE` too.
 
-Rate each finding with the severity definitions in the resolved `conventions/feature-documents.md`. When the
+Rate each finding with the severity definitions in the resolved `conventions/feature-documents.md`. The harm
+statement findings above keep the severity given there. When the
 dispatch declares a lens, rate the findings that lens raises at its declared severity instead. When the resolved page only
 lists the severity names without defining them, rate as before.
 

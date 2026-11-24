@@ -9,6 +9,7 @@ import { git } from "./repository-fixture";
 import { executeOwnedProcess } from "../../../plugins/vh-adlc/scripts/docs-drift/owned-process";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { exactRecord } from "../../../plugins/vh-adlc/scripts/docs-drift/publication-decisions";
+import { ownedWrapper } from "./git-stub";
 
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
@@ -25,10 +26,10 @@ let records;`);
   const service = installOwnedNativeService({ root: f.root, origin, source, head: source, publisher_identity: { actor: "fixture-owner", actor_id: 30 } });
   const trace = join(f.root, "caller-captures.jsonl");
   if ((fault === "matching" || fault === "mixed-plans")) {
-    const executable = join(f.root, "native-bin/git");
-    const record = 'import { appendFileSync as recordCaller } from "node:fs"; recordCaller(' + JSON.stringify(trace)
-      + ', JSON.stringify({cwd:process.cwd(),args:process.argv.slice(2)}) + "\\n");\n';
-    writeFileSync(executable, readFileSync(executable, "utf8").replace(/^(.*\n)/, "$1" + record));
+    const realGit = Bun.which("git"), flock = Bun.which("flock"); if (!realGit || !flock) throw Error("fixture requires Git and flock");
+    // The owned wrapper also records each caller's directory and arguments before it runs.
+    writeFileSync(join(f.root, "native-bin/git"), ownedWrapper({ name: "git", git: realGit, flock, lock: join(f.root, "native-service/state.lock"), bun: process.execPath,
+      service: join(f.root, "native-service/git"), record: trace }), { mode: 0o700 });
   }
   const before = captureRepositoryState(f.repo), nativeBefore = readFileSync(service.statePath), refs = git(origin, "for-each-ref");
   let selectedDirectory = directory;

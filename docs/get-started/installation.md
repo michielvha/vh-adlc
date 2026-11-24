@@ -112,8 +112,9 @@ expected to work there. See [compatibility](../reference/compatibility.md#suppor
 
 ## What the plugin installs
 
-The package's eighteen skills include the generic `vh-adlc` entry, eleven engineering
-operations, `vh-adlc-blog` for article and promotion drafts, `vh-adlc-diagram` for architecture diagrams, `vh-adlc-docs-impact` for
+The package's nineteen skills include the generic `vh-adlc` entry,
+eleven engineering operations, one coordination operation (`vh-adlc-orchestrate`,
+for a session that drives a workstream of sub-sessions), `vh-adlc-blog` for article and promotion drafts, `vh-adlc-diagram` for architecture diagrams, `vh-adlc-docs-impact` for
 selected-change documentation review, `vh-adlc-docs-drift` for corpus drift and
 stale audit proposals, `vh-adlc-docs-truth` for factual claim review, and `vh-adlc-clean` for host cleanup. It includes
 separate feature-reviewer and prose-editor definitions. Its first operation

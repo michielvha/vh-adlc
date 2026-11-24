@@ -125,8 +125,10 @@ host's own worktree tool for a worktree, or to stop before writing.
 project procedure), the lenses, and `plugin`: the running plugin version and, where the host keeps an
 install record, the installed one. A host keeps the plugin a session started with, so after an update
 `plugin.stale` is true until the session restarts, and operations stop before writing. When a `vh-adlc`
-on PATH reports another version than the plugin's lock, `plugin.binary_warning` says so, and operations
-run only the binary `scripts/ensure-vh-adlc.sh` prints.
+on PATH is not the plugin's locked binary, because its digest does not match the lock, `plugin.binary_warning`
+says so and `plugin.path_binary` is `unverified`, and operations run only the binary
+`scripts/ensure-vh-adlc.sh` prints. Neither the context command nor the installer ever runs an unverified
+PATH entry.
 
 Only `spec_reviewer` and `implementation_reviewer` accept a `command` route; settings that give one to
 `author` or `implementer` are refused, naming the role. Agent and skill files never name a model.

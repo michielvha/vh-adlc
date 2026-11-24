@@ -26,12 +26,16 @@ Input: an issue, a failure, a question or a document. Follow `references/loop.md
 4. When the owner asks for it, write substantial findings into an analysis document where the documentation
    convention at the revision says findings belong, and give any issue a short summary that links to it.
    Edit that prose with `guides/humanize-prose.md` first.
-5. Never fix, commit code or ship from this operation. If a fix is wanted, the next step is
+5. Before you recommend or file a fix, write the harm statement and the simplest alternative, as
+   `references/loop.md` (Weigh the harm before building machinery) describes. Recommend machinery only
+   when it clearly beats that alternative; otherwise the recommendation is the alternative. Put both in
+   any findings document and issue.
+6. Never fix, commit code or ship from this operation. If a fix is wanted, the next step is
    `/vh-adlc-spec`.
 
 Edit the report with `guides/humanize-prose.md` at the resolved revision. Report the knowledge line, what
-was measured and how, the hypotheses still open, the smallest next decision, and the page and revision
-used to edit the prose.
+was measured and how, the hypotheses still open, the harm statement and alternative when a fix is in
+view, the smallest next decision, and the page and revision used to edit the prose.
 
 ## Loop routes
 

@@ -4,13 +4,21 @@
 # Sources, in order: a vh-adlc on PATH whose digest and version match the lock,
 # then the user cache entry for the locked version, verified on every reuse,
 # then the release asset, verified before extraction and again before it runs
-# or is cached. Online mode rejects a matching-version PATH entry with a wrong
-# digest; a missing lock digest always fails closed.
-# Offline mode never executes an unverified PATH entry; it tries the verified
-# cache instead. The script writes only below the user cache directory.
+# or is cached. A missing lock digest always fails closed.
+# A PATH entry whose digest does not match the lock is never executed, in either
+# mode: it is ignored with a note and the verified cache or download is used. A
+# wrapper named vh-adlc that calls this script would otherwise recurse without end.
+# A nested run, marked by VH_ADLC_ENSURE_ACTIVE, fails at once for the same reason.
+# The script writes only below the user cache directory.
 #
 # Usage: ensure-vh-adlc.sh [--offline]
 set -euo pipefail
+
+if [[ -n "${VH_ADLC_ENSURE_ACTIVE:-}" ]]; then
+  echo "vh-adlc: ensure-vh-adlc.sh is already running in a parent process (VH_ADLC_ENSURE_ACTIVE is set); a wrapper on PATH that calls this script is the likely cause, so it stops instead of recursing" >&2
+  exit 1
+fi
+export VH_ADLC_ENSURE_ACTIVE=1
 
 offline=false
 for arg in "$@"; do
@@ -82,21 +90,14 @@ fi
 cache_dir="$cache_base/vh-adlc/bin/$version/$platform"
 cached="$cache_dir/vh-adlc"
 
-# 1. A vh-adlc on PATH.
+# 1. A vh-adlc on PATH, executed only once its digest matches the lock.
 if candidate=$(command -v vh-adlc 2>/dev/null) && [[ -n "$candidate" ]]; then
   if [[ "$(sha256 "$candidate")" == "$binary_sha" ]]; then
     reports_version "$candidate" || die "$candidate matches the locked digest but reports a version other than $version"
     echo "$candidate"
     exit 0
   fi
-  if [[ "$offline" == true ]]; then
-    echo "vh-adlc: ignoring unverified PATH entry $candidate in offline mode" >&2
-  else
-    if reports_version "$candidate"; then
-      die "$candidate reports vh-adlc $version but its digest does not match the lock; remove it or fix PATH"
-    fi
-    echo "vh-adlc: ignoring $candidate, which is not vh-adlc $version" >&2
-  fi
+  echo "vh-adlc: ignoring unverified PATH entry $candidate, whose digest does not match the lock for vh-adlc $version" >&2
 fi
 
 # 2. The user cache entry, verified before every reuse.

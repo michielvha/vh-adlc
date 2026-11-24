@@ -13,8 +13,8 @@ Use vh-adlc to repair this regression and finish locally.
 
 The generic `vh-adlc` entry reads lifecycle intake, which inspects the request and
 repository and selects a procedure. The candidate package combines this entry,
-eleven engineering operations, five content operations and one host-cleanup
-operation, giving eighteen skills. Check
+eleven engineering operations, five content operations, one host-cleanup
+operation and one coordination operation, giving nineteen skills. Check
 [compatibility](../reference/compatibility.md) for the lifecycle trials and limits
 on your host.
 
@@ -60,6 +60,7 @@ see [installation](../get-started/installation.md).
 | Documentation truth review | `vh-adlc-docs-truth` | Review factual claims in selected docs or agent instructions, or show recorded verification freshness. |
 | Article | `vh-adlc-blog` | Draft, revise or review articles; `promote` also prepares social Markdown linking to the author's website. |
 | Clean | `vh-adlc-clean` | Plan and remove what killed runs left in `/tmp` and the project's temp root; Compose projects and kind clusters only on request. |
+| Orchestrate | `vh-adlc-orchestrate` | Drive a workstream of sub-sessions: admit work the host can carry, keep a ledger and status passes, route owner decisions and close sessions without losing work. Changes no feature status. |
 
 Triage reports stay uncommitted unless requested. Every GitHub change, including comments and
 labels, waits for the report and approval of the exact batch. Local plan patches and their commit
@@ -326,7 +327,16 @@ severity. A nit never causes a revision on its own: when a pass's blocking or
 should-fix findings change the document, the same commit fixes that pass's nits, and
 the rest are listed in the conversation. The agent applies each pass's findings as one
 revision, after asking you about any judgement finding, so one pass's fixes do not
-seed the next pass's findings.
+seed the next pass's findings. An extra the agent added on its own, which no criterion,
+decision of yours or public contract needs, is removed without asking you and noted in
+the Review Log.
+
+Every investigation and spec states the harm a fix prevents and the simplest
+alternative without new machinery, such as a process rule or a manual step. The
+reviewer flags a missing harm statement, and machinery out of proportion to the
+harm. When two spec reviews in a row are blocking and the blocking count does not
+fall, the agent stops revising. It asks whether to keep going, narrow the scope,
+replace the feature with the simpler alternative, or park it.
 
 An implementation review never skips a check it is able to run. When a criterion depends on what an
 agent does in a session, the implementer proves it with a committed script that reruns that session and

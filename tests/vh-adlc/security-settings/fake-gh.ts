@@ -15,6 +15,7 @@ export type FakeState = {
   updates: { enabled: boolean; paused: boolean };
   secret_scanning: boolean;
   push_protection: boolean;
+  private_vulnerability_reporting: boolean;
   analysis_null: boolean;
   advanced_security: boolean;
   code_security: boolean;
@@ -30,7 +31,7 @@ export type Reply = { code: number; stdout: string; stderr: string };
 export function state(overrides: Partial<FakeState> = {}): FakeState {
   return { hostname: "github.com", repository: "example/project", visibility: "public", archived: false, default_branch: "main", admin: true,
     alerts: false, updates: { enabled: false, paused: false }, secret_scanning: false, push_protection: false, analysis_null: false,
-    advanced_security: false, code_security: false, files: {}, pulls: [], issues: [], fail: [], noop: [], ...overrides };
+    advanced_security: false, code_security: false, private_vulnerability_reporting: false, files: {}, pulls: [], issues: [], fail: [], noop: [], ...overrides };
 }
 
 const status = (on: boolean) => ({ status: on ? "enabled" : "disabled" });
@@ -94,6 +95,15 @@ export function handle(fake: FakeState, argv: string[], stdin: string | null): {
         return ok();
       }
       if (request.method === "DELETE") { fake.updates = { ...fake.updates, enabled: false }; return ok(); }
+    }
+    if (rest === "/private-vulnerability-reporting") {
+      if (fake.visibility !== "public" || fake.hostname !== "github.com") return error(404, "Not Found");
+      if (request.method === "GET") return ok({ enabled: fake.private_vulnerability_reporting });
+      if (request.method === "PUT") {
+        const denied = admin(); if (denied) return denied;
+        if (!fake.noop.includes("PUT private-vulnerability-reporting")) fake.private_vulnerability_reporting = true;
+        return ok();
+      }
     }
     if (rest.startsWith("/contents/") && request.method === "GET") {
       const path = decodeURIComponent(rest.slice("/contents/".length));
