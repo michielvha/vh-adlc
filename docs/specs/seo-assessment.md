@@ -353,6 +353,7 @@ None. The defaults listed in the owner summary were set under the owner's standi
 | 2026-11-24 | R-42 | spec | `f6c767d` | claude-opus-5-5 | procedural | No findings |
 | 2026-11-24 | R-42 | spec | `f6c767d` | n/a | n/a | accepted by owner |
 | 2026-11-25 | R-43 | spec | `4853dd5` | claude-opus-5-5 | procedural | Full review of the Claude Code runner switch: no blocking; 4 should-fix (ancestor instructions, tool flags, unconfined writes, owner summary), 1 nit |
+| 2026-11-25 | R-44 | spec | `1e4412c` | claude-opus-5-5 | procedural | Scoped review of the sandbox revision: 1 blocking (Linux sandbox network namespace hides host loopback), 2 should-fix, 2 nits |
 
 ### R-1
 
@@ -1768,6 +1769,43 @@ SEVERITY: nit
 WHERE: Test Plan AC-11 row (line 270)
 EVIDENCE: The owner summary now says the forward scenarios "need no Linux host". The `no-browser` fixture scan still judges "an ELF binary or has an execute bit". On macOS a dropped browser binary is Mach-O, so there only the execute-bit half of the scan applies.
 PROPOSAL: Judge "an ELF or Mach-O binary or a file with an execute bit", or record which host the scan was meant for.
+
+### R-44
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Test Plan preamble (line 256: "network allowed only to `127.0.0.1` and `localhost`", the preflight "the session's `curl` reaches the fixture site and the stub; the named driver reads a fixture page's heading", and "On macOS that sandbox let loopback `curl` through ... which is why the scenarios run on Linux, where the sandbox uses Bubblewrap"); Context, Owner summary (line 64 "its network on loopback", line 66 "sandboxed headless Claude Code against a fixture site and a Semrush stub on loopback"); Tasks T14 (line 294); Design, Semrush helper (line 215, `VH_ADLC_SEMRUSH_BASE` accepted only for a loopback host)
+EVIDENCE: On Linux, Claude Code's sandbox puts each Bash command in its own network namespace, so the host's loopback, where the harness serves the fixture site and the Semrush stub, cannot be reached from inside it. I inspected the strings of the Claude Code 2.1.330 binary (`/opt/homebrew/bin/claude`, `strings -n 8`). The Linux bwrap builder does `if(h){if(mt.push("--unshare-net"),g&&y){... "Linux HTTP bridge socket does not exist" ...`, so outside traffic goes only through HTTP and SOCKS proxy bridges. The proxy environment function sets `NO_PROXY=localhost,127.0.0.1,::1,169.254.0.0/16,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16`, so curl, Bun's fetch (which the helper uses) and Chromium skip the proxy for 127.0.0.1 and connect directly inside the namespace. The binary's own description of `sandbox.network.allowLocalBinding` says that on Linux the "sandbox has its own network namespace, whose loopback is always usable and is not the host one". So under the settings the Test Plan names, the sandboxed `curl`, the helper's requests to `http://127.0.0.1:<port>` and the named `chrome-headless-shell` would all reach an empty loopback. The preflight would then fail every run, and the scenario proofs for AC-04, AC-05, AC-06, AC-08, AC-09 and AC-11 could not be executed. The only observation the document cites is the macOS sandbox, which has no network namespace. The T9 and T10 evidence used `codex sandbox`, a different mechanism. This gap traces to this revision's switch to Claude Code's sandbox, made for R-43 F-03.
+PROPOSAL: Before acceptance, observe on `sw-dev` whether a sandboxed session reaches a host loopback listener. Then change the design to something that works, for example keeping the filesystem sandbox but leaving its network unrestricted so no network namespace is made, and relying on the fake key and the AC-04 transcript scan. Record the observation and the chosen network setting in the preamble, the owner summary and T14.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-08 row (line 267: "Every scenario runs under the sandbox the Test Plan names, which allows lasting writes only in the fixture repository, so comparing the fixture tree before and after covers them"); Test Plan preamble (line 256: the sandbox's write rule, `--allowedTools` approving Write, and the preflight "a write to the runner directory outside the fixture fails"); Context, Owner summary (line 64: "which keeps the agent's writes inside its fixture"); Tasks T14 (line 294)
+EVIDENCE: Claude Code's sandbox confines Bash commands and their children, not its file tools. The Write tool runs in the Claude Code process under permission rules, and the preamble pre-approves it with a bare `--allowedTools` entry. The binary's own text keeps the two apart: "In local Code sessions, read-only applies to Claude's file tools only; Bash does **not** yet enforce it", and file-tool rules and sandbox paths are handled separately ("still applies to the file tools ... the sandbox does not enforce"). So a wrong package whose agent calls Write on a path outside the fixture, such as the plugin copy, `$HOME` or the runner directory, is not stopped by the sandbox, and the AC-08 tree comparison does not see it. The preflight's outside write names no tool, so a Bash-only check passes on that wrong package. The sandbox also allows writes in its temporary directory, which the binary sets to `TMPDIR=/tmp/claude` and shares across sessions. An export left there lasts, and the fixture comparison misses it too. The AC-08 row's claim was added by this revision.
+PROPOSAL: Scope the Write approval to the fixture (for example `Write(<fixture>/**)`, with a deny rule for everything else), make the preflight attempt both a Bash write and a Write tool call outside the fixture and require both to fail, and have AC-08 assert that every Write `tool_use` `file_path` in the transcript lies inside the adapter's locations. Either check the shared temporary directory for new files, or state it as a limit.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan preamble (line 256: "`CLAUDE_CONFIG_DIR` set to a fresh runner directory that holds only a link to the signed-in credentials file and a `CLAUDE.md` with a canary word" and the preflight condition "the canary word appears nowhere in the session's output"); Tasks T14 (line 294: "the fresh config directory with its canary")
+EVIDENCE: The preflight passes when the canary word is absent from the output. A model that has the user memory loaded has no reason to repeat a bare word it was not asked about, so the check also passes when the memory reached the session. This proof can pass on the very leak it is meant to catch. In R-43 F-01 the canaries showed up because the session was asked about its instructions. Nothing in the preamble says the preflight prompt asks the session to repeat the instructions or memory it holds, or that the canary file tells the session to do something visible.
+PROPOSAL: Make the canary observable: for example, have the config `CLAUDE.md` tell the session to start every reply with the canary word, or have the preflight prompt ask the session to quote every instruction file and memory it was given. Then assert the word is absent, and in a control run with the canary in an allowed location, that it appears.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan preamble (line 256: the Linux host's list "`bwrap`, Bun, Go, Node, a Playwright `chrome-headless-shell` and a signed-in Claude Code CLI"); Context, Background (line 104)
+EVIDENCE: Claude Code's Linux sandbox also needs `socat` for its proxy bridges. The binary says "Linux needs bubblewrap and socat" and "install missing tools (e.g. apt install bubblewrap socat)", and with unsandboxed commands refused, every Bash call fails without it. The host list leaves `socat` out, and the `sw-dev` check on line 104 records neither `socat`, Node nor the Claude Code CLI. Line 104 also still ends "The forward scenarios no longer need it.", which contradicts this revision's preamble: the forward scenarios now run on `sw-dev`. That sentence traces to the previous revision.
+PROPOSAL: Add `socat` to the host list, record `socat`, Node and the Claude Code version on `sw-dev` the way line 104 records the others, and drop or reverse the last sentence of line 104.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (line 66: "The static tests and the helper tests have run and pass, on macOS and on `sw-dev`, as the ticked tasks record")
+EVIDENCE: Only T7 names `sw-dev` ("79 pass, 0 fail on `sw-dev` ... 76 pass, 3 skip on macOS"), and that is the helper test. The static-test evidence in T1, T2, T3, T5 and T8 says "on macOS" (T8: "on macOS: 100 pass, 0 fail"). T7's static line ("`bun test tests/vh-adlc/check.test.ts tests/vh-adlc/seo.test.ts`: all pass") names no host. The ticked tasks do not record the static tests passing on `sw-dev`.
+PROPOSAL: Say that the helper tests passed on both hosts and the static tests on macOS, or record a `sw-dev` run of the static tests.
 
 ## Sources
 
