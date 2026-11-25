@@ -354,6 +354,7 @@ None. The defaults listed in the owner summary were set under the owner's standi
 | 2026-11-24 | R-42 | spec | `f6c767d` | n/a | n/a | accepted by owner |
 | 2026-11-25 | R-43 | spec | `4853dd5` | claude-opus-5-5 | procedural | Full review of the Claude Code runner switch: no blocking; 4 should-fix (ancestor instructions, tool flags, unconfined writes, owner summary), 1 nit |
 | 2026-11-25 | R-44 | spec | `1e4412c` | claude-opus-5-5 | procedural | Scoped review of the sandbox revision: 1 blocking (Linux sandbox network namespace hides host loopback), 2 should-fix, 2 nits |
+| 2026-11-25 | R-45 | spec | `bc51b7f` | claude-opus-5-5 | procedural | Follow-up to R-44: no blocking; 3 should-fix (session temp and config writes, paths hidden under /tmp, inherited environment), 3 nits |
 
 ### R-1
 
@@ -1806,6 +1807,52 @@ SEVERITY: nit
 WHERE: Context, Owner summary (line 66: "The static tests and the helper tests have run and pass, on macOS and on `sw-dev`, as the ticked tasks record")
 EVIDENCE: Only T7 names `sw-dev` ("79 pass, 0 fail on `sw-dev` ... 76 pass, 3 skip on macOS"), and that is the helper test. The static-test evidence in T1, T2, T3, T5 and T8 says "on macOS" (T8: "on macOS: 100 pass, 0 fail"). T7's static line ("`bun test tests/vh-adlc/check.test.ts tests/vh-adlc/seo.test.ts`: all pass") names no host. The ticked tasks do not record the static tests passing on `sw-dev`.
 PROPOSAL: Say that the helper tests passed on both hosts and the static tests on macOS, or record a `sw-dev` run of the static tests.
+
+### R-45
+
+TARGET: bc51b7f2bbd4de65a784d9adac76db40dca735e1
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-08 row (line 267: "leaves the session no lasting write outside its fixture root and the runner's config directory, so comparing the fixture tree before and after covers the assessment's writes"); Test Plan preamble (line 256: the wrapper "binds writable only the scenario's `mktemp -d` fixture root, the run's config directory and the signed-in credentials file" and "its `/tmp` is a private tmpfs that ends with it"); Context, Owner summary (line 64: "makes the whole filesystem read-only except its fixture and the run's own config"); Tasks T14 (line 294)
+EVIDENCE: AC-08 says the assessment "writes only inside the adapter's report and export locations". Under the new wrapper the session can still write in three places the proof never inspects: its private `/tmp`, which is discarded unseen when the session ends, the writable config directory, and the credentials file. The added check covers only Write `tool_use` paths. So a wrong package that saves its export with a Bash command to `/tmp/seo-report.md` or into `$CLAUDE_CONFIG_DIR` passes AC-08, yet in a real run on an adopter's machine that file stays outside the adapter's locations. The proof also treats the same act two ways: a Write-tool scratch file in `/tmp` fails the new `file_path` assertion, while the same file written by a Bash heredoc passes. R-44 F-02 asked the author to "either check the shared temporary directory for new files, or state it as a limit". This revision swapped the shared `/tmp/claude` for a private tmpfs and did neither. The AC-08 row also names two writable places, while the preamble names three.
+PROPOSAL: Bind a fresh runner-owned directory as the session's `/tmp` (instead of `--tmpfs /tmp`), and after each run assert that it and the config directory hold no file the assessment wrote outside the browser's and Claude Code's own state. If that is not wanted, add a Scope `Not handled:` line for writes to the session's temporary directory. In both cases, make the AC-08 row name all three writable places and treat Write and Bash scratch writes the same way.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan preamble (line 256: the wrapper's `--tmpfs /tmp` and its binds; the plugin copy "from a copy outside the fixture tree"; `playwright-core` "into a runner-owned directory outside the fixture tree"; the preflight condition "no plugin but the branch's vh-adlc and Claude Code's built-in ones"); Test Plan AC-04 row (line 263: "a valid fixture credential"); Tasks T14 (line 294)
+EVIDENCE: `--tmpfs /tmp` hides every host path under `/tmp`, and the wrapper binds back only the fixture root, the config directory and the credentials file. The document requires those three paths, the plugin copy and the `playwright-core` directory to sit outside the fixture tree, and it says nowhere that they must not be under `/tmp` or that they get bound. The current harness puts the plugin copy under its output directory (`tests/vh-adlc/seo/run.ts:52`) and the fixture key next to the fixture repository, not inside it (`run.ts:109-113`). The document itself uses `mktemp -d`, which creates paths in `/tmp`, so if the runner directory comes from it, none of these paths exist inside the session. The preflight catches only part of this. "No plugin but the branch's vh-adlc" still holds when vh-adlc is missing, and nothing checks that the fixture credential is visible. With the key file hidden, every AC-04 `no-permission` variant gets zero stub requests for the wrong reason: a package that ignores the missing permission still sends nothing, because the helper cannot find its key. That proof passes on a wrong implementation. This gap comes from this revision's switch to the outer wrapper.
+PROPOSAL: Require every runner path the session needs to be outside `/tmp` or `--ro-bind` it explicitly. Have the preflight require the branch's vh-adlc in the start event's plugin list, and check that the fixture credential path exists and is readable inside the wrapper (for example with `test -r`, never reading it).
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan preamble (line 256: "shares the host network" and "The fixture credential is not a real key, so network access spends no units"); Test Plan AC-04 row (line 263: "Offline forward scenario"); Context, Owner summary (line 64, which no longer says anything about the session's network); Tasks T14 (line 294)
+EVIDENCE: Under the wrapper the session can read the whole host filesystem (`--ro-bind / /`), has unrestricted outbound network, and by default inherits the runner's environment. The current harness passes the whole process environment except `GIT_` variables (`tests/vh-adlc/seo/run.ts:33-35`). The claim that network access spends no units holds only while no real Semrush credential can be reached. The design lets an adapter name a key through `--key-env` (line 192), and the owner holds a live Semrush token (line 38). If the runner's shell on `sw-dev` exports such a variable, or keeps a key file under the home directory, a misbehaving package under test can spend real units through `curl`. The AC-04 transcript scan would report this only after the units were spent. The previous revision kept the network on loopback. This one drops that limit without saying so in the owner summary, and AC-04 still calls the scenario offline.
+PROPOSAL: Start the wrapper with `bwrap --clearenv` and set only the variables the session needs. Have the runner refuse to run when its environment holds a variable whose name contains `SEMRUSH`. State in the preamble and the owner summary that the session has open network and can read the host, and drop "Offline" from the AC-04 row or say what it means now.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan preamble (line 256: "a Bash write and a Write-tool write to the runner directory outside the fixture both fail", next to "`CLAUDE_CONFIG_DIR` set to a fresh runner directory"); Tasks T14 (line 294)
+EVIDENCE: The only "runner directory" defined earlier in the preamble is the config directory, and the wrapper binds that directory writable. Read literally, the preflight writes would succeed and the preflight would fail every run. The probe that supports this text (`/tmp/cc-sbx/probe3.sh`) wrote to `$B`, the parent of the config directory `$B/cfg`, not to the config directory.
+PROPOSAL: Name the outside write target exactly, for example the runner's output directory or the parent of the config directory. Make sure the target is not one of the writable binds.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background (line 104: "On 2026-11-25 it also had Node at `/usr/bin/node` and Claude Code 2.1.330 with a signed-in credentials file")
+EVIDENCE: Every other `sw-dev` fact on line 104 cites the command that showed it. The new sentence cites none. The probe outputs given for this revision (`/tmp/cc-sbx/probe2.out`, `/tmp/cc-sbx/probe3.out`) print neither a Node path nor a Claude Code version.
+PROPOSAL: Cite the commands and their output, for example `command -v node` and `claude --version`, as the rest of line 104 does.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan preamble (line 256: "it confines Bash commands but not the Write tool, which wrote outside the fixture in the same probe")
+EVIDENCE: The Write-tool write outside the fixture under Claude Code's sandbox happened in a separate probe without the wrapper (`/tmp/cc-sbx/probe2.out`: "write-outside-restricted.txt", "write-outside-nonet.txt"). The wrapper results come from `/tmp/cc-sbx/probe3.out`. That probe had no Claude Code sandbox, and its outside Write failed with `EROFS`. Also, probe2's loopback check printed `port=` with no port number, so the private-network claim rests only on R-44 F-01, which the sentence cites, and not on that probe.
+PROPOSAL: Say "in an earlier probe on the same day" instead of "in the same probe".
 
 ## Sources
 
