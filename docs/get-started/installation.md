@@ -97,18 +97,17 @@ for adoption and rollback.
 
 ## Antigravity
 
-With the [Antigravity CLI](https://antigravity.google/docs/cli/install/) (`agy`) installed, run:
+Install the [Antigravity CLI](https://antigravity.google/docs/cli/install/) (`agy`), for example on macOS with Homebrew (`brew install --cask antigravity-cli`) or the official installer script (`curl -fsSL https://antigravity.google/cli/install.sh | bash`), then install vh-adlc globally:
 
 ```sh
 agy plugin install https://github.com/michielvha/vh-adlc/tree/main/plugins/vh-adlc
 ```
 
-The command installs the package from `main` globally. Antigravity is unsupported for vh-adlc
-workflows. Only installation and skill discovery have been checked, on plugin 0.3.1 with CLI 1.4.7 and
-the language server from IDE 2.5.5 run headless; no skill or workflow ran, and current versions are
-untested. Antigravity also skipped the reviewer agent because it expects the agent's `tools`
-frontmatter as a YAML list, so operations that dispatch the reviewer or the blog editor are not
-expected to work there. See [compatibility](../reference/compatibility.md#support-matrix).
+This installs the plugin from `main` into `~/.gemini/config/plugins/vh-adlc`, which is shared across the Antigravity App, Antigravity CLI, and Antigravity IDE. You can also install manually without `agy` by copying or symlinking `plugins/vh-adlc` into `~/.gemini/config/plugins/vh-adlc` (global) or `<project>/.agents/plugins/vh-adlc` (workspace only).
+
+Check loaded components in the Antigravity App under **Customizations > Installed** or with `agy plugin list`. Start a new session in your project and invoke an operation by slash command (such as `/vh-adlc` or `/vh-adlc-spec`), or describe the work in plain text.
+
+Antigravity remains unsupported for full vh-adlc workflow claims until an authenticated scenario run passes. On macOS arm64 with Antigravity CLI 1.5.17 and the Antigravity App, plugin 0.33.0 installed cleanly and exposed all nineteen skills globally, while Antigravity skipped `vh-adlc-reviewer.agent.md` and `vh-adlc-blog-editor.agent.md` because it expects `tools` frontmatter as a YAML list rather than a comma-separated string. Operations that need an independent reviewer rely on the generic subagent fallback in [review protocol](../../plugins/vh-adlc/references/review-protocol.md#independence) (procedural isolation) or remain `review pending`. See [compatibility](../reference/compatibility.md#support-matrix).
 
 ## What the plugin installs
 
