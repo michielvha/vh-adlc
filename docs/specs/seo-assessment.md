@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Re-entered on feat/seo-agent after the R-48 acceptance; implementing T14, then the scenario runs."
+status: draft
+status_description: "Revising the AC-08 config-directory check after the first scenario runs showed it fails correct runs; awaits a scoped review and renewed acceptance."
 branch: feat/seo-agent
 issue: null
 goal: "An adopter can run a free-first website SEO assessment through vh-adlc that spends paid API units only when allowed and within a limit, and leaves exports usable after access ends."
