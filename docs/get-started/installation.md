@@ -97,18 +97,21 @@ for adoption and rollback.
 
 ## Antigravity
 
-With the [Antigravity CLI](https://antigravity.google/docs/cli/install/) (`agy`) installed, run:
+Install the [Antigravity CLI](https://antigravity.google/docs/cli/install/) (`agy`), for example on macOS with Homebrew (`brew install --cask antigravity-cli`) or the official installer script (`curl -fsSL https://antigravity.google/cli/install.sh | bash`), then install vh-adlc globally:
 
 ```sh
 agy plugin install https://github.com/michielvha/vh-adlc/tree/main/plugins/vh-adlc
 ```
 
-The command installs the package from `main` globally. Antigravity is unsupported for vh-adlc
-workflows. Only installation and skill discovery have been checked, on plugin 0.3.1 with CLI 1.4.7 and
-the language server from IDE 2.5.5 run headless; no skill or workflow ran, and current versions are
-untested. Antigravity also skipped the reviewer agent because it expects the agent's `tools`
-frontmatter as a YAML list, so operations that dispatch the reviewer or the blog editor are not
-expected to work there. See [compatibility](../reference/compatibility.md#support-matrix).
+This installs the plugin from `main` into `~/.gemini/config/plugins/vh-adlc`, which is shared across the Antigravity App, Antigravity CLI, and Antigravity IDE. Without `agy`, you can copy or symlink `plugins/vh-adlc` into `~/.gemini/config/plugins/vh-adlc` (global) or `<project>/.agents/plugins/vh-adlc` (workspace only).
+
+Confirm the plugin is loaded in the Antigravity App under **Customizations > Installed** or with `agy plugin list`. Start a new conversation in your project and invoke an operation by slash command (such as `/vh-adlc` or `/vh-adlc-spec`), or describe the work in plain text:
+
+```text
+Use vh-adlc to diagnose this failure; report only.
+```
+
+Independent reviews run through Antigravity's generic subagent fallback reading the bundled reviewer instructions, with procedural isolation. See [compatibility](../reference/compatibility.md#support-matrix) for tested versions and details.
 
 ## What the plugin installs
 

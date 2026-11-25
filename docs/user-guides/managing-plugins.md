@@ -23,6 +23,12 @@ claude plugin marketplace update vhco-tools
 claude plugin update vh-adlc@vhco-tools
 ```
 
+In Antigravity, re-run the install command to replace the staged copy from `main`, then start a new conversation:
+
+```sh
+agy plugin install https://github.com/michielvha/vh-adlc/tree/main/plugins/vh-adlc
+```
+
 ## Reinstall in Codex
 
 Open **Plugins > Personal > vh-adlc > More actions > Uninstall**, install vh-adlc
@@ -42,6 +48,12 @@ In Claude Code:
 
 ```sh
 claude plugin uninstall vh-adlc@vhco-tools
+```
+
+In Antigravity, open **Customizations > Installed**, select **vh-adlc**, and choose **Uninstall**, or run:
+
+```sh
+agy plugin uninstall vh-adlc
 ```
 
 Other marketplace plugins remain installed. In Claude Code, remove the
