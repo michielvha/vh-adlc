@@ -356,6 +356,7 @@ None. The defaults listed in the owner summary were set under the owner's standi
 | 2026-11-25 | R-44 | spec | `1e4412c` | claude-opus-5-5 | procedural | Scoped review of the sandbox revision: 1 blocking (Linux sandbox network namespace hides host loopback), 2 should-fix, 2 nits |
 | 2026-11-25 | R-45 | spec | `bc51b7f` | claude-opus-5-5 | procedural | Follow-up to R-44: no blocking; 3 should-fix (session temp and config writes, paths hidden under /tmp, inherited environment), 3 nits |
 | 2026-11-25 | R-46 | spec | `b174d07` | claude-opus-5-5 | procedural | Scoped review of the R-45 fix: 1 blocking (cleared environment drops the stub address), 2 should-fix (scratch writes against AC-08, wrapper not probed as specified), 2 nits |
+| 2026-11-25 | R-47 | spec | `8f021fc` | claude-opus-5-5 | procedural | Follow-up to R-46: no blocking; 2 should-fix (unexplained `plugins` entry in the fixture, config-directory writes unproven) |
 
 ### R-1
 
@@ -1893,6 +1894,22 @@ SEVERITY: nit
 WHERE: Test Plan AC-08 row (line 269: "inside the adapter's locations or the session's `/tmp`")
 EVIDENCE: The fixture root comes from `mktemp -d`, and on `sw-dev` that path is under `/tmp` (probe3: `/tmp/seo-probe-VRSx/w/inside.txt`). The preamble binds the fixture root at its own path inside the session's new `/tmp`. Any Write path in the fixture, including one outside the adapter's locations, therefore lies "inside the session's `/tmp`", and the Write-path assertion no longer separates the two. If the config directory is also made with `mktemp -d`, the same applies to it. The before-and-after tree comparison still catches lasting fixture writes, so only a file written and then deleted gets through.
 PROPOSAL: Define the allowance as the session's `/tmp` minus the fixture root and the config directory, or as the runner-owned temporary directory's own contents.
+
+### R-47
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan preamble (line 256: "with Claude Code 2.1.330 and this wrapper exactly, cleared environment, runner-owned `/tmp`, read-only output directory and those six variables included, ... Write-tool writes to `/tmp` and inside the fixture succeeded"); Test Plan AC-08 row (line 267: "Compare the fixture tree before and after against the adapter's locations"); Test Plan AC-09 row (line 268); Tasks T14 (line 294)
+EVIDENCE: The probe this sentence cites (`/tmp/seo-work/probes/probe4.sh`, `probe4.out`) ends with `ls $FIXROOT/w`, which lists `inside.txt` and also `plugins`. None of the nine prompted steps asks for a `plugins` entry. Step 4 ran the helper with `--output /tmp/run1`, and that output went to the session's `/tmp` (the `session tmp:` listing shows `run1`). The helper writes only under `--output` (`plugins/vh-adlc/scripts/seo/semrush.ts:255,322,392,610`). The earlier probe without `--clearenv` (`probe3.out`) left only `inside.txt` in the fixture. So under the exact wrapper this revision cites, something other than the assessment's own steps created a new top-level entry in the fixture root, possibly Claude Code itself or Bun under the cleared environment, and the preamble's account leaves it out. If Claude Code or the runtime does this in every session, the AC-08 before-and-after comparison finds a new path outside the adapter's locations in every scenario and fails a correct package. Neither the preflight nor any row checks for it or explains it. This traces to the R-46 F-03 fix in this revision, which replaced the probe evidence.
+PROPOSAL: Find out what created `plugins` in the fixture under the cleared-environment wrapper and record it in the preamble. If it is Claude Code's or Bun's own state, keep it out of the fixture root, for example by setting the variable that relocates it, or name it as an excluded path in the AC-08 comparison. Have the preflight confirm that a session doing nothing leaves the fixture tree unchanged.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-08 row (line 267: "the run's config directory and the credentials file, which hold Claude Code's own state" and "every Write `tool_use` `file_path` ... outside the fixture root and the config directory"); Scope (lines 106 to 128, where this revision removed "Not handled: scratch files a scenario session writes in its temporary directory or the run's config directory ... (R-45 F-01)"); Acceptance Criteria AC-08 (line 249); Context, Owner summary (line 44 and line 64: "except the session's own temporary directory and Claude Code's credentials")
+EVIDENCE: AC-08 now allows only "transient scratch files in the system temporary directory" outside the report and export locations. The AC-08 row checks the fixture tree and the Write-tool paths, but it does not inspect the config directory or the credentials file after the run. It only describes them as holding Claude Code's own state. A Bash write such as `cat > "$CLAUDE_CONFIG_DIR/seo-report.md"` therefore passes the proof. On an adopter's machine that directory is `~/.claude`, which AC-08 does not allow. Before this revision the gap was a stated limit. This revision deleted the Scope line that covered both the temporary directory and the config directory, and AC-08's new wording covers only the temporary directory, so config-directory writes are now neither proven nor stated as a limit. The owner summary's list of the places the session can write also leaves out the config directory as a place assessment output could land.
+PROPOSAL: After each run, assert that the config directory holds nothing beyond the entries Claude Code itself creates, which the preflight can record as a baseline. Otherwise, restore a Scope `Not handled:` line for Bash writes to the run's config directory and the credentials file, and give the reason.
 
 ## Sources
 
