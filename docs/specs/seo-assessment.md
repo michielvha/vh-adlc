@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Accepted again at R-48 with the scenarios on headless Claude Code in a Bubblewrap wrapper on sw-dev; ready to implement T14 onward."
+status: in-progress
+status_description: "Re-entered on feat/seo-agent after the R-48 acceptance; implementing T14, then the scenario runs."
 branch: feat/seo-agent
 issue: null
 goal: "An adopter can run a free-first website SEO assessment through vh-adlc that spends paid API units only when allowed and within a limit, and leaves exports usable after access ends."
