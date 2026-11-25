@@ -357,6 +357,7 @@ None. The defaults listed in the owner summary were set under the owner's standi
 | 2026-11-25 | R-45 | spec | `bc51b7f` | claude-opus-5-5 | procedural | Follow-up to R-44: no blocking; 3 should-fix (session temp and config writes, paths hidden under /tmp, inherited environment), 3 nits |
 | 2026-11-25 | R-46 | spec | `b174d07` | claude-opus-5-5 | procedural | Scoped review of the R-45 fix: 1 blocking (cleared environment drops the stub address), 2 should-fix (scratch writes against AC-08, wrapper not probed as specified), 2 nits |
 | 2026-11-25 | R-47 | spec | `8f021fc` | claude-opus-5-5 | procedural | Follow-up to R-46: no blocking; 2 should-fix (unexplained `plugins` entry in the fixture, config-directory writes unproven) |
+| 2026-11-25 | R-48 | spec | `6793825` | claude-opus-5-5 | procedural | Scoped review of the R-47 fix: no blocking; 2 should-fix (cause of the `plugins` entry, config baseline from a narrower session), 1 nit |
 
 ### R-1
 
@@ -1910,6 +1911,31 @@ SEVERITY: should-fix
 WHERE: Test Plan AC-08 row (line 267: "the run's config directory and the credentials file, which hold Claude Code's own state" and "every Write `tool_use` `file_path` ... outside the fixture root and the config directory"); Scope (lines 106 to 128, where this revision removed "Not handled: scratch files a scenario session writes in its temporary directory or the run's config directory ... (R-45 F-01)"); Acceptance Criteria AC-08 (line 249); Context, Owner summary (line 44 and line 64: "except the session's own temporary directory and Claude Code's credentials")
 EVIDENCE: AC-08 now allows only "transient scratch files in the system temporary directory" outside the report and export locations. The AC-08 row checks the fixture tree and the Write-tool paths, but it does not inspect the config directory or the credentials file after the run. It only describes them as holding Claude Code's own state. A Bash write such as `cat > "$CLAUDE_CONFIG_DIR/seo-report.md"` therefore passes the proof. On an adopter's machine that directory is `~/.claude`, which AC-08 does not allow. Before this revision the gap was a stated limit. This revision deleted the Scope line that covered both the temporary directory and the config directory, and AC-08's new wording covers only the temporary directory, so config-directory writes are now neither proven nor stated as a limit. The owner summary's list of the places the session can write also leaves out the config directory as a place assessment output could land.
 PROPOSAL: After each run, assert that the config directory holds nothing beyond the entries Claude Code itself creates, which the preflight can record as a baseline. Otherwise, restore a Scope `Not handled:` line for Bash writes to the run's config directory and the credentials file, and give the reason.
+
+### R-48
+
+TARGET: 67938257c18d3c3e89439832f35f5565de4f602e
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan preamble (line 256: "That probe's fixture also gained an unexplained top-level `plugins` entry; a later session in the same wrapper that used no tool left the fixture tree unchanged", and the preflight check "the throwaway fixture's tree is unchanged after the session apart from its own `CLAUDE.md`"); Test Plan AC-08 row (line 267: "Compare the fixture tree before and after against the adapter's locations"); Tasks T14 (line 294)
+EVIDENCE: The revision records the `plugins` entry from `/tmp/seo-work/probes/probe4.out` as unexplained but does not find its cause, which R-47 F-01 asked for. `probe5.sh` asked for "Reply with the single word hi. Do not use any tool." It shows only that a session with no tool calls leaves the fixture alone. In probe4 the entry appeared after a session that ran Bash, Write, the Semrush helper under Bun and `chrome-headless-shell --dump-dom`. The helper does not create it, because it writes only under `--output` (`plugins/vh-adlc/scripts/seo/semrush.ts:322,392,610`). The new preflight check runs only curl, `test -r`, `printenv`, the named driver and two failing writes. It never runs the helper, the Skill tool or WebFetch, and every assessment scenario uses those. If the cause is one of those steps, the preflight passes and the AC-08 fixture comparison then fails a correct package in every scenario that reaches that step. Since the cause is unknown, the new check gives no assurance that the scenario proofs can pass. This traces to the R-47 F-01 fix in this revision.
+PROPOSAL: Re-run probe4's steps one at a time in the exact wrapper and record what creates `plugins`. Then either relocate it or name it as an excluded path in the AC-08 comparison. If that is not done, have the preflight also run the helper once with a refused call that sends nothing, load the Skill and make one loopback WebFetch before it compares the fixture tree.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-08 row (line 267: "Assert that after the run the config directory holds no top-level entry the preflight session did not leave there, so an export written there fails"); Test Plan preamble (line 256: "`CLAUDE_CONFIG_DIR` set to a fresh runner directory", "Once per run, before the scenarios, the runner holds one preflight session"); Context, Owner summary (line 64: "Claude Code's own state, which the runner checks for stray files after each run"); Tasks T14 (line 294: "the config-directory baseline check")
+EVIDENCE: Claude Code creates top-level state entries in its config directory only when a session uses the feature behind them. On this host, with Claude Code 2.1.330, `ls -A ~/.claude` lists `file-history`, `shell-snapshots`, `paste-cache`, `session-env`, `cache`, `projects` and `debug` alongside the five entries probe5 recorded (`backups`, `.claude.json`, `.credentials.json`, `plugins`, `sessions`). The preflight session's only Write is one that fails, and it uses neither the Skill tool nor WebFetch. Scenario sessions do write files successfully and do load the skill. Any entry those actions create, for example `file-history` on the first successful Write, is missing from the preflight baseline, so the new assertion fails a correct package. "There" is also undefined: each session gets "a fresh runner directory", so the preflight never ran in a scenario's config directory, and the document does not say the comparison is by entry name. Because only top-level entries are checked, an export written into an existing entry such as `sessions/` passes. That is less likely, but it is the case the check is meant to catch. This traces to the R-47 F-02 fix in this revision.
+PROPOSAL: Make the preflight exercise every tool the scenarios use: a successful Write in its session `/tmp`, a Skill load and a loopback WebFetch. Record the top-level names in its config directory as the baseline, and say each scenario's config directory is compared to that baseline by name. Alternatively, check that no new regular file in the config directory, at any depth, matches the report or export names the scenario's fixture adapter defines.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan preamble (line 256: "the throwaway fixture's tree is unchanged after the session apart from its own `CLAUDE.md`")
+EVIDENCE: The runner writes the control-canary `CLAUDE.md` before the session starts, so a before-and-after comparison that begins after setup needs no exception for it. As worded, the exception also hides a session that edits or replaces that file. Two implementers could reasonably snapshot at different points.
+PROPOSAL: Say the runner takes the before snapshot after it writes the fixture's `CLAUDE.md`, and drop "apart from its own `CLAUDE.md`".
 
 ## Sources
 
