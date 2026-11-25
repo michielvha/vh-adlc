@@ -360,6 +360,7 @@ None. The defaults listed in the owner summary were set under the owner's standi
 | 2026-11-25 | R-47 | spec | `8f021fc` | claude-opus-5-5 | procedural | Follow-up to R-46: no blocking; 2 should-fix (unexplained `plugins` entry in the fixture, config-directory writes unproven) |
 | 2026-11-25 | R-48 | spec | `6793825` | claude-opus-5-5 | procedural | Scoped review of the R-47 fix: no blocking; 2 should-fix (cause of the `plugins` entry, config baseline from a narrower session), 1 nit |
 | 2026-11-25 | R-48 | spec | `6793825` | n/a | n/a | accepted by owner |
+| 2026-11-25 | R-49 | spec | `d956586` | claude-opus-5-5 | procedural | Full review of the config-directory check change: no blocking; 3 should-fix (Claude Code's own manifest.json, T14 tick vs code, fresh HOME unstated), 2 nits |
 
 ### R-1
 
@@ -1938,6 +1939,45 @@ SEVERITY: nit
 WHERE: Test Plan preamble (line 256: "the throwaway fixture's tree is unchanged after the session apart from its own `CLAUDE.md`")
 EVIDENCE: The runner writes the control-canary `CLAUDE.md` before the session starts, so a before-and-after comparison that begins after setup needs no exception for it. As worded, the exception also hides a session that edits or replaces that file. Two implementers could reasonably snapshot at different points.
 PROPOSAL: Say the runner takes the before snapshot after it writes the fixture's `CLAUDE.md`, and drop "apart from its own `CLAUDE.md`".
+
+### R-49
+
+TARGET: d956586009a14056db5446beb844256f4734276f
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-08 row (line 267: "no regular file in the config directory, at any depth, is named like one of the scenario's outputs: `report.md`, `findings.json`, `source-coverage.json`, `manifest.json`, `ledger.json`, or a file under a `requests` directory"); Context, Owner summary (line 64: "which the runner checks for stray output files after each run"); Tasks T14 (line 294: "the config-directory output-name check")
+EVIDENCE: Claude Code writes its own `manifest.json` files inside its config directory. On this Mac, `find ~/.claude -type f -name manifest.json` lists `~/.claude/skills/synced/<org>_<user>/manifest.json`, whose top-level keys are `lastUpdated` and `skills`. That is the account skill sync, and it was last updated on 2026-11-25 at 14:34. The same search also finds marketplace clones under `~/.claude/plugins/marketplaces/`. The harness gives every session a config directory that is signed in with the owner's credentials (`tests/vh-adlc/seo/run.ts:73-79`). Nothing in its flags or settings turns skill sync off: `SETTINGS = { autoMemoryEnabled: false }`, `--setting-sources project,local`, `--strict-mcp-config`, `--no-chrome` (`run.ts:52-66`). If a session syncs account skills, the new name check fails every correct run in the same way the R-48 F-02 baseline check did, which this revision exists to fix. I did not run a session, so I have not shown that sync happens under these flags. This traces to the change this revision made to the AC-08 row.
+PROPOSAL: Judge by content instead of by bare name. One way is to assert that no regular file in the config directory has the SHA-256 of any file the run saved under the adapter's report or export locations. Another is to keep the name list but count a `manifest.json` only when it lists a path under those locations. Otherwise, name `skills/synced/` and `plugins/` as Claude Code subtrees the check skips, and give the reason.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks T14 (lines 294-295: "- [x] T14 ... the config-directory output-name check ...")
+EVIDENCE: T14 is ticked, and its text now includes "the config-directory output-name check". At the reviewed commit the harness still has the old baseline check and no name check. `tests/vh-adlc/seo/run.ts:186` says "The config directory's top-level entries after the preflight session", line 216 has `configBaseline = new Set(readdirSync(configDir))`, and lines 328-329 check "the config directory gained no top-level entry beyond Claude Code's own". The T14 evidence comes from the harness before this change, and no open task covers rewriting the check. An implementer reading the Tasks list sees the work as done. T11's scenario runs would then fail on the baseline check for the reason the AC-08 row gives.
+PROPOSAL: Leave T14's evidence as it was observed and add a new task, for example T15 on `tests/vh-adlc/seo/run.ts`, that replaces the baseline check with the AC-08 check. Its done condition should be a preflight-only run on `sw-dev` that passes. Alternatively, restore T14's earlier text so that the tick matches the code it records.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan preamble (line 256: "It sets only `PATH`, `HOME`, `LANG`, ..."; "Because the home directory is read-only inside the wrapper, the runner fills the vh-adlc binary and docs caches"; "That probe's fixture also gained an unexplained top-level `plugins` entry"); Tasks T14 evidence (line 295)
+EVIDENCE: The T14 evidence finds the cause of the `plugins` entry that R-48 F-01 raised. With the environment cleared, the Bash tool started the login shell, and the shell profile linked `plugins -> OMZ::plugins` into the working directory. The fix was to set `HOME` to "a fresh read-only runner home, where the vh-adlc caches are prefilled", which the harness does at `run.ts:86` and `run.ts:126` (`"--setenv", "HOME", sessionHome`). The normative preamble still calls the entry unexplained. It never says that `HOME` is a fresh runner home, and its cache sentence reads as the user's own home. An implementer who follows the Test Plan and keeps the real `HOME` gets the failure T14 observed: on a host whose shell profile writes into the working directory, the fixture-unchanged checks of the preflight and of AC-08 fail correct runs.
+PROPOSAL: In the preamble, say that the wrapper sets `HOME` to a fresh runner-owned home that is read-only inside the wrapper and holds the prefilled vh-adlc caches. Replace the "unexplained" sentence with the cause that was found.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan preamble (line 256: "the throwaway fixture's tree is unchanged after the session apart from its own `CLAUDE.md`")
+EVIDENCE: R-48 F-03 is still unapplied, although this revision changed the baseline for R-48 F-02. The standard says that a commit applying a pass's should-fix findings also fixes that pass's nits. The harness takes the before snapshot after it writes the control `CLAUDE.md` (`run.ts:199` writes it, then `run.ts:212` takes `snapshot(project)`), so the exception is not needed. As written, it would also hide a session that edits that file.
+PROPOSAL: Say the before snapshot is taken after the runner writes the fixture's `CLAUDE.md`, and drop "apart from its own `CLAUDE.md`".
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan preamble (line 256: "`CLAUDE_CONFIG_DIR` set to a fresh runner directory"); Test Plan AC-08 row (line 267: "after the run no regular file in the config directory")
+EVIDENCE: The harness creates one config directory per run and reuses it for the preflight and for every scenario (`run.ts:73-74`, `--bind configDir configDir` at `run.ts:137`). The preamble reads as one fresh directory per session. With the name check, a stray output written by one scenario makes every later scenario in the same run fail too, so the failure is reported against the wrong scenarios.
+PROPOSAL: Either say that the config directory is shared by all sessions in one run and that the check reports only files that are new since the previous session, or give each scenario its own fresh config directory.
 
 ## Sources
 
