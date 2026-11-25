@@ -367,6 +367,7 @@ None. The defaults listed in the owner summary were set under the owner's standi
 | 2026-11-25 | R-48 | spec | `6793825` | n/a | n/a | accepted by owner |
 | 2026-11-25 | R-49 | spec | `d956586` | claude-opus-5-5 | procedural | Full review of the config-directory check change: no blocking; 3 should-fix (Claude Code's own manifest.json, T14 tick vs code, fresh HOME unstated), 2 nits |
 | 2026-11-25 | R-50 | spec | `4aada51` | claude-opus-5-5 | procedural | Follow-up to R-49: no blocking; 2 should-fix (content check matches Claude Code's own copies, helper result line and procedure rules missing from the baseline), 1 nit |
+| 2026-11-25 | R-51 | spec | `1272aa7` | claude-opus-5-5 | procedural | Follow-up to R-50: no blocking; 3 should-fix (result line for parse failures, given values, filtered output), 2 nits |
 
 ### R-1
 
@@ -2009,6 +2010,43 @@ SEVERITY: nit
 WHERE: Test Plan preamble (line 256: "binds writable only the scenario's `mktemp -d` fixture root, the run's config directory and the signed-in credentials file"); Test Plan AC-08 row (line 267: "the run's config directory and the credentials file, which hold Claude Code's own state"); Context, Owner summary (line 64: "except its fixture and the run's own config")
 EVIDENCE: This revision gives each session its own directory: "`CLAUDE_CONFIG_DIR` set to a fresh runner directory for that session alone", and the AC-08 check now reads "the session's config directory". Three other places still say the run's config directory, which reads as one directory shared by every session. That was the layout R-49 F-05 described. This traces to the R-49 F-05 fix.
 PROPOSAL: Replace "the run's config directory" and "the run's own config" with "the session's config directory" in all three places.
+
+### R-51
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Semrush helper (line 216: "prints one JSON result line per invocation once its arguments parse ... an invocation whose arguments do not parse prints `refused` and a reason only"; line 195: "It refuses a call without `--route`"); Acceptance Criteria AC-03 (line 247: "prints for every invocation whose arguments parse"); Test Plan AC-03 row (line 265) and AC-05 row (line 267: "reading every invocation from the helper's result lines ... assert every recorded invocation passes `--route mcp` ... and its `--max-units` equals the limit"); Context, Owner summary (line 64: "prints a result line naming its route, limit and output directory for every call"); Tasks T15 (line 299)
+EVIDENCE: The document never says which invocations "do not parse". At X, `parseArgs` throws `Refusal` for a missing `--route` ("--route must be mcp or v3", semrush.ts:148), a missing `--output` (:150) and a missing key source, and `main` prints only `{ outcome: "refused", reason }` for them (semrush.ts:605). If the T15 helper keeps that split, as the Design wording allows, the agent invocations that most need to be seen print no `route`, `max_units` or `output`: one without `--route`, or one with `--allow-units` but no `--max-units`. AC-05 says the assessment passes `--max-units` equal to the limit "on every invocation". A harness that reads only those fields from result lines can skip a field-less line and pass, or fail on it. Two implementers will choose differently. The Owner summary also says "for every call", which the Design's exception contradicts. This traces to the R-50 F-02 fix, which added the result line.
+PROPOSAL: Say that every invocation prints `route`, `max_units` and `output` with the values it was given, or null when a flag is absent, parse failures included. Then say in the AC-05 row that a result line with a null or different `route`, `max_units` or `output` fails the scenario, and add an AC-03 case for a missing `--route`.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-03 row (line 265: "A case for each of a successful call, a refused changed `--max-units`, a refused changed `--route` and a `limit` refusal asserts one stdout result line naming the outcome, `route`, `max_units` and the resolved `output`"); Design, Semrush helper (line 216: "its `route`, `max_units`, the `--max-units` it was given"); Test Plan AC-05 row (line 267)
+EVIDENCE: The AC-03 row only asserts that the line names the fields. It does not assert that their values equal the flags passed. For a refused changed `--max-units` or `--route`, the ledger already holds a different value (semrush.ts:355-356). A helper that prints the ledger's recorded route and limit passes every AC-03 case. AC-05 would then read the run's original values from the line of an invocation that passed a changed value, and pass although the criterion says every invocation passes the limit. The Design pins `max_units` to "the `--max-units` it was given" but leaves `route` as "its `route`", which could be the given or the recorded one. "Resolved" is not defined either: relative or absolute. The AC-05 row compares `output` with a directory under the export location. This traces to the R-50 F-02 fix.
+PROPOSAL: In Design, say that `route` is the `--route` given and that `output` is the absolute path of `--output`. In the AC-03 row, assert that each field equals the value passed, with the refused cases passing a route and a limit that differ from the ledger's.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-05 row (line 267: "reading every invocation from the helper's result lines in the transcript's Bash outputs, assert every recorded invocation passes `--route mcp` ..."); Design, Sources and assessment (line 184: "It runs one helper invocation per shell command and reads its result"); Tasks T15 (line 299: "read helper invocations from the result lines the helper prints ... rather than from command text")
+EVIDENCE: A result line reaches the transcript only when the agent leaves the helper's stdout alone. An agent that pipes it (`| jq .outcome`, `| tail -1`), redirects it to a file or runs the command in the background leaves no full line in the Bash output. The one-invocation rule forbids loops but not pipes or redirects. The row then checks "every recorded invocation" over a smaller set, or an empty one. A run whose agent passed a wrong `--max-units` and filtered the output passes. The command-text check this replaces also required at least one invocation (`calls.length > 0`, run.ts:655). The new row requires report requests only at the stub, not result lines. This traces to the R-50 F-02 fix.
+PROPOSAL: In the AC-05 row, fail the scenario when a Bash `tool_use` that runs `scripts/seo/semrush.ts` has no complete result line in its output, and require the number of sent-report result lines to equal the stub's report request count. Alternatively, have the procedure forbid piping or redirecting the helper's output and assert that.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T15 (line 299: "one helper call per report"); Design, Sources and assessment (line 184); Acceptance Criteria AC-07 (line 251)
+EVIDENCE: Design and AC-07 now state the rule as "one helper invocation per shell command". T15 still says "one helper call per report", the phrase R-50 F-02 called undefined because each invocation already sends at most one report. The revision fixed the baseline but carried the old phrase in T15.
+PROPOSAL: Change T15 to "one helper invocation per shell command".
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (line 64: "The helper now prints a result line naming its route, limit and output directory for every call.")
+EVIDENCE: T15 is open, and at X the helper prints `{ outcome, reason }` for refusals and `limit` (semrush.ts:605, :619, :623) and `outcome, report, target, display_limit, units, basis` for a sent report (:644-651), with no route, limit or output directory. The convention asks the summary to tell planned changes apart from observed ones.
+PROPOSAL: Write "The helper will print a result line ..." or "T15 makes the helper print ...".
 
 ## Sources
 
