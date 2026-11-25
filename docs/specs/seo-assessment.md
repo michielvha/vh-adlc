@@ -362,6 +362,7 @@ None. The defaults listed in the owner summary were set under the owner's standi
 | 2026-11-25 | R-48 | spec | `6793825` | claude-opus-5-5 | procedural | Scoped review of the R-47 fix: no blocking; 2 should-fix (cause of the `plugins` entry, config baseline from a narrower session), 1 nit |
 | 2026-11-25 | R-48 | spec | `6793825` | n/a | n/a | accepted by owner |
 | 2026-11-25 | R-49 | spec | `d956586` | claude-opus-5-5 | procedural | Full review of the config-directory check change: no blocking; 3 should-fix (Claude Code's own manifest.json, T14 tick vs code, fresh HOME unstated), 2 nits |
+| 2026-11-25 | R-50 | spec | `4aada51` | claude-opus-5-5 | procedural | Follow-up to R-49: no blocking; 2 should-fix (content check matches Claude Code's own copies, helper result line and procedure rules missing from the baseline), 1 nit |
 
 ### R-1
 
@@ -1979,6 +1980,31 @@ SEVERITY: nit
 WHERE: Test Plan preamble (line 256: "`CLAUDE_CONFIG_DIR` set to a fresh runner directory"); Test Plan AC-08 row (line 267: "after the run no regular file in the config directory")
 EVIDENCE: The harness creates one config directory per run and reuses it for the preflight and for every scenario (`run.ts:73-74`, `--bind configDir configDir` at `run.ts:137`). The preamble reads as one fresh directory per session. With the name check, a stray output written by one scenario makes every later scenario in the same run fail too, so the failure is reported against the wrong scenarios.
 PROPOSAL: Either say that the config directory is shared by all sessions in one run and that the check reports only files that are new since the previous session, or give each scenario its own fresh config directory.
+
+### R-50
+
+TARGET: 4aada51d89787d753581820aad0d8745eebf6372
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-08 row (line 267: "Assert that after the run no regular file in the session's config directory, at any depth, has the SHA-256 of a file the run saved under the adapter's report or export locations, so an export copied there fails"); Context, Owner summary (line 64: "which the runner checks for stray output files after each run"); Tasks T15 (line 296: "replace the config-directory baseline check with the AC-08 content check")
+EVIDENCE: Claude Code writes byte-identical copies of tool output into its config directory by itself. On this Mac with Claude Code 2.1.330, `cat` of a 45,862-byte JSON file through the Bash tool printed "Output too large (44.8KB). Full output saved to: ~/.claude/projects/<project>/<session>/tool-results/bq4in9ygj.txt". `shasum -a 256` gave the same digest, bb6d6678...7759, for the source file and the saved copy. The AC-08 row itself says the first scenario runs created `projects` in the session's config directory. A correct agent that runs `cat` on a large findings table, report or raw export to check it would fail the check, although it never wrote there. Empty files are a second source of matches. Skill sync leaves zero-length regular files in a signed-in config directory: `find ~/.claude -type f -size 0` lists `skills/synced/.bucket-<id>`, `plugins/synced/.bucket-<id>` and synced `__init__.py` files. The row cites a skill-sync `manifest.json` from the scenario runs, so sync runs there too. Any empty file the run saves, such as an empty response body or stderr capture, has the SHA-256 of the empty string and fails the check. Both paths need conditions the fixture may not always produce: output over the persistence threshold, or an empty saved file. That is why this is should-fix and not blocking. Each one fails a correct run. The check was introduced by this revision as the R-49 F-01 fix.
+PROPOSAL: Leave zero-length files out of the comparison. Name `projects/*/*/tool-results/` as Claude Code's own copies of tool output that the check skips, and give the reason. Alternatively, have the preflight show whether `--no-session-persistence` stops those copies, and record the result.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Tasks T15 (line 296: "read helper invocations from the result lines the helper prints, which name its route, per-run limit and output directory, rather than from command text; find the `limit` outcome there; and fix the two procedure gaps the first runs showed, one helper call per report and at least one URL per finding"); Design, Semrush helper (lines 193-215, which define the flags, the ledger and the saved files but no printed result); Design, Sources and assessment (lines 178-184); Test Plan AC-05 row (line 264: "assert every recorded invocation passes `--route mcp` ... and its `--max-units` equals the limit and its `--output` is the same directory"); Test Plan AC-03 and AC-07 rows (lines 262, 266); Context, Owner summary (lines 36-66)
+EVIDENCE: T15 changes covered product files: `scripts/seo/semrush.ts` gets a new output contract and `references/seo.md` gets two new procedure rules. No part of the baseline states either. At X the helper prints one JSON line. For a refusal or `limit` it holds only `outcome` and `reason` (`semrush.ts:605`, `:619`, `:623`). For a sent report it holds outcome, report, target, display_limit, units and basis (`:644-651`), with no route, no `--max-units` and no output directory. The harness reads invocations from command text (`run.ts:573-590`, checks at `:655-657`). The document never says which fields the line must name, or whether a refused invocation prints them. An invocation refused for a changed `--max-units` or `--route` is the case AC-05 needs to see. If that line prints only `refused` and a reason, as it does now, the AC-05 row's "every recorded invocation" check skips the wrong value and passes. "One helper call per report" has no definition. Each helper invocation already sends at most one report, so the rule might mean one invocation per Bash command, no loops or no chained calls, and two implementers would write different rules. The AC-03 and AC-07 rows assert neither the result line nor the new rules. T15's done condition runs the existing `semrush.test.ts` and `seo.test.ts` and has no failing test first. The Owner summary does not mention these changes since the R-48 acceptance. T15 was added by this revision.
+PROPOSAL: In Design, state the helper's result line: its fields, including route, the `--max-units` it was given and the output directory, and that every invocation prints one, refusals and `limit` included. Add the matching AC-03 case and say in the AC-05 row that invocations are read from those lines. State the two `seo.md` rules in Design in testable words and add them to the AC-07 assertions. Then mention the changes in the Owner summary and make T15's tests fail first.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan preamble (line 256: "binds writable only the scenario's `mktemp -d` fixture root, the run's config directory and the signed-in credentials file"); Test Plan AC-08 row (line 267: "the run's config directory and the credentials file, which hold Claude Code's own state"); Context, Owner summary (line 64: "except its fixture and the run's own config")
+EVIDENCE: This revision gives each session its own directory: "`CLAUDE_CONFIG_DIR` set to a fresh runner directory for that session alone", and the AC-08 check now reads "the session's config directory". Three other places still say the run's config directory, which reads as one directory shared by every session. That was the layout R-49 F-05 described. This traces to the R-49 F-05 fix.
+PROPOSAL: Replace "the run's config directory" and "the run's own config" with "the session's config directory" in all three places.
 
 ## Sources
 
