@@ -357,6 +357,7 @@ None. The defaults listed in the owner summary were set under the owner's standi
 | 2026-11-25 | R-43 | spec | `4853dd5` | claude-opus-5-5 | procedural | Full review of the Claude Code runner switch: no blocking; 4 should-fix (ancestor instructions, tool flags, unconfined writes, owner summary), 1 nit |
 | 2026-11-25 | R-44 | spec | `1e4412c` | claude-opus-5-5 | procedural | Scoped review of the sandbox revision: 1 blocking (Linux sandbox network namespace hides host loopback), 2 should-fix, 2 nits |
 | 2026-11-25 | R-45 | spec | `bc51b7f` | claude-opus-5-5 | procedural | Follow-up to R-44: no blocking; 3 should-fix (session temp and config writes, paths hidden under /tmp, inherited environment), 3 nits |
+| 2026-11-25 | R-46 | spec | `b174d07` | claude-opus-5-5 | procedural | Scoped review of the R-45 fix: 1 blocking (cleared environment drops the stub address), 2 should-fix (scratch writes against AC-08, wrapper not probed as specified), 2 nits |
 
 ### R-1
 
@@ -1855,6 +1856,45 @@ SEVERITY: nit
 WHERE: Test Plan preamble (line 256: "it confines Bash commands but not the Write tool, which wrote outside the fixture in the same probe")
 EVIDENCE: The Write-tool write outside the fixture under Claude Code's sandbox happened in a separate probe without the wrapper (`/tmp/cc-sbx/probe2.out`: "write-outside-restricted.txt", "write-outside-nonet.txt"). The wrapper results come from `/tmp/cc-sbx/probe3.out`. That probe had no Claude Code sandbox, and its outside Write failed with `EROFS`. Also, probe2's loopback check printed `port=` with no port number, so the private-network claim rests only on R-44 F-01, which the sentence cites, and not on that probe.
 PROPOSAL: Say "in an earlier probe on the same day" instead of "in the same probe".
+
+### R-46
+
+TARGET: b174d071b4bcdfceb5b9d5aa5f18df3a64412dcb
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Test Plan preamble (line 258: "sets `VH_ADLC_SEMRUSH_BASE` to the stub", the wrapper's "`--clearenv`" and "It sets only `PATH`, `HOME`, `LANG`, `CLAUDE_CONFIG_DIR` and `BUN_RUNTIME_TRANSPILER_CACHE_PATH`", and "the runner refuses to start when its own environment holds a variable whose name contains `SEMRUSH`"); Context, Owner summary (line 64: "it gets a cleared environment, and the runner refuses to start if its own environment names a Semrush variable"); Tasks T14 (line 296); Test Plan AC-04, AC-05 and AC-06 rows (lines 265 onward)
+EVIDENCE: The helper takes the stub address only from its process environment: `plugins/vh-adlc/scripts/seo/semrush.ts:220-221` reads `process.env.VH_ADLC_SEMRUSH_BASE`, and when it is unset or empty it returns the built-in `MCP_URL`, `REPORT_URL` and `BALANCE_URL`, the real Semrush hosts. The agent runs the helper through Bash inside the Claude Code session, so the helper inherits the session's environment. This revision makes the wrapper clear the environment and set only five named variables, and `VH_ADLC_SEMRUSH_BASE` is not one of them. Read as written, every helper call in the scenarios goes to the real Semrush hosts with the fixture key. Then `permitted`, `permitted-v3`, `in-run*` and `expired` see no request at the stub ("at least one report request at the stub", "one handshake" for the 401 stub) and fail on a correct package. AC-04's "zero requests of any kind at the stub" passes on a package that ignores the missing permission, because its requests go to Semrush, not the stub. The `semrush.com` scan reads only `tool_use` inputs, and the helper's internal URL never appears there. The SEMRUSH refusal adds a second clash: `VH_ADLC_SEMRUSH_BASE` contains `SEMRUSH`, so a runner that exports it so its children inherit it (the usual way to pass it on) refuses itself, unless the check runs before the runner sets it, and the document does not say so. This traces to the R-45 F-03 fix in this revision. The current harness passes no such variable either (`tests/vh-adlc/seo/run.ts:33-35`, `codexEnv`), so the implementation gives no hint.
+PROPOSAL: Add `VH_ADLC_SEMRUSH_BASE`, set to the scenario's stub, to the variables the wrapper sets, for example with `--setenv`. Say that the SEMRUSH refusal checks the environment the runner was started with, before it sets that variable. Have the preflight confirm the variable is visible in the session, for example with `printenv VH_ADLC_SEMRUSH_BASE`.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-08 (line 251: "writes only inside the adapter's report and export locations"); Test Plan AC-08 row (line 269: "lies inside the adapter's locations or the session's `/tmp`, which Bash may also use for scratch files"); Scope (line 130: "Not handled: scratch files a scenario session writes in its temporary directory or the run's config directory, which the runner discards after the run"); Context, Owner summary (line 62: "An assessment writes only its report and exports")
+EVIDENCE: AC-08 and the owner summary promise that an assessment writes nowhere but its report and export locations. This revision makes the proof accept writes to `/tmp` explicitly. The Write-path assertion now allows the session's `/tmp`, and the new Scope line leaves temporary-directory and config-directory writes unproven. The reason the line gives, "which the runner discards after the run", holds only in the scenario. On an adopter's machine `/tmp` is not a private bind, so scratch files and any export copy stay there. An implementation reviewer who reads the transcript and sees `Write /tmp/notes.md` gets a passing proof and a criterion whose text is not met. Two careful reviewers would give different verdicts. The standard says a stated limit is the author's call "unless the limit excludes a case the goal, a criterion or a behavior Scope promises names; then it is an open question". AC-08 names this case. This traces to the R-45 F-01 fix in this revision.
+PROPOSAL: Either change AC-08 and the owner summary to allow transient scratch files in the system temporary directory, saying so plainly, or keep AC-08 strict and raise the limit as an Open Question for the owner. In either case, make the AC-08 row and the Scope line agree with the criterion text.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan preamble (line 258: "On `sw-dev` on 2026-11-25, with Claude Code 2.1.330, a session in such a wrapper got HTTP 200 from a loopback listener, failed a Bash write and a Write-tool write outside the fixture with `Read-only file system`, wrote a file inside it with the Write tool, and had `chrome-headless-shell --headless --no-sandbox` render the loopback page"); Context, Owner summary (line 64)
+EVIDENCE: "Such a wrapper" now means `bwrap --die-with-parent --clearenv --ro-bind / / --dev /dev --proc /proc`, with a runner-owned directory bound as `/tmp`, a read-only bind of the output directory, and only five environment variables set. The probe behind the sentence (`/tmp/cc-sbx/probe3.sh`) ran `bwrap --die-with-parent --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp ... --setenv CLAUDE_CONFIG_DIR $B/cfg`. It had no `--clearenv`, it inherited the whole environment (including `SHELL`, `USER`, `TERM` and `XDG_*`), it used a tmpfs `/tmp` and it had no output-directory bind. Nobody has observed Claude Code, its Bash tool, Bun or `chrome-headless-shell` working under the cleared environment. If one of them needs a variable that was dropped, the preflight fails every run and the scenario proofs cannot run. The sentence presents a different configuration's result as evidence for this one.
+PROPOSAL: Repeat the probe with the wrapper exactly as now specified and record its result, or reword the sentence to name the configuration that was actually probed and say the cleared-environment wrapper has not been observed yet.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (line 64: "makes the whole filesystem read-only except its fixture and the run's own config", and line 66: "offline scenarios that run confined headless Claude Code"); Scope (line 115: "offline scenario tests"); Design, Artifacts and publication (line 240: "the offline scenarios load the package")
+EVIDENCE: The preamble now says the session "can still read the host filesystem and reach any host", and the same summary paragraph says it "can still ... reach the internet". This revision dropped "Offline" from the AC-04 row for R-45 F-03, but the summary, Scope and Artifacts still call the scenarios offline. The summary's list of writable places also leaves out the session's `/tmp` and the credentials file, which the AC-08 row now names among the four writable places.
+PROPOSAL: Call them forward or loopback scenarios in those three places, and say in the summary that the session can also write its own temporary directory and the credentials file.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan AC-08 row (line 269: "inside the adapter's locations or the session's `/tmp`")
+EVIDENCE: The fixture root comes from `mktemp -d`, and on `sw-dev` that path is under `/tmp` (probe3: `/tmp/seo-probe-VRSx/w/inside.txt`). The preamble binds the fixture root at its own path inside the session's new `/tmp`. Any Write path in the fixture, including one outside the adapter's locations, therefore lies "inside the session's `/tmp`", and the Write-path assertion no longer separates the two. If the config directory is also made with `mktemp -d`, the same applies to it. The before-and-after tree comparison still catches lasting fixture writes, so only a file written and then deleted gets through.
+PROPOSAL: Define the allowance as the session's `/tmp` minus the fixture root and the config directory, or as the runner-owned temporary directory's own contents.
 
 ## Sources
 
