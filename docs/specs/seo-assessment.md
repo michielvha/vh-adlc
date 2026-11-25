@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revising the forward scenarios to run through headless Claude Code instead of Codex, at the owner's request; awaits review of the R-47 fix and renewed acceptance."
+status: planned
+status_description: "Accepted again at R-48 with the scenarios on headless Claude Code in a Bubblewrap wrapper on sw-dev; ready to implement T14 onward."
 branch: feat/seo-agent
 issue: null
 goal: "An adopter can run a free-first website SEO assessment through vh-adlc that spends paid API units only when allowed and within a limit, and leaves exports usable after access ends."
@@ -358,6 +358,7 @@ None. The defaults listed in the owner summary were set under the owner's standi
 | 2026-11-25 | R-46 | spec | `b174d07` | claude-opus-5-5 | procedural | Scoped review of the R-45 fix: 1 blocking (cleared environment drops the stub address), 2 should-fix (scratch writes against AC-08, wrapper not probed as specified), 2 nits |
 | 2026-11-25 | R-47 | spec | `8f021fc` | claude-opus-5-5 | procedural | Follow-up to R-46: no blocking; 2 should-fix (unexplained `plugins` entry in the fixture, config-directory writes unproven) |
 | 2026-11-25 | R-48 | spec | `6793825` | claude-opus-5-5 | procedural | Scoped review of the R-47 fix: no blocking; 2 should-fix (cause of the `plugins` entry, config baseline from a narrower session), 1 nit |
+| 2026-11-25 | R-48 | spec | `6793825` | n/a | n/a | accepted by owner |
 
 ### R-1
 
