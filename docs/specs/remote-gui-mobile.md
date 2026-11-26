@@ -28,6 +28,8 @@ The first tap still needs a private accessibility check so the viewer can put th
 
 The first release covers iPhone Safari. The owner deferred Android verification on 2026-11-22. The independently built package from `86ae7838` passed the native two-tap test on iOS 27.2.1 and sent one synthetic character to the remote field. The [CI run for that commit](https://github.com/michielvha/vh-adlc/actions/runs/44952292092) passed all six jobs. The rest of the iPhone cases, packaging and privacy checks, and independent implementation review still need evidence. Accepting this scope keeps those checks in the release plan and moves Android coverage to follow-up work.
 
+When the owner opens a remote browser on iPhone and needs to enter a URL or fill a form, the streamed canvas cannot summon the phone keyboard on its own. They have to switch devices or use another input method. The owner chose an inline second tap so the keyboard opens at the field without leaving it for a toolbar control.
+
 ### Two-tap feasibility fixture
 
 The [disposable two-tap fixture](../../tests/remote-gui/mobile-feasibility/two-tap/README.md) ran stock Chromium 156.0.8078.79 on Xvfb with a private AT-SPI bus, noVNC 1.5.0 and x11vnc 0.9.17. A synthetic site supplied input-event booleans for test assertions. The viewer decided whether to show the prompt using only the private helper’s sampled focused state and bounds. Desktop touch emulation verified the plain tap, prompt with the local input unfocused, second tap and one synthetic edit through real RFB. An independent check of AT-SPI `Component.GetAccessibleAtPoint` on the owned frame resolved the test text entry, password entry and plain document at their respective coordinates. A bounds-only check incorrectly offered the prompt after an overlay covered a still-focused field. The component hit test subsequently resolved the overlay in that case. In a second synthetic run, three checks warmed the hit cache before a page overlay covered the still-focused field. Three immediate checks and a later check still returned the original text entry. Chromium explains the possible cached or approximate answer in [CachingAsyncHitTest](https://chromium.googlesource.com/chromium/src/+/refs/tags/156.0.8078.79/ui/accessibility/platform/browser_accessibility_manager.cc#2033). The current stock probe cannot certify visual unobstruction. The owner accepted showing the prompt for the reported editable focus even when a page covers it.
@@ -38,7 +40,7 @@ Physical iPhone 15 Pro Max on iOS 27.2.1 ran `testTwoTapsOpenNativeKeyboardAndTy
 
 The local implementation adds a private focus helper and an authenticated phase reader in `d8604476`, then the noVNC prompt and local editor in `1f409906`. In `tests/remote-gui/mobile.e2e.test.js`, a real stock Chromium browser and real noVNC viewer passed the ordinary two-tap flow with a synthetic text field. The prompt stayed usable across an initial lease. The editor remained usable past the first lease and produced exactly one remote input. The same run held a lookup and showed that an observed phase change discarded pending composition and prevented a late commit from reaching the synthetic field. A separate check in that test read the advanced phase through the authenticated route before a real Chromium handoff finished.
 
-The broader desktop run initially missed the Firefox sizing debounce assertion and intermittently lost the mobile prompt during a slow focus renewal. The mobile helper now rechecks the last verified field without rescanning the tree. Three successive diagnostic mobile runs and the tracked end-to-end test passed afterward. The dormant editor is hidden, and the Firefox sizing test passed two focused reruns. Chromium and Firefox also passed the real noVNC viewport and Clipboard regressions in the broader run.
+The broader desktop run initially missed the Firefox sizing debounce assertion and intermittently lost the mobile prompt during a slow focus renewal. That build rechecked the last verified field without rescanning the tree. The later focus worker replaced that search with AT-SPI’s focused-state query. Three successive diagnostic mobile runs and the tracked end-to-end test passed afterward. The dormant editor is hidden, and the Firefox sizing test passed two focused reruns. Chromium and Firefox also passed the real noVNC viewport and Clipboard regressions in the broader run.
 
 The module race suite, Go vet, tidy check and pinned Go lint passed. The focused Go tests verified same-origin and authenticated requests, refusal of invalid inputs, expiry, the independent phase route and the unit-scale precondition. The installed-copy package checks passed all eleven cases. The physical iPhone proof above covers the earlier fixture. The paired iPhone developer connection was inactive and the USB Android remained locked when checking for packaged device verification. When the phones reconnected, the packaged test browser and private route were verified. Both phones were still locked. The signed XCTest runner built successfully and Xcode could not launch it while the iPhone was locked. The owner-only fixture and runner were stopped after the wait. AC-10 through AC-14 stay open for the remaining proof.
 
@@ -46,7 +48,7 @@ The physical iPhone 15 Pro Max on iOS 27.2.1 subsequently tested Safari against 
 
 During daily-use testing, the owner reported that the sizing notice blocked the Chromium tab strip and typing was unreliable. A real noVNC session reproduced the overlap at a 393 CSS pixel viewport. Typing in the Chromium address bar also failed when replacing the last character or when the keyboard lost focus during a lookup. The repair keeps the notice in the viewer toolbar, retains recent local edits while typing, and checks the browser toolbar before searching page content. It retries transient lookup failures without extending an existing focus lease. In three fresh Chromium sessions with a touch-enabled viewer, opening a new tab worked with sizing fallback visible. Editing the full URL loaded `https://example.com/` and tapping the original tab switched back. The managed browser regression also checks the address bar and a page field against stock Chromium and noVNC. At that point, a native iPhone run and Android verification were still pending for the repaired build.
 
-The hosted mobile test exposed a separate difference in Chrome 157.0.8103.50. The helper found the focused address entry but reached the 256-node search limit before it could rule out another match. Raising the limit to 384 kept the same lookup deadline. The managed browser regression and the public URL and tab-switch workflow passed locally with the matching Chrome Stable build and noVNC 1.6.0.
+The hosted mobile test exposed a separate difference in Chrome 157.0.8103.50. The helper found the focused address entry but reached the 256-node search limit before it could rule out another match. Raising the limit to 384 kept the same lookup deadline in that build. The later focused-state query removed the walker and its node limit. The managed browser regression and the public URL and tab-switch workflow passed locally with the matching Chrome Stable build and noVNC 1.6.0.
 
 The owner then reported that the phone keyboard sometimes closed while typing a URL. In the stock Chromium address-bar test, interrupting focus checks past the 500 ms lease reproduced the dismissal. The viewer now keeps the local editor open for up to three seconds during a temporary loss of verification. It pauses remote keys and discards unsent input and composition. Verification of the same field and phase resumes typing without reopening the keyboard. A reported focus or phase change still closes the editor immediately. The browser test interrupts both types of check and requires the exact URL to load after recovery.
 
@@ -223,8 +225,8 @@ None. The owner approved the reported-focus option after the warm-cache overlay 
 | 2026-11-19 | R-14 | spec | `06f91bd54a0adb348f68fd27ac36928326df1894` | n/a | n/a | accepted by owner |
 | 2026-11-21 | R-15 | spec | `cb08d97a3c436b8c4ea9f61f0120e3acb2544781` | unknown | procedural | Covered drift review found one factual nit in test evidence. Model identity was not attested. |
 | 2026-11-22 | R-16 | spec | `edc803664df47d93618462073a17537cbf01cd22` | unknown | procedural | Three should-fix findings and one factual nit. Model identity was not attested. |
-| 2026-11-22 | R-17 | spec | `62c95df927cbc33fa180f7f5c604b64b6039848c` | unknown | procedural | Three should-fix findings on recovery and geometry verification. Model identity was not attested. |
-| 2026-11-22 | R-18 | spec | `413ea2344b0a3b070d4ff6a1a3af47083676a73c` | unknown | procedural | No findings. Model identity was not attested. |
+| 2026-11-22 | R-20 | spec | `62c95df927cbc33fa180f7f5c604b64b6039848c` | unknown | procedural | Three should-fix findings on recovery and geometry verification. Model identity was not attested. Originally recorded as R-17 on the local branch. |
+| 2026-11-22 | R-21 | spec | `413ea2344b0a3b070d4ff6a1a3af47083676a73c` | unknown | procedural | No findings. Model identity was not attested. Originally recorded as R-18 on the local branch. |
 | 2026-11-24 | R-19 | spec | `ee6ac65605a4c8ca44ef5b8610472f7eb6c05c87` | claude-opus-5-5 | procedural | Covered drift review found three nits and nothing blocking; acceptance kept. |
 
 ### R-1
@@ -654,7 +656,7 @@ WHERE: Context / Packaged implementation checks (line 47)
 EVIDENCE: The paragraph ends by saying the repaired build still needs Android verification. The release scope and owner summary now defer that verification and report a newer physical Safari pass.
 PROPOSAL: Put the remaining verification statement in the past tense so it describes that earlier build.
 
-### R-17
+### R-20
 
 FINDING: F-01
 KIND: factual
@@ -677,7 +679,7 @@ WHERE: Context / Owner summary (lines 25 and 27), Design / Detect and show the p
 EVIDENCE: The R-16 revision removes the previous qualification that a changed field extent invalidates an unopened prompt. The revised general invalidation rule can also apply to an open editor, although Design calls for typing to stay active during keyboard-induced viewport changes while focus and mode remain current. The implementation at `plugins/remote-gui/internal/proxy/mobile.js:190-198` applies the extent check only before opening.
 PROPOSAL: State whether an extent change alone invalidates an open editor when field, mode and phase remain the same. If the existing behavior is intended, retain the unopened-prompt qualification and check that keyboard animation can move or resize the field without dismissing the editor.
 
-### R-18
+### R-21
 
 NO FINDINGS
 
