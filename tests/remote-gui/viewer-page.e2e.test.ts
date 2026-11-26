@@ -259,14 +259,40 @@ for(const family of ['chromium','firefox'] as const)test.skipIf(!enabled||(famil
  try {
   const context=await browser.newContext({viewport:{width:1200,height:800},deviceScaleFactor:2,reducedMotion:'reduce'});
   await context.addInitScript(()=>{(window as any).__focused=true;(window as any).__visible=true;document.hasFocus=()=>Boolean((window as any).__focused);Object.defineProperty(document,'visibilityState',{get:()=>(window as any).__visible?'visible':'hidden',configurable:true})});
-  const page=await context.newPage();const errors:string[]=[];page.on('pageerror',(e:Error)=>errors.push(e.message));await page.goto(server.url.href);await page.waitForFunction(()=>(window as any).__rfb);
+  const page=await context.newPage();const errors:string[]=[];page.on('pageerror',(e:Error)=>errors.push(e.message));
+  await page.clock.install();
+  await page.goto(server.url.href);await page.waitForFunction(()=>(window as any).__rfb);
   await page.evaluate(()=>(window as any).__rfb.dispatchEvent(new Event('connect')));
   const waitCalls=async(n:number)=>{const end=Date.now()+7000;while(state.requests.length<n&&Date.now()<end)await Bun.sleep(20);check(state.requests.length>=n,'missing automatic size request '+n)};
   await waitCalls(1);check(state.requests[0].width===1200&&state.requests[0].height===768&&state.requests[0].claim,'initial CSS geometry/claim incorrect');
-  const first=state.requests.length;for(const width of [1100,1050,1000,900])await page.setViewportSize({width,height:1000});await waitCalls(first+1);await Bun.sleep(200);check(state.requests.length===first+1&&state.requests.at(-1)?.width===900&&state.requests.at(-1)?.height===968,'resize burst was not debounced');
+  // Firefox's viewport calls can exceed 150 ms on a busy runner. Keep all
+  // four changes in the intended debounce window while preserving real layout.
+  const first=state.requests.length;
+  const pauseAt=await page.evaluate(()=>Date.now()+1000);
+  await page.clock.pauseAt(pauseAt);
+  for(const width of [1100,1050,1000,900])await page.setViewportSize({width,height:1000});
+  await page.evaluate(()=>window.dispatchEvent(new Event('resize')));
+  state.delay=450;
+  await page.clock.runFor(149);
+  check(state.requests.length===first,'a resize request escaped before the debounce elapsed');
+  await page.clock.runFor(1);
+  await waitCalls(first+1);
+  // Native resize notifications can arrive while the final size is in flight.
+  await page.evaluate(()=>window.visualViewport!.dispatchEvent(new Event('resize')));
+  await page.clock.runFor(150);
+  check(state.requests.length===first+1,'same-size resize escaped while the request was in flight');
+  await page.clock.resume();
+  await Bun.sleep(650);
+  state.delay=0;
+  check(state.requests.length===first+1&&state.requests.at(-1)?.width===900&&state.requests.at(-1)?.height===968,'resize burst was not debounced');
   await page.evaluate(()=>window.dispatchEvent(new Event('resize')));await Bun.sleep(250);check(state.requests.length===first+1,'unchanged geometry repeated work');
   state.delay=450;await page.setViewportSize({width:800,height:900});await waitCalls(first+2);await page.setViewportSize({width:700,height:900});await page.setViewportSize({width:600,height:900});await waitCalls(first+3);await Bun.sleep(500);check(state.peak===1&&state.requests.at(-1)?.width===600,'in-flight requests were not coalesced');state.delay=0;
-  state.status=503;await page.setViewportSize({width:500,height:900});await page.getByText('Automatic sizing unavailable; fitting the shared browser.',{exact:true}).waitFor();
+  state.status=503;
+  await page.setViewportSize({width:393,height:655});
+  const notice=page.getByText('Automatic sizing unavailable; fitting the shared browser.',{exact:true});
+  await notice.waitFor();
+  const noticeBox=await notice.boundingBox(),screenBox=await page.locator('#screen').boundingBox();
+  check(noticeBox&&screenBox&&noticeBox.y+noticeBox.height<=screenBox.y,'sizing notice covers the shared browser controls');
   state.status=200;await page.setViewportSize({width:600,height:900});await page.locator('#viewport-status').waitFor({state:'hidden'});
   await page.getByRole('button',{name:'Clipboard',exact:true}).click();const field=page.getByLabel('Text for the remote browser',{exact:true});await field.fill('synthetic clipboard field');await page.setViewportSize({width:390,height:667});await Bun.sleep(350);check(await field.evaluate((n:HTMLElement)=>document.activeElement===n),'sizing stole clipboard focus');
   const beforeZero=state.requests.length;await page.locator('#screen').evaluate((node:HTMLElement)=>{node.style.width='0px'});await Bun.sleep(250);check(state.requests.length===beforeZero,'zero-size area sent geometry');await page.locator('#screen').evaluate((node:HTMLElement)=>{node.style.width='100%'});await Bun.sleep(250);

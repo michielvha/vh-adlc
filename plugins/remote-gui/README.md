@@ -2,6 +2,16 @@
 
 Share a task-local app through private Tailscale HTTPS, or give a human control of a fresh headed Chromium browser. Human sign-in runs with automation and browser debugging disabled. After the owner confirms completion, the agent can resume in the same disposable profile. Tailscale access opens directly for the selected owner's identity, with no viewer password or enrollment step.
 
+## iPhone keyboard
+
+Use Safari on iPhone for the two-tap keyboard flow. Android Chrome verification is deferred.
+
+Tap the remote field and then tap **Tap to type**. The second tap opens the phone’s own keyboard. The viewer puts the prompt within the editable bounds Chromium reports. If a site covers a field while leaving it focused, the prompt can appear over that cover. Keys follow Chromium’s current focus, as they do with a hardware keyboard.
+
+If the prompt dims, wait for the viewer to verify the field again. If it disappears, tap the field to request a new prompt.
+
+New browser sessions use this flow when the host has `dbus-daemon`, `at-spi2-registryd`, and Python 3 with the D-Bus and AT-SPI GI bindings. These are optional. Install them through the host’s package manager if they are missing. Stock Chromium registers with a private per-session accessibility bus. Desktop viewing and control stay available when the mobile helper is unavailable.
+
 ## Viewer sizing
 
 New browser sessions adapt to the viewer's available space below its toolbar. Text uses normal CSS-pixel sizing, including on high-density screens. Resizing the viewer or rotating the device keeps the browser process, tabs and form state.
@@ -36,7 +46,7 @@ required browser verification fails, report the blocker without a localhost fall
 
 Installation makes the plugin discoverable. Activation establishes remote context for future chats. Native-agent scenarios and a browser on the other device establish actual behavior; package discovery alone does not.
 
-Version 0.4.0 adds automatic viewer sizing. The clipboard panel and reusable profiles remain available. Update the installed marketplace plugin through your agent's plugin manager, then start a new chat to load its instructions. Existing sessions retain their running supervisor's code. New sessions use the updated version.
+Version 0.5.0 adds the two-tap keyboard flow for iPhone Safari. Update the installed marketplace plugin through your agent's plugin manager, then start a new chat to load its instructions. Existing sessions retain their running supervisor's code. New sessions use the updated version.
 
 ## Human sign-in and agent hand-back
 

@@ -57,7 +57,9 @@ jobs:
       - name: Build GNU mv with atomic no-replace support
         working-directory: ${{ runner.temp }}
         run: |
-          curl --fail --silent --show-error --location --retry 3 --remote-name https://ftp.gnu.org/gnu/coreutils/coreutils-9.7.tar.xz
+          curl_options=(--fail --silent --show-error --location --retry 2 --connect-timeout 8 --max-time 30 --proto '=https' --proto-redir '=https' --output coreutils-9.7.tar.xz)
+          curl "${curl_options[@]}" https://ftpmirror.gnu.org/coreutils/coreutils-9.7.tar.xz ||
+            curl "${curl_options[@]}" https://mirror.csclub.uwaterloo.ca/gnu/coreutils/coreutils-9.7.tar.xz
           echo 'e8bb26ad0293f9b5a1fc43fb42ba970e312c66ce92c1b0b16713d7500db251bf  coreutils-9.7.tar.xz' | sha256sum --check
           tar -xf coreutils-9.7.tar.xz
           cd coreutils-9.7
@@ -135,7 +137,7 @@ jobs:
       - name: Prepare real browser verification
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends xvfb xauth x11vnc novnc websockify python3 libxtst6
+          sudo apt-get install -y --no-install-recommends xvfb xauth x11vnc novnc websockify python3 libxtst6 dbus at-spi2-core python3-dbus python3-gi gir1.2-atspi-2.0
           bun install --cwd tests/remote-gui --frozen-lockfile --ignore-scripts
           bun tests/remote-gui/node_modules/playwright-core/cli.js install --with-deps firefox
           test -x /usr/bin/google-chrome
@@ -143,11 +145,14 @@ jobs:
         env:
           REMOTE_GUI_BROWSER_E2E: '1'
           REMOTE_GUI_VIEWER_E2E: '1'
+          REMOTE_GUI_MOBILE_E2E: '1'
           REMOTE_GUI_CHROMIUM: /usr/bin/google-chrome
           REMOTE_GUI_PLAYWRIGHT_MODULE: ${{ github.workspace }}/tests/remote-gui/node_modules/playwright-core
           REMOTE_GUI_TEST_BINARY: ${{ github.workspace }}/plugins/remote-gui/remote-gui
           REMOTE_GUI_ARTIFACT_DIR: ${{ runner.temp }}/remote-gui-viewport
         run: |
+          "$REMOTE_GUI_CHROMIUM" --version
+          bun test tests/remote-gui/mobile.e2e.test.js
           cd plugins/remote-gui
           go test -race ./internal/browser ./internal/xclip -count=1
           cd ../..

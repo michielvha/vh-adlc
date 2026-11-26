@@ -70,6 +70,10 @@ func (r *runtime) snapshot() session.BrowserHandle {
 	handle.Stop, handle.Handoff, handle.Alive = r.stop, r.handoff, r.healthy
 	handle.Clipboard = r.clipboard()
 	handle.Resize = r.resize
+	if r.mobile != nil {
+		handle.MobileLookup = r.editableAt
+		handle.MobilePhase = r.mobilePhase.Load
+	}
 	return handle
 }
 
@@ -140,7 +144,7 @@ func (r *runtime) healthy() bool {
 		if process.role == "browser" && !r.modeReady {
 			continue
 		}
-		if !state.Alive(process.identity) {
+		if !mobileResource(process.role) && !state.Alive(process.identity) {
 			return false
 		}
 	}
@@ -178,6 +182,7 @@ func (r *runtime) handoff(ctx context.Context, mode string) (session.BrowserHand
 	r.clipMu.Lock()
 	r.clipSwitching = true
 	r.clipMu.Unlock()
+	r.mobilePhase.Add(1)
 	defer r.endClipboardSwitch(r.chrome, mode)
 	// A later owner-completed close is expected after a failed transition.
 	// Keep the viewer/profile available until retry, explicit stop or expiry.
