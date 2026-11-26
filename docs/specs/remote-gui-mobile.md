@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "iPhone Safari release scope accepted. Android verification is deferred."
+status: in-progress
+status_description: "iPhone Safari release verification and viewer corrections are in progress."
 branch: feat/remote-gui-mobile
 issue: null
 goal: "Tap a remote Chromium field, then tap its inline prompt to type using the phone keyboard."
