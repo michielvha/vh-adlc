@@ -1,0 +1,14 @@
+{
+  "base": "fcf7cd5",
+  "branch": "feat/seo-agent",
+  "prepared_version": "0.7.0",
+  "scenario": "independent offline synthetic assessment; not native or live account integration",
+  "source_sha256": {
+    "plugins/vh-adlc/skills/vh-adlc-seo/SKILL.md": "660580de05a5ea038653e0292ff08721b9d4f89e00b685c99ecd873328ab0867",
+    "plugins/vh-adlc/agents/vh-adlc-seo.agent.md": "4a3c7428fda172076db14d9f51fd88f2912bea1fc8a2bdba3db8aac7608cab5c",
+    "plugins/vh-adlc/references/seo.md": "5bbd27c001f68ae00eabb24cf9b585e3bb4158b67cf2f15ffe38493cd85395e4"
+  },
+  "payload_hashes_reverified": true,
+  "canary_unchanged": true,
+  "external_calls": 0
+}

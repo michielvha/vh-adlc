@@ -1,0 +1,32 @@
+{
+  "evidence_kind": "synthetic forward-test fixtures, not observed website state",
+  "retrieved_at": "2026-10-29T10:00:00Z",
+  "redirect_chain": [
+    {
+      "url": "https://automation.example/",
+      "status": 302,
+      "location": "https://preview.automation.example/"
+    },
+    {
+      "url": "https://preview.automation.example/",
+      "status": 200,
+      "location": null
+    }
+  ],
+  "html_url": "https://preview.automation.example/",
+  "title": "Automation",
+  "h1": "Automation for your team",
+  "meta_robots": "noindex",
+  "canonical": "https://automation.example/",
+  "meta_description": null,
+  "resolved_links": [
+    "https://preview.automation.example/ansible"
+  ],
+  "robots_body": "User-agent: *\nAllow: /\nSitemap: https://automation.example/sitemap.xml\n",
+  "sitemap_locs": [
+    "https://preview.automation.example/"
+  ],
+  "response_headers": "not supplied beyond content_type and redirect location",
+  "rendered_html": "not supplied",
+  "live_verified": false
+}

@@ -55,6 +55,7 @@ fallback and report its limitation. Do not claim an unexecuted gate passed.
 | Orchestrating a workstream of sub-sessions | Use `skills/vh-adlc-orchestrate/SKILL.md` to admit, steer and close sub-sessions under `references/orchestrate.md`; it changes no feature status, and the request grants only the writes in its `references/authority.md` row. |
 | Backlog triage | Use `skills/vh-adlc-triage/SKILL.md` to verify scope, rank ready work and save a report; GitHub writes require exact triage approval; every published verdict and local assessment patch also needs current proof in the confined controller from [the boundary guide](triage-boundary.md). |
 | Persistent codebase audit or selected audit-finding repair | Use `skills/vh-adlc-audit/SKILL.md` for the named mode/ledger/source scope; status reads history, reverify/full proposes before selection, and selected fixes use `audit-record.md` and independent audit review. |
+| Website SEO or search visibility assessment | Use `skills/vh-adlc-seo/SKILL.md` with the adopter's domains, markets and evidence locations. It assesses and exports findings; it does not publish pages or change indexing policy. |
 | Diagnosis or findings | Use `skills/vh-adlc-investigate/SKILL.md` with the selected investigation intent. Reproduce the issue and respect report-only limits. |
 | Article authoring, revision or promotion drafts | Use `skills/vh-adlc-blog/SKILL.md`; promotion mode prepares article-linked social copy only on request. Writing an article needs no software feature document. A request for implementing a blog or changing application behavior stays in the feature procedure. |
 | Review documentation affected by a code change | Use `skills/vh-adlc-docs-impact/SKILL.md`, for example “which docs need updating for this patch?”. A mixed feature-code request retains its underlying feature procedure and integrated docs check. |
@@ -84,6 +85,7 @@ another route. Dependency/bot/advisory security sweeps stay maintenance, one-off
 stays investigation and backlog ranking stays triage, even with audit settings. Ambiguous "audit security"
 or "audit the code for security issues" needs one focused persistent/full/dependency/diagnosis scope
 question before dependent work. Never silently invoke full mode. Continue independent reads while waiting.
+A request to audit a website's SEO or search visibility routes to `vh-adlc-seo` and is not persistent source-audit intent.
 
 Feature intake and read-only review can identify a work item without acquiring it. When
 routing into feature writing, the selected operation follows the

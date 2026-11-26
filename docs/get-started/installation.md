@@ -115,12 +115,12 @@ Independent reviews run through Antigravity's generic subagent fallback reading 
 
 ## What the plugin installs
 
-The package's nineteen skills include the generic `vh-adlc` entry,
+The package's twenty skills include the generic `vh-adlc` entry,
 eleven engineering operations, one coordination operation (`vh-adlc-orchestrate`,
 for a session that drives a workstream of sub-sessions), `vh-adlc-blog` for article and promotion drafts, `vh-adlc-diagram` for architecture diagrams, `vh-adlc-docs-impact` for
 selected-change documentation review, `vh-adlc-docs-drift` for corpus drift and
-stale audit proposals, `vh-adlc-docs-truth` for factual claim review, and `vh-adlc-clean` for host cleanup. It includes
-separate feature-reviewer and prose-editor definitions. Its first operation
+stale audit proposals, `vh-adlc-docs-truth` for factual claim review, `vh-adlc-seo` for website search assessment and `vh-adlc-clean` for host cleanup. It includes
+separate feature-reviewer, prose-editor and SEO assessor definitions. Its first operation
 uses the [installer](../../plugins/vh-adlc/scripts/ensure-vh-adlc.sh) to fetch the
 binary version in [vh-adlc.lock.json](../../plugins/vh-adlc/vh-adlc.lock.json).
 It verifies the archive and binary hashes before execution and writes downloads
@@ -161,6 +161,9 @@ pages in `knowledge_pages`, then explicitly cache the locked binary and the comp
 page set. Audit entry always uses offline bootstrap and knowledge; missing caches stop at setup. The example supplies new files; no existing personal
 configuration is assumed. The operation uses artifact-backed agent verification. It does not inherit
 triage's controller, provision credentials or grant remote effects merely by being installed.
+
+Semrush use in `vh-adlc-seo` needs Bun on Linux or macOS, the platforms the packaged Semrush helper
+supports; the rest of the SEO assessment needs no Bun.
 
 The other marketplace plugins install separately. Bun is required for the
 GitHub App registration scripts; installing vh-adlc does not install those scripts

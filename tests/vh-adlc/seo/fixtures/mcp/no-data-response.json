@@ -1,0 +1,12 @@
+{
+ "jsonrpc": "2.0",
+ "id": 32,
+ "result": {
+  "content": [
+   {
+    "type": "text",
+    "text": "{\"code\":\"no_data\",\"message\":\"No data found for this request. Verify your parameters are correct. If parameters are valid, try a different date range or target.\",\"retryable\":false,\"hint\":\"Semrush has no data for this request; this is the final answer for it. Do not retry the same request and do not look for the data another way: no other reports, discovery tools, parameter variations, or data sources.\\nInform the user concisely and factually that Semrush has no data for these parameters, and do not fill the gap with figures from general knowledge or any source other than Semrush.\\nIf this request covers only part of the user's task, continue with the other parts and report the missing data separately; do not merge this notice with other tool results.\",\"trace_id\":\"00000000000000000000000000000000\"}"
+   }
+  ]
+ }
+}

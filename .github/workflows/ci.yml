@@ -105,6 +105,7 @@ jobs:
           tests/vh-adlc/maintenance/*.test.ts
           tests/vh-adlc/audit/*.test.ts
           tests/vh-adlc/docs-impact/*.test.ts
+          tests/vh-adlc/seo/semrush.test.ts
           --timeout 60000
 
   remote-gui:

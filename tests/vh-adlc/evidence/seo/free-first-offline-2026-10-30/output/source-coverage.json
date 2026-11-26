@@ -1,0 +1,74 @@
+[
+  {
+    "source": "Public HTTP",
+    "status": "partial",
+    "target": "automation.example and preview.automation.example",
+    "country": "all requested markets; no geo test",
+    "period": null,
+    "retrieved_at": "2026-10-29T10:00:00Z",
+    "coverage": "4 supplied response records, including one HTML document; synthetic capture; no network requests"
+  },
+  {
+    "source": "Google Search Console",
+    "status": "partial",
+    "target": "property not supplied; URLs on automation.example",
+    "country": "BE;DE rows; NL missing",
+    "period": "2026-10-01/2026-10-28",
+    "retrieved_at": null,
+    "coverage": "3-row synthetic CSV sample; completeness, search type, filters and verification unavailable"
+  },
+  {
+    "source": "Semrush saved domain_ranks",
+    "status": "historical_no_data",
+    "target": "automation.example",
+    "country": null,
+    "period": null,
+    "retrieved_at": "2026-10-29T10:05:00Z",
+    "coverage": "exact saved request returns no_data; database/date/row limit not supplied; does not establish zero traffic"
+  },
+  {
+    "source": "Semrush access",
+    "status": "expired",
+    "target": "automation.example",
+    "country": null,
+    "period": null,
+    "retrieved_at": null,
+    "coverage": "supplied current_access says expired; credential not accessed or tested; no calls made"
+  },
+  {
+    "source": "Bing Webmaster Tools",
+    "status": "unavailable",
+    "target": "not connected",
+    "country": "BE;DE;NL",
+    "period": null,
+    "retrieved_at": null,
+    "coverage": "no Bing observations"
+  },
+  {
+    "source": "Ahrefs Free",
+    "status": "unavailable",
+    "target": "verified-site account unavailable",
+    "country": "BE;DE;NL",
+    "period": null,
+    "retrieved_at": null,
+    "coverage": "no backlink, audit or keyword estimates"
+  },
+  {
+    "source": "Screaming Frog",
+    "status": "unavailable",
+    "target": "not installed",
+    "country": null,
+    "period": null,
+    "retrieved_at": null,
+    "coverage": "no crawler run; supplied capture parsed locally"
+  },
+  {
+    "source": "Lighthouse / PageSpeed / CrUX",
+    "status": "unavailable",
+    "target": "not run",
+    "country": null,
+    "period": null,
+    "retrieved_at": null,
+    "coverage": "no lab/mobile/desktop scores or field Core Web Vitals; missing metrics are null"
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "retrieved": "2026-10-29T10:05:00Z",
+  "request": {
+    "report": "domain_ranks",
+    "target": "automation.example"
+  },
+  "result": {
+    "code": "no_data",
+    "message": "No data for this request"
+  },
+  "current_access": {
+    "status": "expired",
+    "message": "Credential no longer accepted"
+  }
+}
