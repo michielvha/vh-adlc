@@ -217,9 +217,31 @@ setInterval(async ()=>{
         await canvas.click({ position: { x: 18, y: 140 } });
         for (let attempt = 0; attempt < 40 && !observations.bootstrapClicked; attempt++) await delay(100);
         assert.equal(observations.bootstrapClicked, true, 'the remote page did not receive focus before the first tap');
+        // On the iPhone Chromium initially reports the omnibox's wider bounds,
+        // then tightens them as the suggestions open without changing focus.
+        await page.evaluate(() => {
+            const fetch = window.fetch;
+            let first = true;
+            window.fetch = async (path, options) => {
+                const reply = await fetch(path, options);
+                if (path !== '/__remote_gui/editable' || !reply.ok) return reply;
+                const field = await reply.clone().json();
+                if (field?.mode !== 'url') return reply;
+                if (first) {
+                    first = false;
+                    return Response.json({ ...field, width: field.width + 20 });
+                }
+                window.promptHiddenBeforeStableURLBounds = document.getElementById('mobile-type').hidden;
+                window.fetch = fetch;
+                return reply;
+            };
+        });
         await page.route('**/__remote_gui/editable', route => route.fulfill({ status: 503 }), { times: 1 });
         await page.route('**/__remote_gui/editable-phase', route => route.fulfill({ status: 503 }), { times: 1 });
         await tap(Math.floor(addressField.x + addressField.width / 2), Math.floor(addressField.y + addressField.height / 2));
+        await page.waitForFunction(() => typeof window.promptHiddenBeforeStableURLBounds === 'boolean', null, { timeout: 5000 });
+        assert.equal(await page.evaluate(() => window.promptHiddenBeforeStableURLBounds), true,
+            'the prompt appeared over transient omnibox bounds');
         await prompt.waitFor({ timeout: 5500 }).catch(async error => {
             await captureFailure();
             throw new Error('The address bar prompt did not appear. Focus replies: ' + JSON.stringify(focusReplies.slice(-8)), { cause: error });

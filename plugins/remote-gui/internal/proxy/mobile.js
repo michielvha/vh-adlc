@@ -18,6 +18,7 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
     let verifiedPhase = 0;
     let request = null;
     let target = null;
+    let pendingURL = null;
     let tapGeometry = null;
     let lease = 0;
     let editing = false;
@@ -46,6 +47,7 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
         request?.abort();
         request = null;
         target = null;
+        pendingURL = null;
         tapGeometry = null;
         lease = 0;
         composing = false;
@@ -170,12 +172,17 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
         }
     }
 
-    function retrySample(point, generation, attempt) {
+    function retrySample(point, generation, attempt, minDelay = 0) {
         // A temporary failure never extends a verified association.
         if (target ? editing || performance.now() < lease : attempt < 4) {
-            const delay = target ? 20 : 75 * (attempt + 1);
+            const delay = target ? 20 : Math.max(minDelay, 75 * (attempt + 1));
             timer = setTimeout(() => void sample(point, generation, attempt + 1), delay);
         } else clear();
+    }
+
+    function sameFieldBounds(first, second) {
+        return first.x === second.x && first.y === second.y &&
+            first.width === second.width && first.height === second.height;
     }
 
     async function sample(point, generation, attempt) {
@@ -197,6 +204,7 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
             if (generation !== epoch || !promptLayoutCurrent()) return;
             if (performance.now() >= started + 500) { retrySample(point, generation, attempt); return; }
             if (!field && !target) {
+                pendingURL = null;
                 retrySample(point, generation, attempt);
                 return;
             }
@@ -204,7 +212,15 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
                 clear();
                 return;
             }
-            if (target && !editing && ['x', 'y', 'width', 'height'].some(k => field[k] !== target[k])) {
+            // The Chromium omnibox can shrink as its suggestions open. Wait
+            // for matching URL bounds before issuing the first prompt lease.
+            if (!target && field.mode === 'url' && (!pendingURL || pendingURL.token !== field.token ||
+                pendingURL.phase !== field.phase || !sameFieldBounds(pendingURL, field))) {
+                pendingURL = field;
+                retrySample(point, generation, attempt, 170 - (performance.now() - started));
+                return;
+            }
+            if (target && !editing && !sameFieldBounds(target, field)) {
                 clear();
                 return;
             }
@@ -213,6 +229,7 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
             const renew = !target || editing || verifiedPhase === field.phase;
             observedPhase = field.phase;
             target = field;
+            pendingURL = null;
             awaiting = false;
             if (renew) {
                 lease = started + 500;
