@@ -231,6 +231,7 @@ None. The owner approved the reported-focus option after the warm-cache overlay 
 | 2026-11-22 | R-21 | spec | `413ea2344b0a3b070d4ff6a1a3af47083676a73c` | unknown | procedural | No findings. Model identity was not attested. Originally recorded as R-18 on the local branch. |
 | 2026-11-24 | R-19 | spec | `ee6ac65605a4c8ca44ef5b8610472f7eb6c05c87` | claude-opus-5-5 | procedural | Covered drift review found three nits and nothing blocking; acceptance kept. |
 | 2026-11-26 | R-22 | spec | `8ca748e583633eed22c6b6b39fc13f81f40d32b2` | unknown | procedural | Three should-fix findings and a nit. Model identity was not attested. |
+| 2026-11-26 | R-23 | spec | `2f3f9781effc920bf4f023a66285be63fdef7e80` | unknown | procedural | One should-fix finding on confirmed no-match behavior. Model identity was not attested. |
 
 ### R-1
 
@@ -738,3 +739,12 @@ SEVERITY: nit
 WHERE: Context / Owner summary; Test Plan AC-14; Tasks T8 partial evidence
 EVIDENCE: The owner summary describes packaging checks as still needing evidence. Reconciliation added a documented rollback, desktop input and cleanup run built from `9bf555a3` in T8. AC-14 still requires the complete check on the final package candidate, and the recorded rollback used desktop touch emulation.
 PROPOSAL: Include the earlier package rollback and cleanup evidence in the owner summary, with its build and desktop limitation. Keep exact-candidate verification, the remaining native iPhone cases and independent implementation review open.
+
+### R-23
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary; Design / Detect and show the prompt; Design / Type and dismiss; Acceptance Criteria AC-11 and AC-12; Test Plan AC-11 and AC-12; Tasks T9
+EVIDENCE: The revision says the existing pause and dismissal rules apply if a still-focused field moves off the verified tap point. The helper returns a successful no-match for that move (`plugins/remote-gui/internal/browser/mobile_focus.py:71-79`). The viewer clears the editor on a no-match (`plugins/remote-gui/internal/proxy/mobile.js:183-192`). The revised design still describes a temporary verification failure as recoverable, and the new test covers only the move that keeps the field over the original point. A tester cannot tell whether immediate dismissal or a recoverable pause is the expected result after a no-match.
+PROPOSAL: State that a successful no-match at the original point dismisses the editor and clears unsent composition, while temporary request failure can recover under the existing timeout. Add an open-editor test that moves the same field fully off that point and verifies dismissal and no further keys until a new deliberate two-tap sequence.
