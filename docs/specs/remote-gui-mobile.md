@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "iPhone Safari release verification and viewer corrections are in progress."
+status_description: "The iPhone Safari release awaits native keyboard composition verification."
 branch: feat/remote-gui-mobile
 issue: null
 goal: "Tap a remote Chromium field, then tap its inline prompt to type using the phone keyboard."
@@ -170,16 +170,16 @@ Keep the current noVNC release and license notices. Add the automated helper, st
 
 ## Acceptance Criteria
 
-- [ ] AC-10: The first tap on a supported writable remote field sends one remote click and the inline prompt is shown with the keyboard closed. With unchanged remote focus, typing uses the caret placed by that click. The second tap opens the native phone keyboard without another remote click. Taps outside the reported editable bounds, unverified or expired prompts and observed invalidations give no keyboard. The viewer has no toolbar keyboard control.
-  Evidence: R-25 recorded the normal tap sequence and both snap-boundary directions. Delayed pointer and caret proof was still open at review.
+- [x] AC-10: The first tap on a supported writable remote field sends one remote click and the inline prompt is shown with the keyboard closed. With unchanged remote focus, typing uses the caret placed by that click. The second tap opens the native phone keyboard without another remote click. Taps outside the reported editable bounds, unverified or expired prompts and observed invalidations give no keyboard. The viewer has no toolbar keyboard control.
+  Evidence: R-26 verified the delayed pointer, caret, snap and temporary phase outage cases.
 - [ ] AC-11: The native keyboard can type, compose and delete through existing noVNC input. Each committed codepoint and deletion maps to the expected ordinary remote keys without duplication. An observed focus change or disconnect clears pending composition. During temporary verification loss, an open keyboard pauses input and can resume on the same field and phase without replaying discarded edits. The viewer explains current-focus typing and preserves hardware input and Clipboard focus.
-  Evidence: R-25 recorded the exact Unicode frames and native Paste. Native composition and interruption still need evidence.
-- [ ] AC-12: Phone keyboard animation, dismissal, orientation, adaptive sizing and reconnect leave the viewer usable. After dismissal a new intentional two-tap sequence is needed to open it. Before opening, a change in canvas scale or position invalidates the current prompt and its pending lookup.
-  Evidence: R-25 recorded the physical scroll, reconnect and keyboard dismissal. The exact-build rotation and focus-lease probes below followed that review.
-- [ ] AC-13: Human browser mode is sandboxed with automation, debug transport and extensions disabled. Private metadata cannot cross session identities, and field content and text-bearing accessibility data stay outside the helper output, viewer metadata and logs.
-  Evidence: R-25 recorded a real handoff with pending composition and no replayed edit. Private bus lifecycle and identity boundaries still need evidence.
+  Evidence: R-26 verified Unicode, Paste, Backspace and browser-side composition cancellation. The signed native IME check was blocked by the phone lock.
+- [x] AC-12: Phone keyboard animation, dismissal, orientation, adaptive sizing and reconnect leave the viewer usable. After dismissal a new intentional two-tap sequence is needed to open it. Before opening, a change in canvas scale or position invalidates the current prompt and its pending lookup.
+  Evidence: R-26 verified exact-build physical rotation and the held lookup, prompt renewal and fixed-canvas movement cases.
+- [x] AC-13: Human browser mode is sandboxed with automation, debug transport and extensions disabled. Private metadata cannot cross session identities, and field content and text-bearing accessibility data stay outside the helper output, viewer metadata and logs.
+  Evidence: R-26 verified endpoint ownership, the private bus lifecycle and handoff with pending composition.
 - [x] AC-14: The independently installed remote-gui package uses the existing noVNC assets and licenses. Desktop viewing, pointer, hardware keyboard, resizing, Clipboard, handoff and service shares still work. Missing helpers leave a usable viewer and cleanup only owned processes, including on stop, expiry or rollback. The package instructions identify iPhone Safari support and the deferred Android Chrome verification.
-  Evidence: R-25 verified the exact package, desktop checks, rollback and owned cleanup.
+  Evidence: R-26 independently confirmed exact package installation, desktop behavior, rollback and cleanup.
 
 ## Test Plan
 
@@ -217,6 +217,8 @@ Keep the current noVNC release and license notices. Add the automated helper, st
   The delayed-pointer probe held a real noVNC click on a different field. The first lookup reported no match while the old field still had focus, and a bounded retry found the new field after the click was released. A separate repeat click stayed buffered with the remote caret at the beginning of `abc`. The viewer opened the editor and queued `r`. Releasing the RFB click and key in order placed the caret after `abc` and produced `abcr`.
   Both mobile endpoints ran over a real HTTP Unix socket with a synthetic trusted Serve peer. Each refused the other owner, missing identity, wrong origin, wrong method and revoked requests without invoking the focus or phase hook. The accepted owner received the expected field or phase. A separate process ran the exact accessibility worker with the package bus policy and a synthetic publisher. It discarded a publisher with a different PID, skipped attribute reads for rejected, out-of-bounds and unambiguous fields, and kept the synthetic attribute sentinel within the eligible private replies. The trace ran from worker startup through registry exit and found no text or cache subscriptions. On exit the D-Bus library requested service activation, which the private bus could not perform because it has no activation directories.
 
+  An independent browser check committed a synthetic preedit exactly once and discarded a second preedit after another authenticated viewer moved focus. A real RFB socket interruption discarded a pending edit. Reopening the same viewer sent one fresh character with no replay. The remaining signed iPhone input-method test did not start because Xcode required the phone to be unlocked.
+
 ## Open Questions
 
 None. The owner approved the reported-focus option after the warm-cache overlay test. The shipped prompt can follow a focused field even when page content covers it.
@@ -251,6 +253,7 @@ None. The owner approved the reported-focus option after the warm-cache overlay 
 | 2026-11-26 | R-24 | spec | `46f06958b1f582f4b4be2c7d3a3d0200fbdf5eb4` | unknown | procedural | No findings. Model identity was not attested. |
 | 2026-11-26 | R-24 | spec | `46f06958b1f582f4b4be2c7d3a3d0200fbdf5eb4` | n/a | n/a | accepted by owner |
 | 2026-11-26 | R-25 | implementation | `a3e071054ab8ba55855545dd783f3daad72d733f` | unknown | procedural | AC-14 met. AC-10 through AC-13 still need evidence. Model identity was not attested. |
+| 2026-11-26 | R-26 | implementation | `79c241515e698e9f63c18ced7858a9a515cb5d56` | unknown | procedural | Four criteria met. AC-11 still needs the physical composition check. Model identity was not attested. |
 
 ### R-1
 
@@ -793,3 +796,25 @@ EVIDENCE: The exact-build Go checks passed authorization, origin, revocation and
 CRITERION: AC-14 The independently installed remote-gui package uses the existing noVNC assets and licenses. Desktop viewing, pointer, hardware keyboard, resizing, Clipboard, handoff and service shares still work. Missing helpers leave a usable viewer and cleanup only owned processes, including on stop, expiry or rollback. The package instructions identify iPhone Safari support and the deferred Android Chrome verification.
 VERDICT: met
 EVIDENCE: The independent install rebuilt package 0.5.0 at a3e071054ab8ba55855545dd783f3daad72d733f and matched SHA-256 ec8345c5d3b831624385da90bea8a4e417bcf11ca6fb1f468ed17e7230c1a237. Real Chromium and Firefox tests passed viewing, pointer, hardware input, sizing, Clipboard and handoff, and the Go session tests passed service shares and expiry. A separate 0.4.0 to 0.5.0 to 0.4.0 check preserved both running supervisors and viewers across upgrade and rollback. Forcing optional bus startup failure preserved a usable viewer and Clipboard. Candidate stop and expiry removed recorded helper processes while prior viewers stayed ready. Installed noVNC assets and licenses were reused, and both package instructions name iPhone Safari and defer Android Chrome.
+
+### R-26
+
+CRITERION: AC-10 The first tap on a supported writable remote field sends one remote click and the inline prompt is shown with the keyboard closed. With unchanged remote focus, typing uses the caret placed by that click. The second tap opens the native phone keyboard without another remote click. Taps outside the reported editable bounds, unverified or expired prompts and observed invalidations give no keyboard. The viewer has no toolbar keyboard control.
+VERDICT: met
+EVIDENCE: On the independently packaged ec8345c5 build, physical Safari opened the native keyboard only on the second tap and sent one edit per tested field, including a cross-origin frame. The Chrome 157 RFB test observed one first-tap press and release, zero pointer frames from the second tap, a seeded caret edit, and unavailable or expired targets without a prompt. A live pointer-buffered replay verified the earlier field was refused and the bounded retry found the new field. Its same-field replay queued the first key behind the held click and Chromium received abcr at the clicked caret. Both repeat snaps used their emitted points while earlier metadata was held. With a prompt visible, an independent run interrupted both routes, tapped the disabled prompt, observed no keyboard or keys, and opened the same prompt inside its original 500 ms lease after recovery.
+
+CRITERION: AC-11 The native keyboard can type, compose and delete through existing noVNC input. Each committed codepoint and deletion maps to the expected ordinary remote keys without duplication. An observed focus change or disconnect clears pending composition. During temporary verification loss, an open keyboard pauses input and can resume on the same field and phase without replaying discarded edits. The viewer explains current-focus typing and preserves hardware input and Clipboard focus.
+VERDICT: not verified
+EVIDENCE: Physical iOS Safari produced exact z, é and emoji codepoints. On an empty field, native Paste and Backspace produced histories [101], [101,769] and [101] with one deletion, matching direct Chromium Backspace. The real RFB checks counted Unicode frames, paused input during separate phase and focus outages, canceled composition at the recovery deadline, and discarded a late reply. A second authenticated RFB viewer changed remote focus during preedit while the original viewer stayed foreground and connected, produced zero late frames, and a separate preedit committed exactly one press and release. Closing the actual RFB socket during composition canceled the editor and reconnect sent one fresh m without replay. The native iPhone IME preedit and commit test is present and had no observed run while the device was locked.
+
+CRITERION: AC-12 Phone keyboard animation, dismissal, orientation, adaptive sizing and reconnect leave the viewer usable. After dismissal a new intentional two-tap sequence is needed to open it. Before opening, a change in canvas scale or position invalidates the current prompt and its pending lookup.
+VERDICT: met
+EVIDENCE: Exact-build physical Safari completed portrait and landscape rotation, native keyboard open and dismissal, URL submission with full-height restoration, Clipboard handoff, low-field scrolling and submission, and a fresh two-tap edit after reopening. The real RFB suite invalidated pending and visible prompts on separate fixed-framebuffer canvas scale and position changes. It verified continuity during focused-field movement and dismissal after the field left the tap. A separate held-focus replay showed the same-phase reader did not cancel a valid pending lookup, focus samples renewed the prompt across its initial lease, and field movement cleared the visible prompt without changing canvas geometry. The held-reply, unit-scale, later edit, and Chromium and Firefox viewport checks passed.
+
+CRITERION: AC-13 Human browser mode is sandboxed with automation, debug transport and extensions disabled. Private metadata cannot cross session identities, and field content and text-bearing accessibility data stay outside the helper output, viewer metadata and logs.
+VERDICT: met
+EVIDENCE: The exact build used stock Chromium with the sandbox on and human debug transport, automation and extensions disabled. A live real handoff advanced the authenticated phase route while old focus and composition were held, canceled the editor, emitted zero late RFB keys and allowed a fresh edit through the same viewer in the replacement browser. The independent clean-archive Go replay rejected a held result after a production phase advance within its deadline. Live HTTP over a verified Unix peer rejected the wrong owner, origin, method and ended sessions before reading either route. Exact worker tests on the production private bus policy rejected another publisher PID and an exited publisher. Startup, lookup and failure traces restricted calls to the allowed methods and no text or cache subscriptions. The synthetic sentinel appeared only in the eligible publisher attribute replies and was absent from helper output. Live viewer results exposed only the allowed metadata fields.
+
+CRITERION: AC-14 The independently installed remote-gui package uses the existing noVNC assets and licenses. Desktop viewing, pointer, hardware keyboard, resizing, Clipboard, handoff and service shares still work. Missing helpers leave a usable viewer and cleanup only owned processes, including on stop, expiry or rollback. The package instructions identify iPhone Safari support and the deferred Android Chrome verification.
+VERDICT: met
+EVIDENCE: The candidate changed only the feature document from the reviewed a3e07105 build and retains package 0.5.0 and SHA-256 ec8345c5d3b831624385da90bea8a4e417bcf11ca6fb1f468ed17e7230c1a237. The isolated installer, two desktop browser engines, Clipboard, hardware input, pointer, sizing, handoff, service-share and expiry tests passed. Independently installing 0.4.0, then 0.5.0, then 0.4.0 preserved the original and candidate supervisors and viewers. Optional bus startup failure left the viewer and Clipboard usable, and stop and expiry removed recorded candidate processes while prior viewers stayed ready. The noVNC package assets and licenses are retained. Both installed instructions identify iPhone Safari and defer Android Chrome verification.
