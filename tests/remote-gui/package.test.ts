@@ -8,9 +8,13 @@ const plugin = join(repo, 'plugins/remote-gui');
 const read = (path: string) => readFileSync(join(repo, path), 'utf8');
 
 describe('independent remote-gui package', () => {
- test('adaptive sizing is packaged as remote-gui 0.4.0', () => {
+ test('the iPhone keyboard is packaged as remote-gui 0.5.0', () => {
   for (const path of ['plugins/remote-gui/plugin.json', 'plugins/remote-gui/.claude-plugin/plugin.json']) {
-   expect(JSON.parse(read(path)).version).toBe('0.4.0');
+   expect(JSON.parse(read(path)).version).toBe('0.5.0');
+  }
+  for (const path of ['plugins/remote-gui/README.md', 'plugins/remote-gui/skills/remote-gui/SKILL.md']) {
+   expect(read(path)).toMatch(/Safari on iPhone|iPhone Safari/);
+   expect(read(path)).toContain('Android Chrome verification is deferred.');
   }
  });
  test('both catalogs install the same independent source and manifests agree', () => {
