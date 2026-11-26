@@ -29,10 +29,11 @@ const fields = [
 test.skipIf(!enabled)('two inline taps edit a URL and a field through stock Chromium and noVNC', async () => {
     const { chromium } = requireModule(process.env.REMOTE_GUI_PLAYWRIGHT_MODULE);
     const root = mkdtempSync(join(tmpdir(), 'rg-mobile-e2e-'));
-    const observations = { geometry: null, edit: null, cover: null, mode: null };
+    const observations = { geometry: null, edit: null, cover: null, mode: null, value: null, layout: null, caret: null };
+    let entryLeft = 35;
     const fixture = createServer(async (request, response) => {
         const path = new URL(request.url, 'http://127.0.0.1').pathname;
-        if (request.method === 'POST' && ['/geometry', '/edit', '/cover', '/mode'].includes(path)) {
+        if (request.method === 'POST' && ['/geometry', '/edit', '/cover', '/mode', '/value', '/layout', '/caret'].includes(path)) {
             let body = '';
             for await (const part of request) {
                 body += part;
@@ -40,6 +41,11 @@ test.skipIf(!enabled)('two inline taps edit a URL and a field through stock Chro
             }
             observations[path.slice(1)] = JSON.parse(body);
             response.writeHead(204).end();
+            return;
+        }
+        if (request.method === 'GET' && path === '/entry-left') {
+            response.setHeader('Content-Type', 'application/json');
+            response.end(JSON.stringify(entryLeft));
             return;
         }
         if (request.method !== 'GET' || path !== '/s') {
@@ -71,7 +77,17 @@ field.addEventListener('keydown',event=>{
  field.type=field.type==='text'?'password':'text';
  post('/mode',{type:field.type,keptFocus:document.activeElement===field});
 });
-field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:++count}));
+field.addEventListener('input',()=>{
+ post('/edit',{exact:field.value==='z',count:++count});
+ post('/value',Array.from(field.value, character=>character.codePointAt(0)));
+});
+field.addEventListener('click',()=>post('/caret',{start:field.selectionStart,end:field.selectionEnd,length:field.value.length}));
+setInterval(async ()=>{
+ const left=await fetch('/entry-left').then(reply=>reply.json());
+ if(field.offsetLeft===left)return;
+ field.style.left=left+'px';
+ post('/layout',{left,keptFocus:document.activeElement===field});
+},100);
 </script>`);
     });
     const cli = (...args) => JSON.parse(execFileSync(process.env.REMOTE_GUI_TEST_BINARY,
@@ -100,6 +116,23 @@ field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:+
             httpCredentials: { username: 'viewer', password: access.access_code, origin: new URL(session.url).origin },
         });
         const page = await context.newPage();
+        const pointerFrames = [];
+        const keyFrames = [];
+        page.on('websocket', socket => {
+            if (new URL(socket.url()).pathname !== '/websockify') return;
+            socket.on('framesent', ({ payload }) => {
+                if (!Buffer.isBuffer(payload)) return;
+                if (payload[0] === 5 && (payload.length === 6 || payload.length === 7)) {
+                    pointerFrames.push({ mask: payload[1] & 0x7f, x: payload.readUInt16BE(2), y: payload.readUInt16BE(4) });
+                }
+                if (payload[0] === 4 && payload.length === 8) {
+                    keyFrames.push([payload.readUInt32BE(4), payload[1]]);
+                }
+                if (payload[0] === 255 && payload[1] === 0 && payload.length === 12) {
+                    keyFrames.push([payload.readUInt32BE(4), payload.readUInt16BE(2)]);
+                }
+            });
+        });
         async function captureFailure() {
             const directory = process.env.REMOTE_GUI_ARTIFACT_DIR;
             if (!directory) return;
@@ -274,8 +307,75 @@ field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:+
             await tap(120, top + 340);
         }
 
-        await tap(130, top + 145);
+        // A pending or visible prompt must belong to the tap's canvas geometry.
+        const entryPoint = { x: 130, y: top + 145 };
+        const tapEntry = () => tap(entryPoint.x, entryPoint.y);
+        const firstPointer = pointerFrames.length;
+        await tapEntry();
         await prompt.waitFor({ timeout: 5500 });
+        const firstTap = pointerFrames.slice(firstPointer)
+            .filter(point => Math.abs(point.x - entryPoint.x) <= 2 && Math.abs(point.y - entryPoint.y) <= 2)
+            .map(point => point.mask);
+        assert.deepEqual(firstTap.slice(firstTap.indexOf(1)), [1, 0], 'field tap did not send one click');
+        const entry = lastSample.field;
+        const transformCanvas = transform => canvas.evaluate((node, value) => {
+            node.style.transformOrigin = 'top left';
+            node.style.transform = value;
+            return [node.width, node.height];
+        }, transform);
+        for (const transform of ['translateX(12px)', 'scale(0.92)']) {
+            const started = lastSample.started;
+            assert.deepEqual(await transformCanvas(transform), [390, 812]);
+            await prompt.waitFor({ state: 'hidden', timeout: 1000 });
+            assert.ok(Date.now() < started + 500, 'visible prompt was only cleared after expiry');
+            await tap(120, top + 340);
+            await tapEntry();
+            await prompt.waitFor({ timeout: 5500 });
+            assert.equal(lastSample.field.token, entry.token);
+            await transformCanvas('');
+
+            await tap(120, top + 340);
+            let gotRequest;
+            const pending = new Promise(resolve => { gotRequest = resolve; });
+            let release;
+            const released = new Promise(resolve => { release = resolve; });
+            let finish;
+            const finished = new Promise(resolve => { finish = resolve; });
+            const holdEntry = async route => {
+                const point = route.request().postDataJSON();
+                if (Math.abs(point.x - entryPoint.x) > 2 || Math.abs(point.y - entryPoint.y) > 2) {
+                    await route.continue();
+                    return;
+                }
+                gotRequest(Date.now());
+                await released;
+                await route.fulfill({ json: entry }).catch(() => {});
+                finish();
+            };
+            await page.route('**/__remote_gui/editable', holdEntry);
+            try {
+                await tapEntry();
+                const sent = await pending;
+                assert.deepEqual(await transformCanvas(transform), [390, 812]);
+                release();
+                await finished;
+                await delay(35);
+                assert.ok(Date.now() < sent + 350, 'held reply was only checked after expiry');
+                assert.equal(await prompt.count(), 0, 'held reply displayed a prompt after a canvas change');
+            } finally {
+                release();
+                await page.unroute('**/__remote_gui/editable', holdEntry);
+            }
+            await tap(120, top + 340);
+            await tapEntry();
+            await prompt.waitFor({ timeout: 5500 });
+            assert.equal(lastSample.field.token, entry.token);
+            await transformCanvas('');
+            await tap(120, top + 340);
+            await tapEntry();
+            await prompt.waitFor({ timeout: 5500 });
+        }
+
         const focusedField = lastSample.field.token;
         await tap(264, top + 145);
         for (let i = 0; i < 40 && !observations.cover; i++) await delay(50);
@@ -323,12 +423,16 @@ field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:+
             assert.equal(lastSample.field.mode, type);
         }
         await delay(800);
+        const secondPointer = pointerFrames.length;
         await prompt.tap({ timeout: 2000 });
         assert.equal(await editor.evaluate(node => document.activeElement === node), true);
         await delay(550);
+        assert.equal(pointerFrames.length, secondPointer, 'prompt tap sent another remote pointer event');
+        const firstKey = keyFrames.length;
         await page.keyboard.insertText('z');
         for (let i = 0; i < 70 && !observations.edit; i++) await delay(100);
         assert.deepEqual(observations.edit, { exact: true, count: 1 });
+        assert.deepEqual(keyFrames.slice(firstKey), [[0x7a, 1], [0x7a, 0]]);
 
         const collected = await stopMonitor();
         stopMonitor = undefined;
@@ -374,6 +478,49 @@ field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:+
 
         await page.unroute('**/__remote_gui/editable');
         await page.unroute('**/__remote_gui/editable-phase');
+        await page.reload();
+        await page.getByText('Shared browser connected').waitFor({ timeout: 15000 });
+        await page.waitForFunction(() => document.querySelector('#screen canvas')?.width === 390);
+        observations.caret = null;
+        await tapEntry();
+        await prompt.waitFor({ timeout: 5500 });
+        for (let i = 0; i < 30 && !observations.caret; i++) await delay(50);
+        assert.deepEqual(observations.caret, { start: 1, end: 1, length: 1 });
+        await prompt.tap();
+        assert.equal(await editorFocused(), true);
+        entryLeft = 50;
+        for (let i = 0; i < 30 && observations.layout?.left !== entryLeft; i++) await delay(50);
+        assert.deepEqual(observations.layout, { left: 50, keptFocus: true });
+        assert.equal(await editorFocused(), true, 'field movement around the verified point closed the editor');
+        const unicodeStart = keyFrames.length;
+        await page.keyboard.insertText('ée\u0301😀');
+        const expectedValue = [0x7a, 0xe9, 0x65, 0x0301, 0x1f600];
+        for (let i = 0; i < 30 && observations.value?.length !== expectedValue.length; i++) await delay(50);
+        assert.deepEqual(observations.value, expectedValue);
+        const pairs = [0xe9, 0x65, 0x01000301, 0x0101f600].flatMap(key => [[key, 1], [key, 0]]);
+        assert.deepEqual(keyFrames.slice(unicodeStart), pairs);
+        const deleteStart = keyFrames.length;
+        await page.keyboard.press('Backspace');
+        for (let i = 0; i < 30 && observations.value?.length !== expectedValue.length - 1; i++) await delay(50);
+        assert.deepEqual(observations.value, expectedValue.slice(0, -1));
+        assert.deepEqual(keyFrames.slice(deleteStart), [[0xff08, 1], [0xff08, 0]]);
+        const moveKeys = keyFrames.length;
+        await editor.evaluate(node => {
+            node.dispatchEvent(new CompositionEvent('compositionstart'));
+            node.value = 'q';
+        });
+        entryLeft = 165;
+        for (let i = 0; i < 30 && observations.layout?.left !== entryLeft; i++) await delay(50);
+        assert.deepEqual(observations.layout, { left: 165, keptFocus: true });
+        await editor.waitFor({ state: 'hidden', timeout: 2000 });
+        await editor.evaluate(node => node.dispatchEvent(new CompositionEvent('compositionend', { data: 'q' })));
+        assert.equal(keyFrames.length, moveKeys, 'moving the focused field away replayed an edit');
+        await tap(200, top + 145);
+        await prompt.waitFor({ timeout: 5500 });
+        await prompt.tap();
+        assert.equal(await editorFocused(), true);
+        await tap(120, top + 340);
+
         const readPhase = () => page.evaluate(async () => {
             const response = await fetch('/__remote_gui/editable-phase', {
                 method: 'POST',

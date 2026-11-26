@@ -18,7 +18,7 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
     let verifiedPhase = 0;
     let request = null;
     let target = null;
-    let framebuffer = '';
+    let tapGeometry = null;
     let lease = 0;
     let editing = false;
     let composing = false;
@@ -46,7 +46,7 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
         request?.abort();
         request = null;
         target = null;
-        framebuffer = '';
+        tapGeometry = null;
         lease = 0;
         composing = false;
         discardComposition = false;
@@ -74,10 +74,21 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
         prompt.style.top = Math.max(36, Math.min(viewportHeight() - 48, centerY - 22)) + 'px';
     }
 
+    function canvasGeometry() {
+        const { left, top, width, height } = canvas.getBoundingClientRect();
+        return [canvas.width, canvas.height, left, top, width, height];
+    }
+
+    function promptLayoutCurrent() {
+        if (editing || !tapGeometry) return true;
+        const current = canvasGeometry();
+        if (tapGeometry.every((value, index) => value === current[index])) return true;
+        clear();
+        return false;
+    }
+
     function updatePromptLayout() {
-        if (editing || (!target && !awaiting)) return;
-        if (framebuffer !== canvas.width + 'x' + canvas.height) clear();
-        else if (target) position(target);
+        if (!editing && (target || awaiting) && promptLayoutCurrent() && target) position(target);
     }
 
     const metadataHeaders = { 'Content-Type': 'application/json', 'X-Remote-Gui-Editable': '1' };
@@ -117,6 +128,7 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
     }
 
     function phaseUnavailable(generation) {
+        if (!promptLayoutCurrent()) return;
         verifiedPhase = 0;
         updatePrompt();
         updateEditingStatus();
@@ -124,6 +136,7 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
     }
 
     async function watchPhase(generation) {
+        if (generation !== epoch || !promptLayoutCurrent()) return;
         const controller = new AbortController();
         phaseRequest = controller;
         const timeout = setTimeout(() => controller.abort(), 350);
@@ -132,10 +145,10 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
                 method: 'POST', credentials: 'same-origin', cache: 'no-store',
                 headers: metadataHeaders, signal: controller.signal,
             });
-            if (generation !== epoch) return;
+            if (generation !== epoch || !promptLayoutCurrent()) return;
             if (reply.status === 503) { phaseUnavailable(generation); return; }
             const phase = await reply.json();
-            if (generation !== epoch) return;
+            if (generation !== epoch || !promptLayoutCurrent()) return;
             if (!reply.ok || !Number.isSafeInteger(phase) || phase < 1 || phase < observedPhase) {
                 clear();
                 return;
@@ -166,7 +179,7 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
     }
 
     async function sample(point, generation, attempt) {
-        if (generation !== epoch || !panel.hidden) return;
+        if (generation !== epoch || !panel.hidden || !promptLayoutCurrent()) return;
         const controller = new AbortController();
         request = controller;
         const started = performance.now();
@@ -177,11 +190,11 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
                 headers: metadataHeaders,
                 body: JSON.stringify(point),
             });
-            if (generation !== epoch) return;
+            if (generation !== epoch || !promptLayoutCurrent()) return;
             if (response.status === 503) { retrySample(point, generation, attempt); return; }
             if (!response.ok) throw Error('editable focus unavailable');
             const field = await response.json();
-            if (generation !== epoch) return;
+            if (generation !== epoch || !promptLayoutCurrent()) return;
             if (performance.now() >= started + 500) { retrySample(point, generation, attempt); return; }
             if (!field && !target) {
                 retrySample(point, generation, attempt);
@@ -269,13 +282,14 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
         const y = display.absY(position.y);
         if (![x, y].every(value => Number.isInteger(value) && value >= 0 && value < 4096)) return;
         const generation = epoch;
-        framebuffer = canvas.width + 'x' + canvas.height;
+        tapGeometry = canvasGeometry();
         awaiting = true;
         void watchPhase(generation);
         timer = setTimeout(() => void sample({ x, y }, generation, 0), 75);
     });
 
     prompt.addEventListener('click', event => {
+        if (!promptLayoutCurrent()) return;
         if (!event.isTrusted || !target || performance.now() >= lease) { clear(); return; }
         if (!canSend()) return;
         const mode = target.mode;
