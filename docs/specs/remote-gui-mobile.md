@@ -228,6 +228,7 @@ None. The owner approved the reported-focus option after the warm-cache overlay 
 | 2026-11-22 | R-20 | spec | `62c95df927cbc33fa180f7f5c604b64b6039848c` | unknown | procedural | Three should-fix findings on recovery and geometry verification. Model identity was not attested. Originally recorded as R-17 on the local branch. |
 | 2026-11-22 | R-21 | spec | `413ea2344b0a3b070d4ff6a1a3af47083676a73c` | unknown | procedural | No findings. Model identity was not attested. Originally recorded as R-18 on the local branch. |
 | 2026-11-24 | R-19 | spec | `ee6ac65605a4c8ca44ef5b8610472f7eb6c05c87` | claude-opus-5-5 | procedural | Covered drift review found three nits and nothing blocking; acceptance kept. |
+| 2026-11-26 | R-22 | spec | `8ca748e583633eed22c6b6b39fc13f81f40d32b2` | unknown | procedural | Three should-fix findings and a nit. Model identity was not attested. |
 
 ### R-1
 
@@ -705,3 +706,33 @@ SEVERITY: nit
 WHERE: Context (opening paragraph, line 17, and Owner summary); Context / Existing mobile viewers (lines 113-115); Scope (line 139)
 EVIDENCE: Line 17 states the goal ("Make the shared browser usable from a phone"). Context never says who is harmed without the feature, how often, how badly, or whether it heals on its own. Scope line 139 excludes "an extra toolbar keyboard button", the simplest alternative with no new machinery. Lines 113-115 show noVNC 1.7.0, Kasm and n.eko already ship that button. No line gives the reason it was rejected. The design adds a private AT-SPI bus, a worker process, a separate phase route and leases, which is a lot for a single-user alpha. The document is past draft, so this is a nit.
 PROPOSAL: Add a short harm statement to Context and one line saying why the owner rejected the stock noVNC keyboard button, so the proportionality of the helper and phase machinery can be checked against it.
+
+### R-22
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary; Scope; Design / Packaging and recovery; Acceptance Criteria AC-14; Test Plan AC-10, AC-11, AC-12 and AC-14; Tasks T8; `tests/remote-gui/mobile-physical/README.md:13`
+EVIDENCE: The reconciled plan limits physical release verification to iPhone Safari and defers Android Chrome. The physical procedure added by `9989ed70` instructs the tester to run the T8 checklist on both phones. The installed README and skill already describe Android as deferred.
+PROPOSAL: Make iPhone Safari the required T8 run in the fixture checklist and mark any Android run as follow-up evidence.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Detect and show the prompt; Acceptance Criteria AC-12; Test Plan AC-12; Tasks T7 and T8
+EVIDENCE: AC-12 requires an unopened prompt and pending sample to invalidate on independent canvas scale and position changes. `plugins/remote-gui/internal/proxy/mobile.js:77-81` only compares framebuffer dimensions. Design also keeps an open editor active when the verified field moves during keyboard animation, but `mobile.js:168-179,214` resamples the original tap coordinates and `plugins/remote-gui/internal/browser/mobile_focus.py:71-79` refuses a field that moves fully off that point. The proof allows a move small enough to keep the initiating point inside the field. T7 is checked and T8, the only unchecked task, names physical verification and rollback.
+PROPOSAL: Add unchecked regression and implementation tasks for these AC-12 behaviors before the final package run. Require the open-editor case to move the same eligible field fully away from the original tap and demonstrate that the next edit still reaches it.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-10 and AC-11; Test Plan AC-10 and AC-11; Tasks T8; `tests/remote-gui/mobile-physical/README.md:15-21` and `tests/remote-gui/mobile-physical/fixture.py:44-51`
+EVIDENCE: The reconciled physical checklist makes the two-codepoint accent conditional even though AC-11 requires it. The fixture logs remote DOM input and focus events. It does not record pointer counts, caret position or RFB press/release pairs. A tester following the checklist can observe a visible keyboard and final text while missing an extra remote click, an incorrectly placed caret or duplicate traffic that produces no DOM edit.
+PROPOSAL: Name the check that captures each required pointer, caret and RFB assertion, and identify which checks use native iPhone input and which use a separate deterministic harness. Give the decomposed-accent case a reproducible input method and verify the delivered codepoints explicitly.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Owner summary; Test Plan AC-14; Tasks T8 partial evidence
+EVIDENCE: The owner summary describes packaging checks as still needing evidence. Reconciliation added a documented rollback, desktop input and cleanup run built from `9bf555a3` in T8. AC-14 still requires the complete check on the final package candidate, and the recorded rollback used desktop touch emulation.
+PROPOSAL: Include the earlier package rollback and cleanup evidence in the owner summary, with its build and desktop limitation. Keep exact-candidate verification, the remaining native iPhone cases and independent implementation review open.
