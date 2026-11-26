@@ -272,12 +272,18 @@ for(const family of ['chromium','firefox'] as const)test.skipIf(!enabled||(famil
   await page.clock.pauseAt(pauseAt);
   for(const width of [1100,1050,1000,900])await page.setViewportSize({width,height:1000});
   await page.evaluate(()=>window.dispatchEvent(new Event('resize')));
+  state.delay=450;
   await page.clock.runFor(149);
   check(state.requests.length===first,'a resize request escaped before the debounce elapsed');
   await page.clock.runFor(1);
   await waitCalls(first+1);
+  // Native resize notifications can arrive while the final size is in flight.
+  await page.evaluate(()=>window.visualViewport!.dispatchEvent(new Event('resize')));
+  await page.clock.runFor(150);
+  check(state.requests.length===first+1,'same-size resize escaped while the request was in flight');
   await page.clock.resume();
-  await Bun.sleep(200);
+  await Bun.sleep(650);
+  state.delay=0;
   check(state.requests.length===first+1&&state.requests.at(-1)?.width===900&&state.requests.at(-1)?.height===968,'resize burst was not debounced');
   await page.evaluate(()=>window.dispatchEvent(new Event('resize')));await Bun.sleep(250);check(state.requests.length===first+1,'unchanged geometry repeated work');
   state.delay=450;await page.setViewportSize({width:800,height:900});await waitCalls(first+2);await page.setViewportSize({width:700,height:900});await page.setViewportSize({width:600,height:900});await waitCalls(first+3);await Bun.sleep(500);check(state.peak===1&&state.requests.at(-1)?.width===600,'in-flight requests were not coalesced');state.delay=0;

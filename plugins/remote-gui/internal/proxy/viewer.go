@@ -175,7 +175,9 @@ function queueSize(claim=false){
 async function flushSize(){
  if(sizeInFlight||!pendingSize||keyboardAffectsSize()||!sizingEligible())return;
  keyboardViewport=null;
- const request=pendingSize;pendingSize=null;sizeInFlight=true;
+ const request=pendingSize;pendingSize=null;
+ if(!request.claim&&request.retries===0&&request.width+'x'+request.height===lastSize)return;
+ sizeInFlight=true;
  const controller=new AbortController();sizeAbort=controller;
  const deadline=setTimeout(()=>controller.abort(),5000);
  try{
