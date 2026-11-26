@@ -10,10 +10,10 @@ Install a copy with `git archive <commit> plugins/remote-gui | tar -x -C <dir>` 
 
 ## Phone checklist
 
-Do this once in iPhone Safari and once in Android Chrome. Both phones must be on the tailnet as the session owner. Open the printed URL, tap the remote address bar twice, type `127.0.0.1:18731/` and press Go.
+Run this checklist in iPhone Safari on the tailnet as the session owner. Android Chrome verification is a follow-up. Open the printed URL, tap the remote address bar twice, type `127.0.0.1:18731/` and press Go.
 
 1. Tap Text once. The keyboard stays closed and a **Tap to type** prompt appears. Tap the prompt: the keyboard opens. Type `z`.
-2. In the same field type `é` from the keyboard, then `e` followed by a combining acute if the keyboard offers it, then `😀`. Press backspace once.
+2. In the same field type `é` from the keyboard and `😀`. Prepare `é` as U+0065 U+0301 in a disposable local note or the iOS test runner, then use Safari’s native Paste action in the open editor. Inspect the synthetic remote value as codepoints to distinguish it from U+00E9. Press backspace once and record the resulting field value.
 3. Repeat step 1 in Password, Textarea, Contenteditable, the framed field and the address bar.
 4. Tap the background area, Readonly and Disabled. No prompt and no keyboard should appear.
 5. Tap Adjacent A and then Adjacent B quickly, then back. The prompt follows the field you tapped last.
@@ -23,3 +23,5 @@ Do this once in iPhone Safari and once in Android Chrome. Both phones must be on
 9. Rotate to landscape and back. Open and dismiss the keyboard twice. After a dismissal, one tap must not reopen it.
 10. Scroll to Low field and Submit, then type into Low field and tap Submit. Open the Clipboard panel while a prompt shows. Reload the viewer and type once more.
 11. Confirm the noVNC toolbar has no keyboard button.
+
+Use the real RFB browser regression to check per-tap pointer packets, caret placement and per-edit key packets. The physical fixture records visible Safari behavior and the resulting remote edits.
