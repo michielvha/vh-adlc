@@ -72,6 +72,9 @@ reports missing labels, create nothing and give its next step.
   allows creating it.
 - Ground every claim in a citation you gathered in this run: a `file:line`, a command and its output, or a
   source you read and list. Measure rather than remember.
+- Start Background with the harm statement from `references/loop.md` (Weigh the harm before building
+  machinery): the harm, the simplest alternative without machinery, and why the design beats it. Keep
+  the design in proportion to that harm.
 - Write criteria as end states, each with a Test Plan row naming a real check.
 - Where the design changes state, runs concurrently, or crosses a process or network boundary, state in
   Design what happens under concurrent requests, partial failure, retry or replay, and upgrade or rollback
@@ -79,7 +82,9 @@ reports missing labels, create nothing and give its next step.
 - When you change a rule, limit or default, search the document for every other place that states it and
   change them all in the same commit.
 - Put every judgement call into Open Questions in the standard's decision shape, and put each to the owner
-  with the host's question tool. Never answer one yourself. Fold the owner's answers into the document. When
+  with the host's question tool. Never answer one yourself. Under
+  [severity by consequence](#under-severity-by-consequence), this covers only the calls its
+  plausible-choice rule names; record every other choice in Design. Fold the owner's answers into the document. When
   the resolved convention states the nit rule, nits from a review pass are not Open Questions; review
   mode handles them under that rule.
 - Creating an issue needs explicit authority.
@@ -97,7 +102,8 @@ reports missing labels, create nothing and give its next step.
    alone prompted the re-review of a `planned` or `in-progress` spec, follow the
    [drift re-review limit](#drift-re-reviews).
 2. Dispatch `vh-adlc-reviewer` as `references/review-protocol.md` describes, with the document, X, kind
-   `spec`, the docs revision, the binary path and the plugin pin. If dispatch is impossible, write the handoff and leave
+   `spec`, the docs revision, the binary path, the plugin pin and the scope
+   `bun scripts/loop/cli.ts review-scope` prints for X. If dispatch is impossible, write the handoff and leave
    the review pending.
 3. Apply the model eligibility rules in `references/review-protocol.md` before storing anything.
    A requested model must match; an unrequested default may report `MODEL: unknown`,
@@ -105,15 +111,29 @@ reports missing labels, create nothing and give its next step.
    session. If the protocol leaves the review pending, store nothing. Otherwise store the records
    after the header under the next `### R-<n>`, with a Review Log row at X naming the reported model,
    before changing anything. Then run `vh-adlc review check` against the same text.
-4. Check the [drift re-review limit](#drift-re-reviews) before applying findings. Apply the eligible
+4. Check the [drift re-review limit](#drift-re-reviews) and the convergence trigger before applying
+   findings. The trigger fires when this pass and the spec review before it both have blocking
+   findings, and this pass has at least as many: count the `SEVERITY: blocking` records under each
+   `### R-<n>`. For example, R-5 with 12 blocking after R-4 with 11 fires it; R-5 with 9 does not. When
+   it fires, revise nothing. Ask the owner one proportionality question that restates the harm
+   statement and the simplest alternative, with four choices: keep going, narrow the scope, replace the
+   feature with the alternative, or park it. Recommend one. Act on the answer before any further
+   revision, and count passes for the trigger only from that answer onward. Otherwise apply the eligible
    findings as one revision. First list the behaviors the design touches and every test, scenario and
    fixture the criteria and Test Plan name. Walk each eligible finding and every change it implies
    through all of them, and re-read each named test or scenario before changing what it checks.
-   Turn judgement findings into Open Questions for the owner first, without changing the baseline; when
-   the nit rule below applies, nits are the exception. Once the owner has answered, apply every factual finding to be applied and every answer in
+   Turn judgement findings into Open Questions for the owner first, without changing the baseline; when the
+   nit rule below applies, nits are the exception, and under
+   [severity by consequence](#under-severity-by-consequence) only the findings its plausible-choice rule
+   names become questions. Once the owner has answered, apply every factual finding to be applied and every answer in
    one commit. Where a finding can be met by removing a mechanism or by adding one with the same
    behavior, remove it; where they behave differently, the choice is an Open Question recommending
-   removal. Where a finding traces to a change the previous revision made, revisit that change instead of
+   removal. The exception is an extra the author added on its own initiative: a mechanism, assertion or
+   proof step that no criterion, owner decision or public contract requires. When removing it needs no
+   follow-up, remove it without an Open Question and record the removal in the Outcome cell of that
+   pass's Review Log row, for example `removed author extra: replacement-pod assertion (R-4 F-02)`. A
+   removal that touches a criterion, an owner decision or a public contract keeps the Open Question.
+   Where a finding traces to a change the previous revision made, revisit that change instead of
    patching on top of it. List the behaviors and checks you walked in the report. A blocking pass is
    cleared only by a new independent pass at the new commit.
 
@@ -122,14 +142,56 @@ reports missing labels, create nothing and give its next step.
    lists `nit` as a record value does not state it. When it applies, follow it in that same commit: fix
    every nit of the pass, factual or judgement and in any section, only when the pass's blocking or
    should-fix findings change the normative baseline, and never a free-text widening nit. Raise no nit as an Open Question. List every nit you did not apply, from every pass this run
-   handled, with its review and finding IDs and one line, in your report and the owner-facing summary,
-   not in the document. When the resolved page does not state it, apply a factual nit like any other factual
+   handled, with its review and finding IDs and one line, in your report and the owner-facing summary, not
+   in the document; under [severity by consequence](#under-severity-by-consequence) the summary triages
+   them as that section says. When the resolved page does not state it, apply a factual nit like any other factual
    finding and turn a judgement nit into an Open Question, as before the rule, and say in the report that
    the nit rule needs the plugin's own pin from `knowledge.md`.
 5. When a clean review at X exists, Open Questions is empty and acceptance is needed, present the
    owner-facing summary below, then ask the owner to accept. On acceptance in session, append the
    acceptance row at X, run `vh-adlc gate planned`, and on a pass move the status and commit with the
    gate's line.
+
+## Under severity by consequence
+
+These rules apply when the resolved `conventions/feature-documents.md` names the product profile as the
+context for severity: its Review log section rates findings by consequence for the repository's product
+profile. On an older revision, keep the rules above as they stand: every judgement call goes to Open
+Questions, the owner summary lists every unapplied nit, and there is no Deferred section and no cut check.
+
+- **Open Questions.** Raise a judgement call in author mode, or a judgement finding in review mode step 4,
+  only under the plausible-choice rule: where the owner could plausibly choose differently, judged against
+  the product profile and the files `bun scripts/loop/cli.ts context` lists. Settle every other choice and
+  record it in Design with a one-line reason. That includes step 4's remove-or-add choice: where removing
+  and adding behave differently, raise it only under the same rule, recommending removal. Step 4's
+  exception for an extra you added stays as it is, with its Review Log record. Every option you offer
+  meets the goal in full.
+- **Stated limits.** You may answer a finding with a stated limit instead of a new mechanism: a Scope line
+  `Not handled: <the case>, <why> (R-<n> F-<nn>).` It changes the baseline, so it goes in the revision like
+  any other change. It is your call, unless the limit excludes a case the goal, a criterion or a behavior
+  Scope promises names; then it is an Open Question.
+- **Deferred entries.** Record every deferral as one line in the document's `## Deferred` section, after
+  Open Questions: `- D-<nn>: <the item>. From: <source>. Verdict: pending.`, with the next unused ID. The
+  source is exactly one of `R-<n> F-<nn>, stated limit` for a stated limit you add, beside its Scope line;
+  `R-<n> F-<nn>, deferred at acceptance` for a finding the owner defers when accepting;
+  `owner cut on <date>` for an item an owner-directed cut removes; `author cut` for an extra you remove
+  under step 4's exception; and `drift re-review R-<n>` for extra work the owner defers in a drift
+  re-review. The section is outside the normative baseline, so an entry alone never needs a new review.
+- **Cut check.** After every owner-directed deferral (a cut in session, a proportionality answer of
+  narrow, a finding deferred at acceptance, extra work deferred in a drift re-review), check each item
+  before recording it. An item that is an always-blocking defect (security, data loss, tenant isolation),
+  or that the goal or a criterion names, becomes an Open Question instead of a Deferred entry: keep it, or
+  drop it knowingly as a stated limit. Put one line in the reply,
+  `Cut check: nothing important lost (D-<a> to D-<b> recorded).`, or name the items you turned into
+  questions and why. A deferral at acceptance that becomes a question holds the acceptance until the owner
+  answers it. The check judges importance only; usefulness waits for ship's follow-up review after merge.
+- **Scope.** For every spec review, run
+  `bun scripts/loop/cli.ts review-scope --repo <dir> --document <doc> --commit <X>` and pass its JSON to
+  the reviewer in the host dispatch. A command route's `review` command computes the same scope itself.
+- **Owner-list triage.** The owner-facing summary shows only the unapplied nits the owner's recorded rules
+  do not settle, with a count of the rest and where the full list is. The full list, every unapplied nit
+  with its review and finding IDs and one line, follows in a section headed `All unapplied nits` at the end
+  of the same reply.
 
 ## Drift re-reviews
 

@@ -23,8 +23,6 @@ jobs:
 
   checker:
     runs-on: ubuntu-latest
-    env:
-      VH_ADLC_TRIAGE_TEST_TIMEOUT_MS: '60000'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -70,7 +68,7 @@ jobs:
           install -D src/mv "$RUNNER_TEMP/diagram-bin/mv"
           printf '%s\n' "$RUNNER_TEMP/diagram-bin" >> "$GITHUB_PATH"
       - name: Check the vh-adlc package
-        run: bun test tests/vh-adlc --timeout 60000
+        run: bun test tests/vh-adlc --parallel --timeout 60000
 
   checker-macos:
     runs-on: macos-latest
@@ -99,7 +97,7 @@ jobs:
           bun plugins/vh-adlc/scripts/docs-drift/build-zip.ts --check
       - name: Check portable vh-adlc behavior
         run: >-
-          bun test tests/vh-adlc/*.test.ts
+          bun test --parallel tests/vh-adlc/*.test.ts
           tests/vh-adlc/triage/collection.test.ts
           tests/vh-adlc/triage/copilot-trial.test.ts
           tests/vh-adlc/triage/discovery.test.ts

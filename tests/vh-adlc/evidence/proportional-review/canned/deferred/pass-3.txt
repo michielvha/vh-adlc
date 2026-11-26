@@ -1,0 +1,7 @@
+MODEL: scripted-reviewer
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan
+EVIDENCE: `greet.sh` changed on the default branch, and no release step checks `names.log` before a release goes out.
+PROPOSAL: Add a release check that runs `greet.sh` against a fresh `names.log` before every release and blocks the release when the log is wrong.

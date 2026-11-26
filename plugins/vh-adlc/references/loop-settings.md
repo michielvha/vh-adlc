@@ -34,7 +34,7 @@ Resume takes the route of the operation it continues.
 | `schema_version` | Required integer `1` when the file exists. |
 | `roles.<role>.route` | `host` or `command`. A role that is not listed uses `host` with no model. |
 | `roles.<role>.model` | Optional for `host`, passed to the host as a requested model under `review-protocol.md`. Required for `command`. |
-| `roles.<role>.argv` | `command` only: the executable, then its arguments. It must contain `{prompt}` or `{prompt_file}`, and may use `{model}` and `{export_dir}`. No other placeholder is accepted. |
+| `roles.<role>.argv` | `command` only: the executable, then its arguments. It must contain `{prompt}` or `{prompt_file}`, and may use `{model}` and `{export_dir}`. No other placeholder is accepted. `{prompt}` passes the whole prompt as one argument, which Linux limits to 128 KiB, and a scoped spec re-review's prompt carries the document diff, so a large revision can pass that limit. Prefer `{prompt_file}`, for example `sh -c 'f=$1; shift; exec "$@" - < "$f"' sh {prompt_file} codex exec ...` for a CLI that reads `-` from standard input. |
 | `roles.<role>.model_attestation` | Optional, `command` only: `codex-session` reads the served model from Codex's session log for the run's thread id instead of the reviewer's self-report; the `argv` must include `--json`. A missing log, no or several recorded models, or a mismatch leaves the review pending. |
 | `review_scratch` | Optional list of directories inside the checkout left out of the before-and-after check: build output a shell-enabled implementation reviewer may write to, and ignored directories other sessions or tools write while a review runs, such as other worktrees, temp roots and `node_modules`. Changes there do not leave the review pending. An entry is checked by its path alone, so it may be a symlink, such as a worktree's shared `node_modules`. Never `.`, an absolute path, `..` or `.git`. |
 | `project_procedure` | Optional contained file of local rules. Every SDD operation reads it before acting. |
@@ -125,8 +125,10 @@ host's own worktree tool for a worktree, or to stop before writing.
 project procedure), the lenses, and `plugin`: the running plugin version and, where the host keeps an
 install record, the installed one. A host keeps the plugin a session started with, so after an update
 `plugin.stale` is true until the session restarts, and operations stop before writing. When a `vh-adlc`
-on PATH reports another version than the plugin's lock, `plugin.binary_warning` says so, and operations
-run only the binary `scripts/ensure-vh-adlc.sh` prints.
+on PATH is not the plugin's locked binary, because its digest does not match the lock, `plugin.binary_warning`
+says so and `plugin.path_binary` is `unverified`, and operations run only the binary
+`scripts/ensure-vh-adlc.sh` prints. Neither the context command nor the installer ever runs an unverified
+PATH entry.
 
 Only `spec_reviewer` and `implementation_reviewer` accept a `command` route; settings that give one to
 `author` or `implementer` are refused, naming the role. Agent and skill files never name a model.

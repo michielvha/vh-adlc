@@ -4,7 +4,7 @@ import type { LabelsGitHub } from "./github";
 import { digest } from "./plan";
 
 export type FilingRequest = {
-  operation: "investigate" | "spec";
+  operation: "investigate" | "spec" | "follow-up";
   type: string;
   verdict?: "act now" | "track" | "reject";
   waiting_on?: "prerequisite" | "decision";
@@ -17,12 +17,17 @@ export type Preview = {
   title: string; body: string; labels: string[]; missing: string[]; next: string | null;
 };
 
+/** A follow-up review's issue body ends with this line, naming the feature document and its entry. */
+export const DEFERRED_LINE = /^Deferred: \S+ D-\d{2,}$/;
+/** Ship's follow-up review files a follow-up with the feature type and a gap with the bug type. */
+const FOLLOW_UP_TYPES = ["enhancement", "bug"];
+
 const PLAN_STEP = "Run `bun <plugin>/scripts/labels/cli.ts plan --repo <checkout> --output <new file>`, have the owner approve its exact digest and apply it, then file again.";
 
 /** The standard state label a request names (references/issues.md), or null for none. */
 export function stateFor(request: FilingRequest): string | null {
-  if (request.operation === "spec") {
-    if (request.verdict !== undefined || request.waiting_on !== undefined) throw new Error("spec files an issue with a type label only");
+  if (request.operation === "spec" || request.operation === "follow-up") {
+    if (request.verdict !== undefined || request.waiting_on !== undefined) throw new Error(`${request.operation} files an issue with a type label only`);
     return null;
   }
   if (request.verdict === "act now" && request.waiting_on === undefined) return "ready";
@@ -41,6 +46,11 @@ export function filingPreview(root: string, gh: LabelsGitHub, request: FilingReq
   const labels = effectiveLabels(loadSettings(root));
   const type = labels.find((label) => label.kind === "type" && label.standard === request.type);
   if (!type) throw new Error(`type must be one of the standard type labels: ${labels.filter((label) => label.kind === "type").map((label) => label.standard).join(", ")}`);
+  if (request.operation === "follow-up") {
+    if (!FOLLOW_UP_TYPES.includes(request.type)) throw new Error(`follow-up files with the feature type (enhancement) or the bug type (bug), not ${request.type}`);
+    const last = request.body.trimEnd().split("\n").at(-1) ?? "";
+    if (!DEFERRED_LINE.test(last)) throw new Error("a follow-up issue body ends with the line `Deferred: <document path> D-<nn>`");
+  }
   const state = stateFor(request);
   const wanted = [type, ...labels.filter((label) => label.standard === state)];
   const actor = gh.actor(), existing = gh.labels(identity.repository);

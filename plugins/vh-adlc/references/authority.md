@@ -25,6 +25,7 @@ additional execution or publication permission.
 | Create a tracking issue | Included in acceptance, or requested; a triage-created issue must be in its exact approved batch |
 | Apply a label plan with the labels helper | The owner's approval of that exact plan digest for that repository (`references/issues.md`) |
 | Push the feature branch, create or update its PR, update the linked issue | An explicit ship request, whether directly named or selected through intake |
+| Record a merged feature's follow-up review: file the approved follow-up and gap issues, create one temporary worktree on a new `docs/follow-up-<slug>` branch from the remote default branch, commit the verdicts there, push that branch and open or update its PR | The owner's one approval in ship's follow-up review after merge (`skills/vh-adlc-ship/SKILL.md`). It never merges, never pushes the default branch, and needs no writer handoff, because it edits only the merged document's Deferred section |
 | Merge | Separate approval for that exact action, or the explicitly selected audit batch's current/adopted `conditional-merge` permission and all retained gates in [audit.md](audit.md). Either one also covers that PR's `after-merge` branch cleanup in [branches.md](branches.md) |
 | Rebuild/restart an owned audit verification runtime | Current explicit permission or adopted `live-verify` naming that exact owned development target and method, with all local ownership/restriction gates |
 | Tag, release, deploy, restart an unrelated/shared app, end a live session | Separate approval for that exact action; audit grants none of these effects |
@@ -33,6 +34,7 @@ additional execution or publication permission.
 | Enabling automatic merged-branch deletion | The owner's yes to enabling it for that repository with `auto-delete --enable`, a request that already asks for it, or an approved plan digest that includes it, all from [branches.md](branches.md) |
 | Turning on free repository security settings with the security-settings helper's `apply` | The consumer's committed settings adopt `security_settings: apply` for a repository they name, on github.com. Among maintenance runs, only a full sweep whose request has `authorized_sweep` true may apply; a request flag that selects `check` or a pull-request scope gives `check`. Onboarding applies only as the committed settings decide. A continuation reuses the run's saved helper files and does not run the helper again. Adopting `apply` is the owner's agreement that `guides/onboard-a-repository.md` in vhco-pro/docs asks for. Nothing grants turning a setting off. See [security-settings.md](security-settings.md) |
 | Cleaning stale merged branches and their worktrees | Owner approval of the exact plan digest from [branches.md](branches.md), or a sweep request that already asks for stale-branch removal. A plan whose `remove-worktree` operations list ignored paths needs the owner's approval of its digest even after such a request |
+| Under `skills/vh-adlc-orchestrate/SKILL.md`: editing its workstream ledger, dated owner-answer comments on work-item issues, its own harm statements and handoffs in the ledger, and archiving the workstream's sub-sessions, including those a previous orchestrator started, once each is done | The owner's request to orchestrate that workstream. It grants nothing else: creating the ledger issue, writing a feature document, merging, releasing and ending any other live session keep the authority their own rows give |
 | Another repository, account or feature | A new scope decision |
 
 Scoped audit `live-verify` covers only the owned development target, temporary test resources and
@@ -90,7 +92,7 @@ a worktree when it starts in the primary checkout. That worktree is the host's: 
 creates none, and on a host without such a tool the operation stops before writing.
 
 Work on a feature only in its owning worktree, found with `git worktree list --porcelain`; run branch
-checks, `fresh` and `gate` there. Outside the maintenance, audit and docs-drift roles below, never create, remove, prune, reset or force-move a worktree,
+checks, `fresh` and `gate` there. Outside the maintenance, audit and docs-drift roles below, and the one temporary worktree ship's follow-up review after merge creates and removes for its `docs/follow-up-<slug>` branch, never create, remove, prune, reset or force-move a worktree,
 and never repoint an unrelated branch. The one exception is the branch helper in [branches.md](branches.md):
 under the authority above, it deletes branches and refs whose tips it proved merged, and removes the
 clean worktrees its rules allow: no changed tracked files and no untracked files, with ignored files

@@ -195,6 +195,7 @@ Keep the current noVNC release and license notices. Add the automated helper, st
   On 2026-11-21, the owner used Safari on the iPhone 15 Pro Max with iOS 27.2.1 to test the private viewer from `66c737bc`. The owner confirmed that the second tap opened the native keyboard. The remote field recorded four edit events and its exact single-character assertion remained open. Two wireless XCTest attempts timed out while enabling UI automation before Safari opened.
   The next two Xcode runs reached Safari on the same iPhone. The first tap focused the remote field, but neither run displayed the typing prompt. An isolated trace found that the accessibility tree walk exhausted its budget even though the platform's focused-state query found the field. The helper now keeps one private bus connection and uses that query to select a unique candidate before checking its state, bounds, and input mode.
   The repaired remote-gui 0.4.0 package (SHA-256 `f01a82530d92d447aed3aebf6fbdad99e06851d290baca8f8f94428a02197589`) passed the physical Safari test on the iPhone 15 Pro Max with iOS 27.2.1, stock Chromium 156.0.8078.79 and noVNC 1.5.0. The keyboard stayed closed after the first field tap, opened after the second tap on the inline prompt, and the remote field received exactly one edit with the expected `z`. The private session stopped after the run. The enabled Chromium and noVNC browser regression also passed against this package, including a remote address-bar edit and the private bus call check. The rest of the physical matrix remains open.
+  On 2026-11-24 the rollback and cleanup sequence ran again on this same candidate. The Fedora host built the copy from `9bf555a3` into a private cache and got the same binary SHA-256 `f01a8253`. The prior package came from `origin/main` (`e813e83b`). In one isolated home, a prior session A and a candidate session B started, then a prior session C started while B stayed live. `tests/remote-gui/mobile-physical/viewer-check.mjs` opened all three from desktop Chromium on the Mac with touch emulation. Each canvas drew. Only B requested the mobile module, and none showed a keyboard button. Killing B's private bus left its viewer drawing. Stopping B removed all of its processes, including the orphaned focus worker, while A and C stayed connected. A two-minute candidate session left no process after expiry. Through `tests/remote-gui/mobile-physical/start.sh`, a desktop hardware keyboard loaded the synthetic fixture in the remote Chromium. It logged one keydown and one keyup per key. Android Chrome and the remaining iPhone cases are still open.
 
 ## Open Questions
 
@@ -224,6 +225,7 @@ None. The owner approved the reported-focus option after the warm-cache overlay 
 | 2026-11-22 | R-16 | spec | `edc803664df47d93618462073a17537cbf01cd22` | unknown | procedural | Three should-fix findings and one factual nit. Model identity was not attested. |
 | 2026-11-22 | R-17 | spec | `62c95df927cbc33fa180f7f5c604b64b6039848c` | unknown | procedural | Three should-fix findings on recovery and geometry verification. Model identity was not attested. |
 | 2026-11-22 | R-18 | spec | `413ea2344b0a3b070d4ff6a1a3af47083676a73c` | unknown | procedural | No findings. Model identity was not attested. |
+| 2026-11-24 | R-19 | spec | `ee6ac65605a4c8ca44ef5b8610472f7eb6c05c87` | claude-opus-5-5 | procedural | Covered drift review found three nits and nothing blocking; acceptance kept. |
 
 ### R-1
 
@@ -678,3 +680,26 @@ PROPOSAL: State whether an extent change alone invalidates an open editor when f
 ### R-18
 
 NO FINDINGS
+
+### R-19
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Packaged implementation checks (line 41 and line 49); Tasks T8 partial evidence (line 195)
+EVIDENCE: I rated this pass under docs e79eaa6a0126f2e8ddca2cf14e3db3067b244cc7, the revision AGENTS.md pins at ee6ac65605a4c8ca44ef5b8610472f7eb6c05c87 and the one `vh-adlc lint` reports with source "repository". The dispatch named 0c983f6 instead, and its short SHA ee6ac6567 does not resolve to HEAD. The convention makes this a full pass because AGENTS.md, a bridge file, changed. On the finding itself: line 41 says "The mobile helper now rechecks the last verified field without rescanning the tree", and line 49 says "Raising the limit to 384 kept the same lookup deadline." Commit 86ae7838, made after R-15, took out both. `git show 86ae7838` deletes the `hint`/`hintEpoch` fields from mobile.go and the hint path, MAX_NODES = 384 and the tree walk from mobile_focus.py. The helper is now a persistent worker that calls `Collection.GetMatches` with a limit of 2. Line 195 describes the new approach, so lines 41 and 49 now contradict it about how the helper works today.
+PROPOSAL: Put lines 41 and 49 in the past tense, or add one line saying the focused-state match query in T8 replaced the hint recheck and the node limit.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Owner summary (fourth paragraph, line 29); Context / Packaged implementation checks (lines 45 and 55); Tasks T8 partial evidence (line 196)
+EVIDENCE: For observed proof, the Owner summary names only "The earlier physical fixtures ... Their cooperative pages did not prove this implementation." The detailed sections record three things it leaves out. Line 45 has packaged iPhone Safari passes against `492c2f9e`. Line 55 has the owner's 2026-11-20 approval to ship after using the preview. Line 196 has a physical Safari pass on the repaired package f01a8253... with exactly one `z` edit. The standard asks for the summary to be refreshed when proof changes and to separate planned checks from observed proof.
+PROPOSAL: Give the summary one or two sentences on validation state: packaged iPhone Safari passed the ordinary text case, the owner approved shipping, and Android plus the rest of the physical matrix are still open.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context (opening paragraph, line 17, and Owner summary); Context / Existing mobile viewers (lines 113-115); Scope (line 139)
+EVIDENCE: Line 17 states the goal ("Make the shared browser usable from a phone"). Context never says who is harmed without the feature, how often, how badly, or whether it heals on its own. Scope line 139 excludes "an extra toolbar keyboard button", the simplest alternative with no new machinery. Lines 113-115 show noVNC 1.7.0, Kasm and n.eko already ship that button. No line gives the reason it was rejected. The design adds a private AT-SPI bus, a worker process, a separate phase route and leases, which is a lot for a single-user alpha. The document is past draft, so this is a nit.
+PROPOSAL: Add a short harm statement to Context and one line saying why the owner rejected the stock noVNC keyboard button, so the proportionality of the helper and phase machinery can be checked against it.

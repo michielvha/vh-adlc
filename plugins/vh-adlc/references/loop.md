@@ -19,6 +19,30 @@ it matters. For unpublished work, label it local and link the actual file using 
 When a link is unavailable, give the repository and exact path or identifier. Use links the reader is
 authorized to open.
 
+## Weigh the harm before building machinery
+
+Machinery is any new mechanism a fix adds: code, a workflow, a credential or account, a gate, or
+signalling between systems. Before you recommend, file or specify it, write the harm statement:
+
+- The harm: who is affected, how often, how bad it is, and whether it heals on its own.
+- The simplest alternative without machinery: a process rule, a manual step, documentation, or
+  waiting for a later milestone.
+
+Recommend machinery only when it clearly beats that alternative, and say why. Otherwise recommend
+the alternative. The same check comes first when one feature would become a prerequisite of another,
+before it gates any work or any fan-out waits on it: a prerequisite that loses to its alternative
+gates nothing, and the dependent work goes ahead with the alternative.
+
+## Product profile
+
+A repository states its product in a section headed Product profile in its root `AGENTS.md`: what the
+product is, who uses it, its stage, and what is at stake (tenants, user data, money, credentials). A few
+lines are enough. When the resolved `conventions/feature-documents.md` names the product profile as the
+context for severity, spec reviews rate failure paths by it, and the spec skill judges Open Questions and
+the owner's nit list against it together with the files `bun scripts/loop/cli.ts context` lists.
+Without a profile, reviews judge as for production software with users whose data matters. Each adopter
+writes its own; the plugin never adds one to a consumer repository.
+
 ## Check host capacity before any fan-out
 
 Before you create a worktree, start another session or sub-agent, or launch parallel or long local
