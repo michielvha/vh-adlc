@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 status_description: "Exact-build iPhone Safari verification and independent implementation review passed."
 branch: feat/remote-gui-mobile
 issue: null
