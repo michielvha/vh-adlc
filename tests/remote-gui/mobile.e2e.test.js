@@ -29,10 +29,12 @@ const fields = [
 test.skipIf(!enabled)('two inline taps edit a URL and a field through stock Chromium and noVNC', async () => {
     const { chromium } = requireModule(process.env.REMOTE_GUI_PLAYWRIGHT_MODULE);
     const root = mkdtempSync(join(tmpdir(), 'rg-mobile-e2e-'));
-    const observations = { geometry: null, edit: null, cover: null, mode: null, value: null, layout: null, caret: null };
+    const observations = { bootstrap: false, bootstrapClicked: false, geometry: null, edit: null, cover: null, mode: null, value: null, layout: null, caret: null };
+    const fixtureReads = [];
     let entryLeft = 35;
     const fixture = createServer(async (request, response) => {
         const path = new URL(request.url, 'http://127.0.0.1').pathname;
+        if (request.method === 'GET' && path !== '/entry-left') fixtureReads.push(path);
         if (request.method === 'POST' && ['/geometry', '/edit', '/cover', '/mode', '/value', '/layout', '/caret'].includes(path)) {
             let body = '';
             for await (const part of request) {
@@ -46,6 +48,18 @@ test.skipIf(!enabled)('two inline taps edit a URL and a field through stock Chro
         if (request.method === 'GET' && path === '/entry-left') {
             response.setHeader('Content-Type', 'application/json');
             response.end(JSON.stringify(entryLeft));
+            return;
+        }
+        if (request.method === 'GET' && path === '/bootstrap') {
+            observations.bootstrap = true;
+            response.setHeader('Content-Type', 'text/html');
+            response.end(`<!doctype html><meta charset="utf-8"><title>Remote URL bootstrap</title>
+<script>document.addEventListener('click',()=>void fetch('/bootstrap-click'));</script>`);
+            return;
+        }
+        if (request.method === 'GET' && path === '/bootstrap-click') {
+            observations.bootstrapClicked = true;
+            response.writeHead(204).end();
             return;
         }
         if (request.method !== 'GET' || path !== '/s') {
@@ -167,6 +181,13 @@ setInterval(async ()=>{
         await canvas.focus();
         await page.keyboard.press('Control+t');
         await page.keyboard.press('Control+l');
+        // Chrome's New Tab page can update its search UI independently.
+        // Start the address-bar interaction on a page the test controls.
+        await page.keyboard.type('http://127.0.0.1:' + fixture.address().port + '/bootstrap');
+        await page.keyboard.press('Enter');
+        for (let attempt = 0; attempt < 40 && !observations.bootstrap; attempt++) await delay(100);
+        assert.equal(observations.bootstrap, true, 'the remote tab did not load the local bootstrap');
+        await page.keyboard.press('Control+l');
         // Read the focused native entry once to place the tap at its actual
         // position. Chromium's toolbar dimensions vary with runner builds.
         const probes = [];
@@ -191,6 +212,11 @@ setInterval(async ()=>{
         }
         if (!addressField) await captureFailure();
         assert.ok(addressField, 'Chromium did not report a focused address bar: ' + JSON.stringify(probes));
+        // Return focus to the page. The real first tap should select the
+        // existing URL using Chromium's native address-bar behavior.
+        await canvas.click({ position: { x: 18, y: 140 } });
+        for (let attempt = 0; attempt < 40 && !observations.bootstrapClicked; attempt++) await delay(100);
+        assert.equal(observations.bootstrapClicked, true, 'the remote page did not receive focus before the first tap');
         await page.route('**/__remote_gui/editable', route => route.fulfill({ status: 503 }), { times: 1 });
         await page.route('**/__remote_gui/editable-phase', route => route.fulfill({ status: 503 }), { times: 1 });
         await tap(Math.floor(addressField.x + addressField.width / 2), Math.floor(addressField.y + addressField.height / 2));
@@ -250,6 +276,7 @@ setInterval(async ()=>{
         }
         await resumed.waitFor({ timeout: 1500 });
         const address = 'http://127.0.0.1:' + fixture.address().port + '/t';
+        const addressKeyStart = keyFrames.length;
         for (const character of address) await page.keyboard.insertText(character);
         await page.keyboard.press('Shift+ArrowLeft');
         await page.keyboard.insertText('s');
@@ -260,7 +287,12 @@ setInterval(async ()=>{
         page.on('request', recordViewport);
         await page.keyboard.press('Enter');
         for (let attempt = 0; attempt < 35 && !observations.geometry; attempt++) await delay(100);
-        assert.ok(observations.geometry, 'the corrected address did not load the expected page');
+        if (!observations.geometry) {
+            await captureFailure();
+            assert.fail('The corrected address did not load. Fixture reads: ' + JSON.stringify(fixtureReads)
+                + '; RFB key frames: ' + JSON.stringify(keyFrames.slice(addressKeyStart))
+                + '; focus replies: ' + JSON.stringify(focusReplies.slice(-8)));
+        }
         // Safari can end the native input session before its visual viewport
         // reports that the keyboard has finished moving off screen.
         await editor.waitFor({ state: 'hidden', timeout: 3000 });
