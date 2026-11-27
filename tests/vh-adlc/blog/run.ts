@@ -678,7 +678,8 @@ for (const id of selected) {
     checks.noveltyFlagged = /only|novelty|Pine|unsupported/i.test(response);
   }
   if (id === "fallback") checks.honestFallback = /self.edit/i.test(response) && /unavailable|disabled|no.*retriev|not.*retriev/i.test(response);
-  if (id === "editor") checks.editorVerdict = /verdict|needs revision|copy repairs/i.test(response) && /preference|soften|unjustified/i.test(response);
+  if (id === "editor") // "Weakens the recommendation" names the same softening as "soften" does.
+    checks.editorVerdict = /verdict|needs revision|copy repairs/i.test(response) && /preference|soften|weaken|unjustified/i.test(response);
   if (id === "ship-public") checks.explicitSuggestion = response.includes("vh-adlc-blog promote") && /unreleased|no.*release|not.*released|not.*published/i.test(response);
   if (id === "ship-internal") checks.noSuggestion = !response.includes("vh-adlc-blog promote");
   writeFileSync(join(out, `${id}.response.txt`), response);

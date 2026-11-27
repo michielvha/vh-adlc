@@ -114,7 +114,8 @@ opening words of the passage, for example "under The cutover, the run starting
 - A presentation revision adds, moves, removes or replaces treatments, corrects the
   caption or alt text of a treatment, or edits a diagram treatment, as the request
   names, and leaves every prose line, heading, front matter field, code block and
-  exact-wording span byte-identical.
+  exact-wording span byte-identical. It places treatments only between existing
+  paragraphs and never splits a paragraph to make room for one.
 
 A request for both wording changes and treatment changes runs as a wording-only
 revision followed by a presentation revision over the revised prose, each under
@@ -212,8 +213,9 @@ inherits the writer's own reading of an image; on Codex that means `spawn_agent`
 with `fork_turns` set to `none`. Tell it to read
 `agents/vh-adlc-blog-editor.agent.md` from the installed package itself rather
 than pasting its text. Give it the resolved docs revision and the path of each
-cached convention page it needs, so it never searches for them outside the
-project. Supply the original and candidate, source-position
+cached convention page it needs, built from that revision as `references/loop.md`
+describes rather than by listing the cache, so neither of you searches outside the
+project, the package and those pages. Supply the original and candidate, source-position
 inventory, edit reasons, source evidence, voice references, protected spans and
 the Presentation inputs. For a new article, supply the brief and notes instead of
 an original. Include social copy in a promotion run. Reuse a site-specific critic
