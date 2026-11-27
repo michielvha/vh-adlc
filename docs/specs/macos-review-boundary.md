@@ -466,43 +466,54 @@ readable, and that a scratch entry touching a store or its parent leaves the rev
 
 ## Acceptance Criteria
 
-- [ ] AC-01: On macOS, a command-route review whose reply passes every existing check comes back `ready`.
+- [x] AC-01: On macOS, a command-route review whose reply passes every existing check comes back `ready`.
+      Evidence: `recorded-run/record-09a01042.md` (code commit 09a01042, this Mac outside any sandbox: boundary tests 79 pass, 5 skip, 0 fail; mutants 18/18): the route tests pass; R-26 at bc2af4d5 returned met.
 - [ ] AC-02: On macOS, no reviewer process can change the owning worktree (files, ignored files, index,
       HEAD, refs) or the private clone outside `review_scratch`, during or after the review, either through
       their own paths or by renaming a parent directory. This includes a descendant that detaches into its
       own session, clears its environment and writes after the reviewer has exited. Writes inside
       `review_scratch` and in the temporary directory still succeed.
-- [ ] AC-03: On a host where neither boundary can be applied, including a macOS process already inside a
+      Residual: https://github.com/michielvha/vh-adlc/issues/195
+- [x] AC-03: On a host where neither boundary can be applied, including a macOS process already inside a
       Seatbelt sandbox, a command-route review stays pending with a reason that names the missing boundary.
-- [ ] AC-04: On a host without `unshare`, `runOwnedClient` with `pidNamespace: true` and no `writeDeny`
+      Evidence: `recorded-run/record-09a01042.md` (code commit 09a01042, this Mac outside any sandbox: boundary tests 79 pass, 5 skip, 0 fail; mutants 18/18): the nested-sandbox and unavailable-boundary tests pass, and the precheck mutation fails the nested test; R-26 returned met.
+- [x] AC-04: On a host without `unshare`, `runOwnedClient` with `pidNamespace: true` and no `writeDeny`
       runs the client with the `marker` boundary instead of throwing.
-- [ ] AC-05: In this repository, `bun plugins/vh-adlc/scripts/loop/cli.ts route` returns a `command` route
+      Evidence: `recorded-run/record-09a01042.md` (code commit 09a01042, this Mac outside any sandbox: boundary tests 79 pass, 5 skip, 0 fail; mutants 18/18): the no-unshare subprocess test passes; R-26 returned met.
+- [x] AC-05: In this repository, `bun plugins/vh-adlc/scripts/loop/cli.ts route` returns a `command` route
       with model `gpt-6.2-sol` and `model_attestation: codex-session` for both `spec review` and `review`.
+      Evidence: `bun plugins/vh-adlc/scripts/loop/cli.ts route` for both reviewer operations prints `"route":"command"`, `"model":"gpt-6.2-sol"` and `"model_attestation":"codex-session"` (T8); R-26 returned met.
 - [ ] AC-06: On this Mac, real Codex spec reviews through `cli.ts review` are stored with outcome `ready`,
       the served model attested from the session log and `git status` unchanged (R-6 to R-9). A real Codex
       implementation review through the final route code comes back `ready` the same way, its reviewer
       having read the recorded unsandboxed run, with the owning worktree's status and refs unchanged. The
       committed script that ran it fails unless the outcome is `ready` for that commit and nothing changed,
       and keeps the run's Codex transcript.
-- [ ] AC-07: `references/loop-settings.md` states the macOS boundary and what it denies, what stays
+      Residual: https://github.com/michielvha/vh-adlc/issues/195
+- [x] AC-07: `references/loop-settings.md` states the macOS boundary and what it denies, what stays
       writable, the pending cases, the `-s danger-full-access` requirement for Codex under it, and that tests
       starting their own `sandbox-exec` need a run outside any sandbox, the reviewer's allowlisted
       environment, and the macOS credential read denies with their Keychain and Linux limits and the
       scratch-over-a-store pending case; `references/review-protocol.md` names the boundary and links to
       `loop-settings.md`.
+      Evidence: `loop-settings.md` and `review-protocol.md` at bc2af4d5 state the AC-07 points, the protocol linking `loop-settings.md` (T20, T33, T35); R-26 returned met.
 - [ ] AC-08: On macOS, a command-route review whose owning worktree holds a protected file with a second
       hard link stays pending, with a reason naming that file, and a protected file that disappears or can't
       be read during that check leaves the review pending with a retryable reason instead of an error.
-- [ ] AC-10: Run on a process without a boundary, such as inside a Seatbelt sandbox,
+      Residual: https://github.com/michielvha/vh-adlc/issues/195
+- [x] AC-10: Run on a process without a boundary, such as inside a Seatbelt sandbox,
       `tests/vh-adlc/loop/review-route.test.ts` reports one failure whose message says the route tests need
       an unsandboxed run, and skips its route tests instead of failing each one.
+      Evidence: `recorded-run/record-09a01042.md` (code commit 09a01042, this Mac outside any sandbox: boundary tests 79 pass, 5 skip, 0 fail; mutants 18/18): inside `sandbox-exec` the route test file reports the single "The route tests need an unsandboxed run" failure and 67 skips; R-26 returned met.
 - [ ] AC-11: On macOS, a `review_scratch` entry that resolves to a protected path, a parent of one, or a path
       inside the Git directory or common Git directory, or a symlink to a path inside a denied path, leaves the
       review pending with a reason naming the entry, while a real scratch directory and a scratch symlink to a
       disjoint directory still work.
-- [ ] AC-12: No variable of the controller's environment reaches a command-route reviewer or any process it
+      Residual: https://github.com/michielvha/vh-adlc/issues/195
+- [x] AC-12: No variable of the controller's environment reaches a command-route reviewer or any process it
       starts except the allowlisted ones and `request.env`; the owned-process marker is the one variable the
       route adds. Codex still authenticates and attests with that environment.
+      Evidence: `recorded-run/record-09a01042.md` (code commit 09a01042, this Mac outside any sandbox: boundary tests 79 pass, 5 skip, 0 fail; mutants 18/18): the environment test passes and the allowlist mutation fails it; the proof run R-25 at 492cb991 was ready with `gpt-6.2-sol` attested under that environment; R-26 returned met.
 - [ ] AC-13: On macOS, no reviewer process can read the fixed credential stores under the reviewer's home
       (`.ssh`, `.aws`, `.kube`, `.docker`, `.config/gh`, `.config/gcloud`, `.netrc`, `.git-credentials`),
       directly or by renaming a store or a directory above it, while other files there stay readable and
@@ -580,7 +591,8 @@ readable, and that a scratch entry touching a store or its parent leaves the rev
       Evidence: `bun test --timeout 60000 tests/vh-adlc/loop/review-route.test.ts` at T33: 73 pass, 3 fail. The `CODEX_HOME` log is not found, so the review stays pending. With `HOME` unset, a scratch symlink to the account's `~/.ssh` runs the reviewer. `review-protocol.md` has no Markdown link to `loop-settings.md`.
 - [x] T35 `plugins/vh-adlc/scripts/loop/review-route.ts`, `plugins/vh-adlc/references/review-protocol.md`, `tests/vh-adlc/evidence/macos-review-boundary/run-review.sh` - attestation reads `CODEX_HOME` when set, an unset `HOME` falls back to the account's home, the protocol links to `loop-settings.md`, and the runner compares the owning branch's ref, HEAD, files and index, not every ref of the shared repository; T34 passes, the mutant script catches every mutation, and a ref of another branch moving no longer fails the runner's state check (AC-06, AC-07, AC-12, AC-13, R-24)
       Evidence: Attestation reads `CODEX_HOME/sessions` when `CODEX_HOME` is set. An unset `HOME` falls back to `os.homedir()`, while an empty one still names no home. `review-protocol.md` links `[loop-settings.md](loop-settings.md)`. The runner's `state()` no longer lists every ref. `bun test --timeout 60000 tests/vh-adlc/loop/ tests/vh-adlc/triage/owned-process.test.ts tests/vh-adlc/direct-operation-compatibility.test.ts tests/vh-adlc/check.test.ts`: 311 pass, 5 skip, 0 fail, so T34 passes. `mutants.py` exits 0 with all 18 mutations caught. In a disposable repository, moving another branch leaves `state()` unchanged, and moving the owning branch changes it.
-- [ ] T30 `tests/vh-adlc/evidence/macos-review-boundary/` - the recorded unsandboxed run at the new code commit, including the AC-12 and AC-13 tests; the AC-06 proof run on the commit that holds it; and the formal Codex implementation review on the commit that holds the proof artifacts, each stored and checked as in T22. AC-02, AC-06, AC-08 and AC-11, whose code is unchanged, then go back to the owner to be residualised to #195 again (AC-01 to AC-08, AC-10 to AC-13)
+- [x] T30 `tests/vh-adlc/evidence/macos-review-boundary/` - the recorded unsandboxed run at the new code commit, including the AC-12 and AC-13 tests; the AC-06 proof run on the commit that holds it; and the formal Codex implementation review on the commit that holds the proof artifacts, each stored and checked as in T22. AC-02, AC-06, AC-08 and AC-11, whose code is unchanged, then go back to the owner to be residualised to #195 again (AC-01 to AC-08, AC-10 to AC-13)
+      Evidence: Recorded run at code commit 09a01042 (`recorded-run/record-09a01042.md`): boundary tests 79 pass, 5 skip, 0 fail; AC-10 sandboxed run 1 failure, 67 skip; mutant script exit 0, 18/18 caught. Committed as 492cb991. The proof run R-25 on 492cb991 was `ready`, attested `gpt-6.2-sol`, state unchanged, runner exit 0, with artifacts committed at bc2af4d5. The formal Codex implementation review R-26 on bc2af4d5 was `ready`, attested and unchanged (artifacts in `implementation-review-bc2af4d5`). Both record sets pass `vh-adlc review check`. AC-02, AC-06, AC-08 and AC-11, the unchanged #195 edges, are residualised to #195 again by the orchestrator's standing instruction. AC-13 was not met on a new edge, an empty `HOME`, which goes to the orchestrator for an issue. Earlier cycle: the R-24 proof run at 5fe9190d led to T34 and T35.
 
 
 ## Open Questions
