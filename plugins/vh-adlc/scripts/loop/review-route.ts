@@ -239,6 +239,21 @@ export function removeExport(dir: string) {
 
 /** Splits a reply into its two header lines and the records after them. */
 export function parseReply(reply: string): { model: string; target: string; records: string } | { error: string } {
+  // A reviewer that cannot read a convention page from the cache stops on its own line; that is a pending
+  // review for the dispatcher, never a record, whatever header lines came before it. Replies whose records
+  // open as records do (FINDING:, CRITERION: or NO FINDINGS) are records, even when they quote the marker.
+  // In any other reply a marker line stops the review, matched leniently: any case and spacing, list or quote
+  // markers, emphasis, backticks, a colon, a dash or nothing after the words, code fences, a line of prose
+  // before it and trailing text after it.
+  const lines = reply.split(/\r?\n/).map(text => text.trim()).filter(Boolean).filter(text => !/^(?:MODEL|TARGET): /.test(text));
+  if (!/^(?:FINDING:|CRITERION:|NO FINDINGS)/.test(lines[0] ?? "")) {
+    for (const text of lines) {
+      const stop = /^PAGE\s+NOT\s+CACHED\b[*_`'"]*\s*[:\-\u2013\u2014]?[*_`'"\s]*(.*)$/i.exec(text.replace(/^[\s>*+\-\d.)`'"_]*/, ""));
+      if (!stop) continue;
+      const page = /[A-Za-z0-9_\/-][A-Za-z0-9._\/-]*/.exec(stop[1]!)?.[0]?.replace(/\.+$/, "");
+      return { error: `the reviewer stopped: page not cached: ${page || "unnamed"}` };
+    }
+  }
   // Only the two header lines and the blank lines around them are removed; the records keep their bytes.
   let at = 0;
   const line = (): string | undefined => {
