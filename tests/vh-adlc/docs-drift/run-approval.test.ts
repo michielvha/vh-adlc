@@ -8,6 +8,7 @@ import { recordRunApproval } from "../../../plugins/vh-adlc/scripts/docs-drift/r
 import { captureSnapshot } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { manifestDigest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { readBoundArtifact } from "../../../plugins/vh-adlc/scripts/docs-drift/evidence-input";
+import { SetupRequired } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
 
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
@@ -32,4 +33,16 @@ test("re-preparation before dispatch needs fresh exact approval and preserves th
   expect(current).not.toEqual(original);
   expect(JSON.parse(readBoundArtifact({ source_repo: f.repo, artifact_root: directory, reference: current }).toString()).manifest_sha256).toBe(manifestDigest(manifest));
   expect(readFileSync(join(directory, original.path))).toEqual(bytes);
+}, 60000);
+
+test("publication without a retained approval.yaml asks for setup and records no approval", () => {
+  const f = preflightFixture(roots), source = f.head(), directory = join(f.root, "run");
+  const run = createRunDirectory({ repo: f.repo, source, directory, origins: join(f.root, "origins"), entry: "interactive" });
+  const manifest = structuredClone(f.plan.manifest);
+  manifest.bindings.source_commit = source; manifest.bindings.settings_sha256 = captureSnapshot(f.repo, source).settings_sha256;
+  let refusal: unknown;
+  try { recordRunApproval({ repo: f.repo, run, manifest, command: "publish" }); } catch (error) { refusal = error; }
+  expect(refusal).toBeInstanceOf(SetupRequired);
+  expect((refusal as Error).message).toBe("Retain exact approval.yaml for the displayed manifest before publication.");
+  expect(latestRunArtifact(run, "approval")).toBeUndefined();
 }, 60000);

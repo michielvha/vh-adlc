@@ -78,7 +78,9 @@ test.each(["matching", "caller-change", "mixed-plans", "prepare-protocol"])("nor
   const copy = join(f.root, "copied-prepared-run"); cpSync(directory, copy, { recursive: true });
   const copied = await invoke("publish", copy);
   expect(copied.result.exit_code).toBe(2);
-  expect(copied.report).toMatchObject({ outcome: "setup-required" });
+  // A missing approval also asks for setup, so assert the refusal only the ownership check gives.
+  expect(copied.report).toMatchObject({ outcome: "setup-required",
+    diagnostics: ["The original host ownership record is required for executing stages. Use resume --action inspect to observe this copy."] });
   const reviewer = final?.artifacts.reviewer_capture;
   if (!reviewer) throw Error("Original reviewer capture required");
   const rolePath = join(directory, reviewer.path), unavailable = rolePath + ".unavailable";
