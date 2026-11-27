@@ -1,7 +1,8 @@
 ---
-status: planned
-status_description: "Accepted by the owner at R-4; waits for tasks and implementation."
+status: in-progress
+status_description: "Being implemented on fix/instruction-freshness, task by task."
 issue: https://github.com/michielvha/vh-adlc/issues/139
+branch: fix/instruction-freshness
 goal: "SDD operations read the repository's listed instruction files and project procedure as they stand at the default branch tip, even from a checkout that is behind it."
 covers:
   - plugins/vh-adlc/scripts/loop/
