@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Being implemented on feat/macos-review-boundary; T18 to T22 remain, the recorded run after #182."
+status: draft
+status_description: "Back to draft for drift re-review R-18: the reviewer gets an allowlisted environment."
 issue: https://github.com/michielvha/vh-adlc/issues/187
 branch: feat/macos-review-boundary
 goal: "Spec and implementation reviews in this repository run on Codex from a Mac, with no owner step per review, and no reviewer process can change the owning worktree or the private clone once the review has been judged."
