@@ -257,6 +257,14 @@ printf '%s\\n' '{"type":"turn.completed"}'
     // Since T55 records keep their exact bytes; this stub's reply has no final newline.
     expect(outcome).toMatchObject({ status: "ready", model: "gpt-6.1-sol", records: "NO FINDINGS" });
   });
+  routed("a session log under CODEX_HOME attests the model when HOME holds no .codex", async () => {
+    const { root, commit } = repository(), codexParent = homeDir(), emptyHome = homeDir();
+    const script = codex(`MODEL: unknown\nTARGET: ${commit}\n\nNO FINDINGS`, "gpt-6.1-sol", codexParent);
+    const outcome = await runReviewRoute({ repo: root, commit, kind: "implementation", document: "docs/specs/feature.md",
+      route: { model: "gpt-6.1-sol", argv: [script, "--json", "{prompt}"], model_attestation: "codex-session" },
+      prompt: "p", scratch: [], timeoutMs: 10_000, env: { HOME: emptyHome, CODEX_HOME: join(codexParent, ".codex") } });
+    expect(outcome).toMatchObject({ status: "ready", model: "gpt-6.1-sol" });
+  });
   routed("a session log that records another model leaves the review pending", async () => {
     const { root, commit } = repository(), home = homeDir();
     pending(await attested(root, commit, codex(`MODEL: unknown\nTARGET: ${commit}\n\nNO FINDINGS`, "gpt-5.3-codex", home), home), "attest");
@@ -756,4 +764,25 @@ if cat "${home}/.ssh/id_test" >/dev/null 2>&1; then echo "read ssh" >> ${rec}; e
     expect(existsSync(out)).toBe(false);
     expect(readFileSync(join(top, "o"), "utf8")).not.toContain("SECRET");
   });
+
+  darwin("with HOME unset, the stores of the account's home are still protected", async () => {
+    const { homedir } = await import("node:os");
+    const { root, commit } = repository();
+    const ran = recordFile();
+    symlinkSync(join(homedir(), ".ssh"), join(root, "cache"));
+    const saved = process.env.HOME;
+    delete process.env.HOME;
+    let outcome: ReviewOutcome;
+    try {
+      outcome = await runReviewRoute({ repo: root, commit, kind: "implementation", document: "docs/specs/feature.md",
+        route: { model: "gpt-6.1-sol", argv: [stub(`echo ran > ${ran}`, ok(commit)), "{prompt_file}"] }, prompt: "p", scratch: ["cache"], timeoutMs: 10_000 });
+    } finally { if (saved === undefined) delete process.env.HOME; else process.env.HOME = saved; }
+    pending(outcome, "cache");
+    expect(existsSync(ran)).toBe(false);
+  });
+});
+
+test("the review protocol links to loop-settings.md for the boundary details", () => {
+  const protocol = readFileSync(resolve(import.meta.dir, "../../../plugins/vh-adlc/references/review-protocol.md"), "utf8");
+  expect(protocol).toMatch(/\]\(loop-settings\.md(#[^)]*)?\)/);
 });
