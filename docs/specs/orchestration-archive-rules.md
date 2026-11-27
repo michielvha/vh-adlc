@@ -1,8 +1,8 @@
 ---
 status: draft
-status_description: "Written with the owner's answers folded in; waiting for the first spec review."
+status_description: "Revised for spec review R-1; waiting for the next spec review."
 issue: https://github.com/michielvha/vh-adlc/issues/180
-goal: "An orchestrator archives a sub-session only when the forge shows its work finished, or when another session has taken its feature over and its worktree is kept, and archives nothing outside its workstream that the owner has not picked."
+goal: "An orchestrator archives a sub-session only when the forge shows its work finished, or when another session takes or is approved to take its feature over and its worktree is kept, and archives nothing outside its workstream that the owner has not picked."
 covers:
   - plugins/vh-adlc/references/orchestrate.md
   - plugins/vh-adlc/references/authority.md
@@ -32,20 +32,27 @@ After this change, a sub-session ends in one of two ways, and the reference name
 **Work finished** means the forge CLI shows the work item merged, or, for work with nothing to merge,
 its issue closed, or the owner has said the work is abandoned. Only then is the session archived. The
 owner accepted that a mistakenly closed issue lets the orchestrator archive such a session. **Taken over** means another session carries the
-feature on, as a paused or stale session's replacement or a resumed copy. The old session may be
-archived before the merge, but only once its handoff, naming its worktree, is in the workstream ledger,
-and only in a way that keeps its worktree, branch and uncommitted changes. If the host would delete the
-worktree, the orchestrator asks the owner first. This brings in #166.
+feature on, or is approved to: a paused or stale session's replacement, or a resumed copy. A paused
+session archived under the batched approval before its replacement starts counts as taken over. The old
+session may be archived before the merge, but only once its handoff or state report, naming its
+worktree, is in the workstream ledger, and only in a way that keeps its worktree, branch and uncommitted
+changes. If the host would delete the worktree, the orchestrator asks the owner first. This brings in
+#166. Pending or failed sessions the owner approves ending stay an exception, as before.
 
 The grant covers only the workstream's sub-sessions. When the owner asks for a general cleanup, the
-orchestrator lists every candidate with its work state and archives only the ones the owner picks.
+orchestrator lists every candidate with its work state and archives only the ones the owner picks. A
+picked workstream sub-session still needs its work finished or taken over; for an open one, the
+orchestrator asks the owner whether the work is abandoned before archiving it. The incident table's row
+for archiving during cleanup points to the rule that now holds the cleanup condition.
 
 The change is rule text in `references/orchestrate.md` and the orchestration row of
 `references/authority.md`, plus tests that read the new sentences from this document. No new code or
 tool runs; the forge check is the `gh` read the status pass already does. The plugin's minor version
 goes up, as with every plugin feature.
 
-No decisions are open. No review has run yet, and nothing in this document has been executed. Acceptance authorizes building the rule and test changes
+No decisions are open. Spec review R-1 found a gap: paused sessions archived before their replacement
+starts fell outside both rules and lost the worktree safeguard. This revision closes it and answers the
+other findings. A new review has not run yet, and nothing in this document has been executed. Acceptance authorizes building the rule and test changes
 on a feature branch. Merging and releasing still need the owner.
 
 ### Background
@@ -89,6 +96,8 @@ In scope:
 - A two-row glossary for the two ways a session ends, carried verbatim into the reference's glossary.
 - The orchestration row in `plugins/vh-adlc/references/authority.md`: the archive write points to the
   Close-out rules and the row says the grant covers no session outside the workstream.
+- Incident 13's Rules cell in the reference's incident table, from `S-36, S-37` to `S-36, S-55, S-37`,
+  because S-55 now holds the cleanup condition that stops it.
 - `tests/vh-adlc/check.test.ts`: the required-sentence and glossary checks also read this document,
   and its sentences replace those with the same ID.
 - The minor version bump in both plugin manifests.
@@ -102,7 +111,8 @@ Out of scope:
 - The host's archive action. Whether it keeps a worktree is the host's behavior; the rule only decides
   when to ask the owner.
 - A new row in the reference's incident table. The test fixes that table at sixteen rows under the
-  earlier feature's AC-15, and the incident is recorded in this document's Background and in #180.
+  earlier feature's AC-15, and the incident is recorded in this document's Background and in #180. Only
+  row 13's Rules cell changes, as listed above.
 - Unarchiving. The Remote Control app has no way back.
 
 ## Design
@@ -112,7 +122,7 @@ Out of scope:
 | Term | Meaning |
 | --- | --- |
 | Work finished | A sub-session's work item is merged, or for work with nothing to merge its issue is closed, or the owner has said the work is abandoned, as the forge CLI or a recorded owner answer shows. |
-| Taken over | Another session carries a sub-session's feature on: the replacement of a paused or stale session, or a resumed copy. The old session's work stays open until its work item is merged. |
+| Taken over | Another session carries a sub-session's feature on, or is approved to: the replacement of a paused or stale session, including one archived before its replacement starts, or a resumed copy. The old session's work stays open until its work item is merged. |
 
 The reference's `## Glossary` table gains both rows exactly as written here.
 
@@ -129,16 +139,16 @@ exactly in the reference, under the section its heading names.
 
 **Close-out** (`## Close-out`):
 
-- S-36: A sub-session ends in one of two ways, and each has its own archive rule: work finished, or taken over.
+- S-36: Apart from pending or failed sessions the owner approves ending, a sub-session ends in one of two ways, and each has its own archive rule: work finished, or taken over; a paused session archived before its replacement starts is taken over.
 - S-55: Work finished: archive a sub-session only once the forge CLI shows its work item merged, or for work with nothing to merge its issue closed, or the owner has said the work is abandoned, never on the session's own report of done, and only after it has confirmed its cleanup finished; archive finished sub-sessions promptly.
-- S-56: Taken over: when another session takes a sub-session's feature over, the old session may be archived before the merge, but only once its handoff, naming its worktree, is in the workstream ledger, and only in a way that keeps its worktree, branch and uncommitted changes for the session taking over.
+- S-56: Taken over: when another session takes, or is approved to take, a sub-session's feature over, the old session may be archived before the merge, but only once its handoff or state report, naming its worktree, is in the workstream ledger, and only in a way that keeps its worktree, branch and uncommitted changes for the session taking over.
 - S-57: Where the host's archive action would remove a taken-over session's worktree, ask the owner before archiving it.
-- S-58: A pending or failed session that the owner approves ending is archived under that approval.
-- S-59: When the owner asks to clean up sessions in general, list every candidate with its work state (PR merged, PR open, waiting on the owner, or nothing to merge) and archive only the ones the owner picks.
+- S-59: When the owner asks to clean up sessions in general, list every candidate with its work state (PR merged, PR open, waiting on the owner, or nothing to merge) and archive only the ones the owner picks; a picked workstream sub-session is still archived only when its work is finished or it is taken over.
 
 S-45 under Plugin upgrades stays as it is: the batched owner approval still governs archiving paused
-sessions and a replaced stale orchestrator, and S-56 and S-57 add the conditions every taken-over
-session meets. The explanation at `orchestrate.md:170-172` becomes redundant with S-56 and S-57 and is
+sessions and a replaced stale orchestrator. A paused session S-45 archives has an approved replacement,
+so it is taken over under S-36 and the glossary, its ledger state report is the report S-56 accepts, and
+S-56 and S-57 apply to it before its replacement starts. The explanation at `orchestrate.md:170-172` becomes redundant with S-56 and S-57 and is
 removed, leaving one statement of the rule.
 
 ### How the rules read together
@@ -154,10 +164,14 @@ removed, leaving one statement of the rule.
   to it.
 - **Taken over is not finished.** The glossary row and S-56 keep the old session's work open. The
   ledger keeps the work item until it is merged, now carried by the session taking over.
-- **Pending and failed sessions.** S-58 keeps the exception the old S-36 opened with, and S-46 already
-  requires the owner's approval to recreate one.
+- **Pending and failed sessions.** S-36 keeps the exception the old S-36 opened with, and S-46
+  already requires the owner's approval to recreate one. A separate sentence for it would repeat S-36,
+  so there is none; the ID S-58 stays unused.
 - **Cleanup listing.** The work states are the four the issue names. Sessions outside the workstream
-  appear in the list too, but S-54 means none is archived unless the owner picks it.
+  appear in the list too, but S-54 means none is archived unless the owner picks it. For the
+  workstream's own sub-sessions, S-59 keeps S-55 and S-56 in force: a pick of an open one is not an
+  archive approval, so the orchestrator asks the owner whether its work is abandoned, and archives it
+  only on that answer. The goal settles this: the incident began with a general cleanup request.
 
 ### Authority row
 
@@ -173,7 +187,9 @@ document replaces the one with the same ID or appends it. The existing checks th
 list: every sentence under its section, unique IDs, at least 53 sentences, the rewording check, and
 incident rows that name existing IDs. A new glossary check asserts that the reference carries this
 document's two glossary rows verbatim. A new authority check asserts the row says "under the Close-out
-rules" and no longer says "once each is done". The parser reads this document with the same functions,
+rules" and no longer says "once each is done". A new incident check asserts row 13 names S-55. The
+version stays the existing check that the package version differs from `origin/main`'s; a feature
+takes the next minor version by the delivery convention's commit types, which no test checks. The parser reads this document with the same functions,
 so the sentence format above is the earlier one exactly.
 
 ### Upgrade, rollback and concurrency
@@ -188,20 +204,21 @@ irreversible step, and every rule here only adds conditions before it.
 
 - [ ] AC-01: `plugins/vh-adlc/references/orchestrate.md` states every required sentence of
       `docs/specs/workstream-orchestration.md`, with S-02 and S-36 replaced by this document's text, and
-      every sentence this document adds, each under the section its heading names.
+      every sentence this document adds, each under the section its heading names, and the incident
+      table's row 13 names S-55.
 - [ ] AC-02: The reference's glossary carries this document's two glossary rows verbatim, so work
       finished and taken over are defined side by side.
 - [ ] AC-03: The orchestration row in `plugins/vh-adlc/references/authority.md` limits the archive
       write to the workstream's sub-sessions under the Close-out rules, and neither it nor the reference
       grants archiving a sub-session "once each is done".
-- [ ] AC-04: Both plugin manifests carry the same version, one minor version above the version on the
-      default branch when the feature branch is cut.
+- [ ] AC-04: Both plugin manifests carry the same version, and it differs from the version on the
+      default branch.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | `tests/vh-adlc/check.test.ts`, "states every required sentence under the section its heading names", run on the merged sentence list. A new test proves the merge: removing S-56 from a copy of the reference reports `["S-56"]`, and restoring the old S-36 text in a copy reports `["S-36"]`. |
+| AC-01 | `tests/vh-adlc/check.test.ts`, "states every required sentence under the section its heading names", run on the merged sentence list. A new test proves the merge: removing S-56 from a copy of the reference reports `["S-56"]`, and restoring the old S-36 text in a copy reports `["S-36"]`. A new test asserts incident row 13 lists S-55, and fails on a copy where row 13 reads `S-36, S-37`. |
 | AC-02 | `tests/vh-adlc/check.test.ts`, a new test that the reference contains each glossary row of this document; it fails when either row is deleted from a copy. |
 | AC-03 | `tests/vh-adlc/check.test.ts`, the authority tests extended: the one orchestration row contains "under the Close-out rules" and "outside the workstream", and neither the row nor the reference contains "once each is done". The existing "the row check fails when any one write is removed" test stays. |
 | AC-04 | `tests/vh-adlc/check.test.ts`, the existing "a package change comes with a version change" test and the manifest checks, run on the feature branch. |
