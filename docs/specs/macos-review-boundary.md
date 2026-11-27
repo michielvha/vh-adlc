@@ -486,6 +486,23 @@ None.
 | 2026-11-27 | R-9 | spec | `34633957` | gpt-6.2-sol | procedural | 9 blocking, 8 should-fix; Codex command route; convergence trigger fired again (R-8 had 6 blocking); held for the owner |
 | 2026-11-27 | R-10 | spec | `7fd292bb` | claude-opus-5-5 | procedural | 1 blocking, 4 should-fix, 2 nits; host route, owner-directed gating pass on #187 because the convergence trigger fired twice (R-7, R-9) on Codex findings that re-raise owner decisions; Codex stays the route for every other review |
 | 2026-11-27 | R-11 | spec | `6af33856` | claude-opus-5-5 | procedural | clean: 0 blocking, 2 should-fix, 1 nit; host route, the owner-directed gating pass continued |
+| 2026-11-27 | R-12 | spec | `e531af54` | claude-opus-5-5 | procedural | 1 blocking, 1 should-fix; host route, the owner-directed gating pass continued |
+
+### R-12
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Acceptance Criteria AC-06, Test Plan AC-06, Design (The AC-06 proof runs), Tasks T21 and T22, Owner summary ("a script for the real-Codex proof that fails closed"; "Still planned")
+EVIDENCE: AC-06 (lines 407-411) still says "A committed script reruns both, fails unless the outcome is `ready` and the worktree is unchanged, and keeps their Codex transcripts." This revision, applying R-11 F-02, drops the spec run of the script. Design lines 352-354 and the Test Plan AC-06 row now say the spec half is "the committed artifacts of the Codex spec reviews R-6 to R-9 under `spec-review-<commit>`". Those artifacts do not support the criterion. `ls tests/vh-adlc/evidence/macos-review-boundary/spec-review-*/` at X shows only environment.txt, outcome.json, route.json, status-before.txt, status-after.txt and an empty stderr.txt in each of the four directories. There is no Codex session log or transcript and no refs before and after. They also came from the current `run-review.sh`, which records `exit=$?` and then returns the status of its last reporting command (lines 17-19), not from the fail-closed script T21 delivers. The AC-06 row still says "For each it keeps ... the refs before and after ..., the Codex session log of the run's thread as its transcript", but only one run is left. No run is planned that would show the final script running a spec review, failing closed on it, or keeping its transcript. Under "A passing subset never upgrades a composite criterion", the formal implementation reviewer has to return `not verified` or `not met` for AC-06. `impl_review_clean` then fails, and a correct implementation cannot reach `complete` on this plan. Running the script for spec now would store a spec review, which Design rightly avoids because it would become the latest spec review. The Owner summary does not tell the owner that the spec half of the proof changed from a rerun to earlier artifacts.
+PROPOSAL: Restate AC-06 to match the new proof: the spec half is the stored R-6 to R-9 Codex spec reviews (ready, attested, status unchanged), and the committed fail-closed script with kept transcript and refs applies to the implementation run. Apply the same wording to the Test Plan AC-06 row, T21 and T22, and name the change in the Owner summary for the owner's acceptance.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (The AC-06 proof runs), Test Plan AC-06, Tasks T19 and T22
+EVIDENCE: The spec half of AC-06 now rests on R-6 to R-9, run at `5ae4e466`, `519dbbfd`, `cc7bb1ac` and `34633957` (the spec-review-*/environment.txt files). Those runs used the route code as it was then. T19, still unticked, changes `plugins/vh-adlc/scripts/loop/review-route.ts` and `owned-process.ts` after them: "the scratch overlap check with the profile built from the validated paths, and the disappearing-file guard". Both run before every reviewer starts, including the spec kind with its export deny. Nothing planned runs a real Codex spec review through the final route code. The only implementation-code run of the real route is the implementation-kind proof run at P. A T19 change that left spec reviews pending on this Mac, for example an overlap check that rejected the export, would still pass the AC-06 proof as written. This traces to this revision's switch from a spec rerun to earlier artifacts.
+PROPOSAL: Say in Design that the stored spec runs predate T19, and have the formal implementation reviewer confirm, from the diff between `34633957` and the code commit, that the spec-kind path through the route is unchanged except for the checks the recorded-run tests cover. Alternatively, have the recorded run include a spec-kind stub run of the real route at the code commit.
 
 ### R-11
 
