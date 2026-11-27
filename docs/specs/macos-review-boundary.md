@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised for R-21: credential rules come last and scratch entries may not touch a store; a host re-review is pending, then owner acceptance."
+status_description: "Revised for R-22: a direct proof of the credential rule order and the loop-settings text; a host re-review is pending, then owner acceptance."
 issue: https://github.com/michielvha/vh-adlc/issues/187
 branch: feat/macos-review-boundary
 goal: "Spec and implementation reviews in this repository run on Codex from a Mac, with no owner step per review, and no reviewer process can change the owning worktree or the private clone once the review has been judged."
@@ -456,9 +456,12 @@ the committed route, or to review a later commit without `loop.yaml`.
 **Documentation.** `loop-settings.md` owns the details. Its command-route paragraphs state: the two
 boundaries and what each denies; that everything else stays writable; the pending cases; that a Codex
 route on macOS passes `-s danger-full-access` because Codex's own sandbox can't start inside the profile;
-and that a reviewer inside the profile can't run tests that start their own `sandbox-exec`, so such tests
-need a run outside any sandbox. `review-protocol.md`'s command-route item names the boundary in one
-sentence and links to `loop-settings.md`. The Instruction freshness section and
+that a reviewer inside the profile can't run tests that start their own `sandbox-exec`, so such tests
+need a run outside any sandbox; that the reviewer gets an allowlisted environment; and that on macOS the
+profile refuses reads of the fixed credential stores, with the Keychain and, on Linux, every store left
+readable, and that a scratch entry touching a store or its parent leaves the review pending.
+`review-protocol.md`'s command-route item names the boundary in one sentence and links to
+`loop-settings.md`. The Instruction freshness section and
 `parseReply` are left alone.
 
 ## Acceptance Criteria
@@ -483,8 +486,10 @@ sentence and links to `loop-settings.md`. The Instruction freshness section and
       and keeps the run's Codex transcript.
 - [ ] AC-07: `references/loop-settings.md` states the macOS boundary and what it denies, what stays
       writable, the pending cases, the `-s danger-full-access` requirement for Codex under it, and that tests
-      starting their own `sandbox-exec` need a run outside any sandbox; `references/review-protocol.md` names
-      the boundary and links to `loop-settings.md`.
+      starting their own `sandbox-exec` need a run outside any sandbox, the reviewer's allowlisted
+      environment, and the macOS credential read denies with their Keychain and Linux limits and the
+      scratch-over-a-store pending case; `references/review-protocol.md` names the boundary and links to
+      `loop-settings.md`.
 - [ ] AC-08: On macOS, a command-route review whose owning worktree holds a protected file with a second
       hard link stays pending, with a reason naming that file, and a protected file that disappears or can't
       be read during that check leaves the review pending with a retryable reason instead of an error.
@@ -518,7 +523,7 @@ sentence and links to `loop-settings.md`. The Instruction freshness section and
 | AC-10 | Run `/usr/bin/sandbox-exec -p '(version 1)(allow default)' bun test --timeout 60000 tests/vh-adlc/loop/review-route.test.ts` on this Mac, as part of the recorded run: one failure whose message contains "unsandboxed run" (must pass: "The route tests need an unsandboxed run: this process is inside a Seatbelt sandbox, which cannot nest"; must fail: "no process boundary on this host" and a run with no failure), the route tests reported as skipped, and the non-route tests passing. Watched failing first: before the change the same run gives 50 failures with per-test pending reasons. |
 | AC-11 | Darwin-only tests in `review-route.test.ts`: a scratch entry that is a symlink to the owning worktree's root, one that is a symlink into the common Git directory, and one that is a symlink to the worktree's tracked `src` directory each leave the review pending with a reason naming the entry, and the reviewer stub never runs (fails without the overlap check). A real scratch directory and a scratch entry that is a symlink to a directory outside every protected path still let the stub write through them. |
 | AC-12 | `tests/vh-adlc/loop/review-route.test.ts`, on every platform with a boundary: the test process sets `VH_REVIEW_SENTINEL`, a `GH_TOKEN`-style name, `GIT_DIR` and `SSH_AUTH_SOCK` stand-ins; an implementation reviewer stub writes `env` to a record file outside the protected paths, and every name in it must be in the allowlist, `request.env`, `VH_ADLC_OWNED_PROCESS`, or the stub shell's own `PWD`, `SHLVL`, `_` and `OLDPWD`; `PATH` and `HOME` are present, and a variable passed through `request.env` is present. Watched failing first: today the stand-ins appear. It is in the recorded run. The authentication and attestation half is the AC-06 proof run, real Codex through the route with this environment. |
-| AC-13 | Darwin-only tests in `review-route.test.ts`, with `request.env.HOME` pointing at a fake home that holds a file in each of the eight stores (`.ssh/id_test`, `.aws/credentials`, `.kube/config`, `.docker/config.json`, `.config/gh/hosts.yml`, `.config/gcloud/credentials.db`, and `.netrc` and `.git-credentials` as plain files) plus an unlisted `notes.txt`. (1) An implementation reviewer stub tries to read each of the eight and `notes.txt` and records the results: all eight reads are refused, `notes.txt` is read, and the review is ready. (2) The stub renames `.ssh`, `.config`, `.netrc` and the fake home itself, each followed by a read through the new path: every rename is refused and nothing is read. (3) A scratch entry that is a symlink to the fake home's `.ssh`, and one to its `.config`, each leave the review pending with a reason naming the entry, and the stub never runs. (4) With `.config` absent from the fake home, the stub creates `.config/other/file`, which lands, while reads of the other stores stay refused. Watched failing first, and each part failing again with its rule removed through the mutant script (the read denies, the store write denies, the parent write denies, the store part of the overlap check, and the order that puts the credential rules last). It is in the recorded run. That Codex still runs and attests with the denies is the AC-06 proof run. |
+| AC-13 | Darwin-only tests in `review-route.test.ts`, with `request.env.HOME` pointing at a fake home that holds a file in each of the eight stores (`.ssh/id_test`, `.aws/credentials`, `.kube/config`, `.docker/config.json`, `.config/gh/hosts.yml`, `.config/gcloud/credentials.db`, and `.netrc` and `.git-credentials` as plain files) plus an unlisted `notes.txt`. (1) An implementation reviewer stub tries to read each of the eight and `notes.txt` and records the results: all eight reads are refused, `notes.txt` is read, and the review is ready. (2) The stub renames `.ssh`, `.config`, `.netrc` and the fake home itself, each followed by a read through the new path: every rename is refused and nothing is read. (3) A scratch entry that is a symlink to the fake home's `.ssh`, and one to its `.config`, each leave the review pending with a reason naming the entry, and the stub never runs. (4) With `.config` absent from the fake home, the stub creates `.config/other/file`, which lands, while reads of the other stores stay refused. (5) The rule order, which the overlap check otherwise hides: `runOwnedClient` is called directly with a `writeDeny` whose allow covers the fake `.ssh` and whose read denies name the stores, and a command that moves the key out of `.ssh` and reads it is refused. Watched failing first, and each part failing again with its rule removed through the mutant script (the read denies, the store write denies, the parent write denies, the store part of the overlap check, and the order that puts the credential rules last). It is in the recorded run. That Codex still runs and attests with the denies is the AC-06 proof run. |
 
 ## Tasks
 
@@ -563,9 +568,11 @@ sentence and links to `loop-settings.md`. The Instruction freshness section and
 
 - [ ] T28 `tests/vh-adlc/loop/review-route.test.ts` - the AC-12 sentinel test; fails because the reviewer inherits the controller's environment (AC-12, R-18 F-01)
 - [ ] T29 `plugins/vh-adlc/scripts/loop/review-route.ts` - pass the allowlisted environment plus `request.env`; T28 passes and `tests/vh-adlc/loop/` passes (AC-12)
-- [ ] T31 `tests/vh-adlc/loop/review-route.test.ts` - the AC-13 tests: direct reads of all eight stores, the four renames, the two scratch symlinks into stores and the missing-`.config` write; they fail because nothing denies reads (AC-13, R-19 to R-21)
+- [ ] T31 `tests/vh-adlc/loop/review-route.test.ts` - the AC-13 tests: direct reads of all eight stores, the four renames, the two scratch symlinks into stores, the missing-`.config` write and the direct rule-order case; they fail because nothing denies reads (AC-13, R-19 to R-22)
 - [ ] T32 `plugins/vh-adlc/scripts/loop/review-route.ts`, `plugins/vh-adlc/scripts/triage/owned-process.ts`, `tests/vh-adlc/evidence/macos-review-boundary/mutants.py` - the read-deny list with its store and existing-parent write denies placed after the scratch allows, and the overlap check over stores; T31 passes, `tests/vh-adlc/loop/` passes, and the mutant script, extended with the read denies, the store write denies, the parent write denies, the store overlap check and the rule order, catches every mutation (AC-13)
 - [ ] T30 `tests/vh-adlc/evidence/macos-review-boundary/` - the recorded unsandboxed run at the new code commit, including the AC-12 and AC-13 tests; the AC-06 proof run on the commit that holds it; and the formal Codex implementation review on the commit that holds the proof artifacts, each stored and checked as in T22. AC-02, AC-06, AC-08 and AC-11, whose code is unchanged, then go back to the owner to be residualised to #195 again (AC-01 to AC-08, AC-10 to AC-13)
+
+- [ ] T33 `plugins/vh-adlc/references/loop-settings.md` - the command-route paragraphs add the reviewer's allowlisted environment, the macOS credential read denies with their Keychain and Linux limits, and the scratch-over-a-store pending case; `tests/vh-adlc/direct-operation-compatibility.test.ts` passes (AC-07, R-22 F-02)
 
 ## Open Questions
 
