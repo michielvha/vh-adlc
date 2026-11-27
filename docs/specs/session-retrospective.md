@@ -1,7 +1,8 @@
 ---
-status: planned
-status_description: "Accepted by the owner on 2026-11-27 at spec review R-7 (f0f8dd4d, no findings); v1 reviews only the conversation it runs in, and transcript parsing is #185. Tasks are next."
+status: in-progress
+status_description: "Implementation in progress on feat/session-retrospective; accepted at R-7 (f0f8dd4d)."
 issue: https://github.com/michielvha/vh-adlc/issues/101
+branch: feat/session-retrospective
 goal: "After an agent session, the owner gets a saved, ranked list of concrete changes to the agent's environment that would have prevented that session's mistakes and waste, each naming where it belongs and whether it has happened before."
 covers:
   - .agents/plugins/marketplace.json
