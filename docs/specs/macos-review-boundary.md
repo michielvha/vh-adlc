@@ -1,7 +1,7 @@
 ---
 status: draft
 status_description: "Being written; spec review on the host route pending."
-issue: null
+issue: https://github.com/michielvha/vh-adlc/issues/187
 goal: "Spec and implementation reviews in this repository run on Codex from a Mac, with no owner step per review, and no reviewer process can change the owning worktree or the private clone once the review has been judged."
 covers:
   - plugins/vh-adlc/scripts/loop/review-route.ts
@@ -249,6 +249,72 @@ None.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-27 | R-1 | spec | `7248ba28` | claude-opus-5-5 | procedural | 1 blocking, 4 should-fix, 4 nits; host route, because the Codex command route cannot run on macOS until this feature exists |
+
+### R-1
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design (Profile; What the route denies), Owner summary ("refuses writes to exactly the paths the check judges"), goal frontmatter, AC-02, Test Plan row AC-02
+EVIDENCE: A `(deny file-write* (subpath D))` rule does not stop a process from renaming an ancestor of D. I ran this on this Mac in a fresh mktemp dir T with D0=T/parent/repo: `sandbox-exec -D D0=... -p '(version 1)(allow default)(deny file-write* (subpath (param "D0")))' /bin/sh -c "echo x > T/parent/repo/f; mv T/parent T/moved; echo hacked > T/moved/repo/f; mv T/moved T/parent"`. The direct write was refused ("Operation not permitted"), but `mv=ok w=0 back=0` followed, and `cat T/parent/repo/f` printed `hacked`. The ancestors of the denied paths are left writable: for this worktree that is `/Users/michielvh/code/vh-adlc/.claude/worktrees` and the main checkout `/Users/michielvh/code/vh-adlc`, which also holds the common Git directory. So a detached writer can change the worktree, the index and refs after the review has been judged, which is the guarantee the goal and AC-02 promise. The AC-02 tests only write through the protected path, so every listed proof passes on this design. I also tested the fix: adding `(literal (param "A1")) (literal (param "A2"))` for T/parent and T to the deny refused the `mv` ("rename ... Operation not permitted"), still allowed creating a sibling file in T/parent, and left the file as `orig`.
+PROPOSAL: In the profile, also deny `file-write*` on the `literal` path of every ancestor of each denied path, up to `/`. State this in Design and the loop-settings paragraph, and add an AC-02 test where a late writer renames the worktree's parent directory, writes through the new path and renames it back, asserting that the rename is refused and the file is unchanged.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Profile; What the route denies), Scope, AC-02
+EVIDENCE: Seatbelt matches the path a write goes through, not the inode. In a fresh temp dir I made a hard link `T/out/link` to `T/repo/f` and ran `sandbox-exec ... (deny file-write* (subpath T/repo))` with `echo hacked > T/out/link`. It returned `w=0`, and `T/repo/f` then read `hacked`. Any file in the worktree or its Git directories that shares an inode with a writable path outside them can be changed through that other path, during or after the review. Examples are Git objects shared with a local clone made without `--no-hardlinks`, and hard-linked package stores. The route's own clone uses `--no-hardlinks` (review-route.ts:317), which shows the hazard is known. I found no such links in this repository today (`find ... -links +1` returned nothing). AC-02 still says "no reviewer process can change the owning worktree" without exception.
+PROPOSAL: Either leave the review pending when a protected tree holds a regular file with a link count above 1, or add a Scope "Not handled" line for hard-linked files and narrow AC-02 to match.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (What the route denies: "That is what lets an implementation reviewer run tests"; Codex route), AC-01, AC-02, AC-03, AC-06, Test Plan rows AC-01 to AC-03 and AC-06
+EVIDENCE: Seatbelt profiles with rules do not nest. `sandbox-exec -p '(version 1)(allow default)' sandbox-exec -p '<deny profile>' ...` and a deny profile inside a deny profile both exited 71 with `sandbox_apply: Operation not permitted`. An implementation reviewer runs inside the route's profile, so on this Mac `bun test tests/vh-adlc/loop/review-route.test.ts` in the clone finds neither boundary. The 39 tests that fail today (I reproduced 5 pass, 39 fail) still fail there, and the new darwin-only seatbelt tests fail with them. The Codex implementation review that AC-06 runs on this feature, and any later macOS Codex implementation review of a feature covering review-route.ts, therefore cannot observe AC-01 to AC-03 and can only return `not verified` or `not met` for them. AC-06 needs only `ready`, so it can still go green, but the feature cannot reach a clean implementation review through the route it adds. The document never says so.
+PROPOSAL: State the limit in Scope and Design. Name how this feature's implementation review establishes AC-01 to AC-03, for example a host-route implementation review or the reviewer reading a recorded run, and how later macOS Codex reviews treat tests that need sandbox-exec.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Owner summary (trade-off paragraph), Design (Codex route: "On Linux the PID namespace and the before-and-after check guard the worktree and the clone in the same way"), Scope (Out of scope: "Protecting anything beyond the worktree and the clone"), AC-02, Open Questions
+EVIDENCE: `codex exec --help` (0.172.0) says `-s` selects "the sandbox policy to use when executing model-generated shell commands". Under `danger-full-access` those commands also get network access, which Codex's read-only policy denies. The Owner summary mentions only writes "in the home directory or in other repositories". It omits three things. First, network access next to readable credentials. Second, write access to `~/.codex/sessions`, the log the attestation trusts (review-route.ts:278-296). Third, deferred-execution routes that change the worktree after judgement without being a descendant: `~/Library/LaunchAgents`, crontab, shell rc files, `~/.gitconfig` (`core.hooksPath`), and the plugin and vh-adlc binary caches. The AC-02 proof covers only descendants, so readers can disagree whether such routes count as "a reviewer process". "Any host reviewer can do the same today" has no citation. The Linux sentence is also inaccurate: on Linux nothing denies writes, and the check only catches net changes, so a write the reviewer reverts before exit goes unseen. The committed argv turns Codex's own sandbox off on Linux too. The design never weighs the obvious alternative: an outer profile that denies `file-write*` by default and allows only the temporary directory, `~/.codex` and named build caches. That would close the persistence routes and the F-01 rename route together. Security posture is a plausible-choice item under conventions/feature-documents.md (Open questions).
+PROPOSAL: Put network access, session-log writability and the persistence routes in the Owner summary and the Scope limit, and fix the Linux sentence. Weigh a deny-by-default write profile in Design with a reason for keeping or rejecting it. If both options still meet the goal, raise the choice as an Open Question.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan row AC-02, AC-02
+EVIDENCE: Test (1) asserts that a late write into the clone is absent "after two seconds". But `runReviewRoute` deletes `work` (the clone's parent) in its `finally` block (review-route.ts:357-360) before it returns. So that half of the test passes whether or not the clone is denied. The existing "the owning worktree is preserved" stubs do write into the clone, since they run with cwd = clone (review-route.ts:331). Under the Test Plan, though, on macOS they assert only that the owning worktree is unchanged. No listed proof shows that a write into the clone, or into the export, is refused during the review. A `writeDeny` without the clone passes every row, although AC-02 promises the clone cannot be changed "during or after the review".
+PROPOSAL: Add a darwin-only test whose stub tries to write into the clone, and into the export for a spec review, while the review runs, and records the result in a file in the temporary directory. Assert that the write was refused and the review is ready.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Design (What the route denies; Profile)
+EVIDENCE: The design takes the common Git directory from `git rev-parse --git-common-dir` and then calls `realpathSync`. In a main worktree that command prints `.git` relative to the repository, and `realpathSync` would resolve it against the Bun process's cwd. In a linked worktree it printed an absolute path (`/Users/michielvh/code/vh-adlc/.git`). No harm results today, because in a main worktree the Git directory sits under `repo` and is also covered by `--absolute-git-dir`.
+PROPOSAL: Specify `git rev-parse --path-format=absolute --git-common-dir`.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan row AC-05
+EVIDENCE: The row expects the command to "print `route: command`, model `gpt-6.1-sol` and `model_attestation: codex-session`". `bun plugins/vh-adlc/scripts/loop/cli.ts route --repo . --operation "spec review"` prints JSON: `{"role":"spec_reviewer","route":"host"}` today (cli.ts:103).
+PROPOSAL: Write the expected output as the JSON fields `"route":"command"`, `"model":"gpt-6.1-sol"` and `"model_attestation":"codex-session"`.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan row AC-04, Design (Availability probe)
+EVIDENCE: `pidNamespaceAvailable()` caches its result in the module-level `namespaceProbe` (owned-process.ts:20-27). `tests/vh-adlc/loop/owned-process.test.ts:27` already calls it when the file loads. On Linux CI, where `unshare` works, the cached `true` means setting `PATH` in the test changes nothing, and the AC-04 test gets `pid-namespace`. The row does not say how the test avoids the cache.
+PROPOSAL: Run the AC-04 case in a subprocess with the reduced `PATH`, or name a probe-reset seam in Design.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: nit
+WHERE: frontmatter covers, Context (Background), Design (Boundary selection; What the route denies)
+EVIDENCE: Scope includes "A plugin minor version bump", but `covers` does not list `plugins/vh-adlc/.claude-plugin/plugin.json` (version 0.33.0) or the evidence directory `tests/vh-adlc/evidence/macos-review-boundary/` named in the AC-06 row. Several citations are off by a line or more. The "could not start" catch is at review-route.ts:333, not 332. The `ps` call is at owned-process.ts:45, not 46. `runOwnedClient` starts at owned-process.ts:91, not 92. `snapshot` spans review-route.ts:157-203, not 157-190.
+PROPOSAL: Add both paths to `covers` and correct the line citations.
 
 ## Sources
 
