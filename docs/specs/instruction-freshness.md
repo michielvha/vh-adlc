@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised for spec review R-2; waits for a new independent spec review."
+status_description: "Revised for spec review R-3; waits for a new independent spec review."
 issue: https://github.com/michielvha/vh-adlc/issues/139
 goal: "SDD operations read the repository's listed instruction files and project procedure as they stand at the default branch tip, even from a checkout that is behind it."
 covers:
@@ -58,7 +58,9 @@ Proof is planned, not yet observed: a new test file builds a bare origin and clo
 then checks every state, the settings fallback, the offline paths and that no ref except the tracking
 ref moved. A text test checks the read rule in every skill and reference. The first spec review asked
 for five corrections and four smaller fixes, and the second for three corrections and five smaller
-fixes, mostly to make the planned tests exact. All are applied here; a new review is pending. Acceptance
+fixes, mostly to make the planned tests exact. The third found that two extra pointers would have
+broken a pinned skill-body test; they are dropped, and the remaining test gaps are closed. All are
+applied here; a new review is pending. Acceptance
 authorizes implementation on a feature branch. Opening the code PR and merging need separate requests.
 
 ### Background
@@ -99,11 +101,15 @@ Current state:
   worktree returned `"source":"repository","pin_files":["AGENTS.md"]`.
 - `claim` already fetches the default branch, without `--no-tags`
   (`plugins/vh-adlc/scripts/loop/claim.ts:40`).
-- Existing text tests pin phrases in the lines this feature rewrites:
-  `tests/vh-adlc/proportional-review.test.ts:196` expects ``judged against the product profile and the
-  files `bun scripts/loop/cli.ts context` lists``, and `tests/vh-adlc/check.test.ts:694` and
+- Existing text tests pin the skills' wording. `tests/vh-adlc/check.test.ts:694` and
   `tests/vh-adlc/direct-operation-compatibility.test.ts:31` expect `scripts/loop/cli.ts context` in the
-  skills.
+  skills, and `tests/vh-adlc/proportional-review.test.ts:196` expects ``judged against the product
+  profile and the files `bun scripts/loop/cli.ts context` lists`` in the spec skill.
+  `direct-operation-compatibility.test.ts:17-27,101-108` also compares each of the seven SDD skills'
+  bodies with a pinned baseline, leaving out only `## Loop routes` and `## Issue labels`. Each of the
+  seven skills' read-rule line sits under `## Loop routes`; the spec skill's line 164 sits under
+  `## Under severity by consequence`, which is pinned. The orchestrate skill's line 24 sits under
+  `## Start` and no body test pins it.
 - The review route builds its reviewer prompt from settings at the reviewed commit
   (`plugins/vh-adlc/scripts/loop/cli.ts:194`), so it is not affected by a stale working tree.
 - `implement_worktree` defaults to `shared`, which allows implement to work in the primary worktree
@@ -237,15 +243,16 @@ restating it. Each pointer names the command with its flag in one code span,
 to read the listed files at the versions `references/loop-settings.md` (Instruction freshness) names.
 For example: Before acting, run `bun scripts/loop/cli.ts context --default-branch <default branch>` and
 read every file it lists at the version `references/loop-settings.md` (Instruction freshness) names.
-`references/loop.md:42` and `skills/vh-adlc-spec/SKILL.md:164` judge against the files as read under
-that rule and gain a pointer to `references/loop-settings.md` (Instruction freshness).
-`references/orchestrate.md:108` needs no change: it re-runs `context`, and the orchestrate skill's read
-rule governs what it then reads.
+Three other places name the files `context` lists and stay unchanged. `references/loop.md:42` and
+`skills/vh-adlc-spec/SKILL.md:164` judge open questions and nits against those files, and the read
+rule each operation follows before acting already decides which version of them it holds.
+`references/orchestrate.md:108` re-runs `context`, and the orchestrate skill's read rule governs what
+it then reads.
 
-The rewritten lines keep the phrases the existing text tests pin: ``judged against the product profile
-and the files `bun scripts/loop/cli.ts context` lists`` stays word for word in
-`skills/vh-adlc-spec/SKILL.md`, with the pointer added after it, and every skill keeps
-`scripts/loop/cli.ts context` inside the new command span. Those tests therefore need no change.
+The rewritten lines are the seven SDD skills' lines under `## Loop routes`, the orchestrate skill's line
+under `## Start`, `references/loop.md:143` and `references/loop-settings.md`. None of them is in a body
+that `direct-operation-compatibility.test.ts` pins, and each keeps `scripts/loop/cli.ts context` inside
+the new command span, so the existing text tests need no change.
 
 ### Concurrency, failure, upgrade
 
@@ -289,9 +296,9 @@ the plugin removes the field and the rule together, because they ship in one ver
 | AC-01, AC-02 | `tests/vh-adlc/loop/context-freshness.test.ts`: a bare origin and a clone with `.vh-adlc/loop.yaml` listing five files, each with one role. The instruction file and the project procedure: origin advances them, the clone leaves them unchanged (`stale`). A third file: neither side changes it (`current`). A fourth: origin advances it and the clone commits its own edit (`edited`). A fifth: origin advances it and the clone edits it without committing (`edited`). Asserts each state and `read`, and that `git show` of each `stale` `read` equals origin's content. |
 | AC-03 | Same file: origin's settings add a new instruction file and a lens; asserts `freshness.settings.state` is `stale`, `read` includes the new path as `stale`, and `lenses` are origin's. A second case gives origin invalid settings and asserts the local list with an `error`. |
 | AC-04 | Same file: the clone commits an edit to its own `.vh-adlc/loop.yaml` (a new lens), so its settings read as `edited` and are kept; origin deletes a listed file and drops it from its settings. Asserts that file is `removed` with `read` null. |
-| AC-05 | Same file: a clone with no remote; one whose `origin` points to a missing path, with no `origin/HEAD` and no flag, whose `reason` names `--default-branch`; the same missing path with `--default-branch main`, whose `reason` names the failed fetch; a clone holding `refs/remotes/origin/main.lock`, created after origin advanced past the clone's `refs/remotes/origin/main`, whose `reason` names the failed fetch; and a clone whose branch was reset to a root commit unrelated to origin's history, whose `reason` names the missing merge base. Each exits 0 with every entry `unverified`, and its `read`, `lenses` and `lensText` equal `loopContext` of `loadLoopSettings` on the clone's working tree. `tests/vh-adlc/loop/plugin-version.test.ts` keeps passing for `plugin`. |
+| AC-05 | Same file: a clone with no remote; one whose `origin` points to a missing path, with no `origin/HEAD` and no flag, whose `reason` names `--default-branch`; the same missing path with `--default-branch main`, whose `reason` names the failed fetch; a clone holding `refs/remotes/origin/main.lock`, created after origin advanced past the clone's `refs/remotes/origin/main`, whose `reason` names the failed fetch; and a clone whose branch was reset to a root commit unrelated to origin's history that holds `.vh-adlc/loop.yaml` and at least one listed file, so the list of `unverified` entries is not empty, whose `reason` names the missing merge base. Each exits 0 with every entry `unverified`, and its `read`, `lenses` and `lensText` equal `loopContext` of `loadLoopSettings` on the clone's working tree. `tests/vh-adlc/loop/plugin-version.test.ts` keeps passing for `plugin`. |
 | AC-06 | Same file: records `git rev-parse HEAD`, `git symbolic-ref HEAD`, `git status --porcelain=v2`, `git write-tree` and `git for-each-ref` before and after `context` against an origin that also holds a new tag, and asserts that only `refs/remotes/origin/main` differs, now at origin's tip. |
-| AC-07 | Same file: in each of the seven SDD SKILL.md files, the orchestrate SKILL.md and `references/loop.md`, at least one sentence contains both the literal `` `bun scripts/loop/cli.ts context --default-branch <default branch>` `` and the literal `(Instruction freshness)` after `references/loop-settings.md`. Must pass: ``Before acting, run `bun scripts/loop/cli.ts context --default-branch <default branch>` and read every file it lists at the version `references/loop-settings.md` (Instruction freshness) names.`` Must fail: ``Before acting, read every file `bun scripts/loop/cli.ts context` lists.`` (no flag) and ``Run `bun scripts/loop/cli.ts context --default-branch <default branch>`.`` with no `(Instruction freshness)` in that sentence. In `references/loop-settings.md`, the section under the Instruction freshness heading contains ``The conventions revision is always the one `vh-adlc knowledge` resolves from the checkout.`` Must pass: that sentence. Must fail: the section without it, or with ``The conventions revision is the one the tip's `AGENTS.md` pins.`` `tests/vh-adlc/loop/glossary.test.ts` gains the Instruction freshness row with its rejected synonyms. |
+| AC-07 | Same file: in each of the seven SDD SKILL.md files, the orchestrate SKILL.md and `references/loop.md`, at least one sentence contains both the literal `` `bun scripts/loop/cli.ts context --default-branch <default branch>` `` and the literal `(Instruction freshness)` after `references/loop-settings.md`. Must pass: ``Before acting, run `bun scripts/loop/cli.ts context --default-branch <default branch>` and read every file it lists at the version `references/loop-settings.md` (Instruction freshness) names.`` Must fail: ``Before acting, read every file `bun scripts/loop/cli.ts context` lists.`` (no flag) and ``Run `bun scripts/loop/cli.ts context --default-branch <default branch>`.`` with no `(Instruction freshness)` in that sentence. In `references/loop-settings.md`, the section under the Instruction freshness heading contains all three of `` `--default-branch <default branch>` ``, `` `git show <read>` `` and ``The conventions revision is always the one `vh-adlc knowledge` resolves from the checkout.`` Must pass: the Design's three rule bullets (run `context` with `--default-branch <default branch>`; read each entry of `freshness.files` at its `read` value, a revision with `git show <read>`; the conventions sentence). Must fail: the section with only the conventions sentence, or with ``The conventions revision is the one the tip's `AGENTS.md` pins.`` in its place. `tests/vh-adlc/loop/glossary.test.ts` gains the Instruction freshness row with its rejected synonyms. |
 | AC-08 | Same file: a clone with `refs/remotes/origin/HEAD` deleted runs `context` once with `--default-branch main` and once without it; both report `freshness.tip` equal to origin's tip and no entry `unverified`. |
 
 ## Tasks
