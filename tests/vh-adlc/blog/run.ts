@@ -248,7 +248,7 @@ Lines I would be happy to see quoted, word for word:
 ${quotable.map(q => `- "${q}"`).join("\n")}
 
 Notes:
-${paragraphs(prose(words, "We moved the payments ledger to Keelson over one quarter, and the plan review screen became the part of the work I trust most.", seed), 90).join("\n\n")}
+${paragraphs(prose(words, "We moved the payments ledger to Keelson one week at a time, and the plan review screen became the part of the work I trust most.", seed), 90).join("\n\n")}
 `;
 const QUOTABLE = ["The plan review is the only meeting I never cancel.", "Nobody on the team approves their own change, including me."];
 
@@ -296,13 +296,14 @@ For rendered checks, a browser driver is installed outside this project: require
   }
   // visual-revision and visual-review share an article with one treatment under a heading and a long unbroken run.
   write("screen-1.png", screen);
-  write("notes.md", notesFor("the notes behind article.md.", QUOTABLE, 300, 9));
-  const gap = paragraphs(prose(1600, "The ledger cutover took three weekends, and each one followed the same script.", 13), 120).join("\n\n");
+  const gap = paragraphs(prose(1600, "The ledger cutover ran for more than a year, and every week followed the same script.", 13), 120).join("\n\n");
+  // The notes support every claim in the article, so a wording-only revision has no reason to cut the long run.
+  write("notes.md", `${notesFor("the notes behind article.md.", QUOTABLE, 300, 9)}\nMy week-by-week record of the ledger cutover, all accurate:\n\n${gap}\n`);
   const articleText = `${front("The weekend we cut over the ledger")}We planned the move for months, and the plan review screen was where every step started.
 
 ## What we moved
 
-${figure("screen-1.png", "Keelson plan review for payments-ledger with two additions and one update", "The plan review we approved before the first cutover weekend")}
+${figure("screen-1.png", "Keelson plan review for payments-ledger with two additions and one update", "The plan review we approved before the first cutover step")}
 
 The first step was the smallest one: create the new database and the event queue, and change one worker role.
 

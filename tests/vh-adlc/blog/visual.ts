@@ -543,8 +543,9 @@ export function analyze(rollouts: Rollout[], opts: { png: string; allowedUrl: (u
       for (const url of call.text.match(URL_PATTERN) ?? []) if (!opts.allowedUrl(url) && call.kind !== "web") result.fetches.push({ ...at, what: `url: ${url}` });
       // A GitHub connector call is a fetch unless it reads the allowed docs repository at the pin.
       if (/mcp__\w*github/i.test(call.kind === "function" ? call.name : call.text)) {
-        const repos = [...call.text.matchAll(/repository_full_name\W+([\w.-]+\/[\w.-]+)/g)].map((m) => m[1]);
-        const refs = [...call.text.matchAll(/\bref\W+([\w./-]+)/g)].map((m) => m[1]);
+        // Quoted values only: a shorthand property such as `{ref, path}` takes its value from a quoted `const ref = "..."`.
+        const repos = [...call.text.matchAll(/repository_full_name"?\s*[:=]\s*["'`]([\w.-]+\/[\w.-]+)["'`]/g)].map((m) => m[1]);
+        const refs = [...call.text.matchAll(/\bref"?\s*[:=]\s*["'`]([\w./-]+)["'`]/g)].map((m) => m[1]);
         if (!repos.length || !refs.length || repos.some((r) => refs.some((ref) => !opts.allowedUrl(`https://github.com/${r}/blob/${ref}/x`)))) result.fetches.push({ ...at, what: `github connector: ${call.text.slice(0, 120)}` });
       }
       if (call.text.includes(base)) {

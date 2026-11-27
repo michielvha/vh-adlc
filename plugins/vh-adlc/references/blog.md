@@ -103,8 +103,9 @@ Revisions fall into three kinds:
   structural edits and corrections the request names, such as adding a section or
   fixing a code block, and fix an identifiable defect in a code block, such as a
   stale command flag. It changes no treatment and otherwise adds or removes no
-  heading and changes no heading level or code block. It reports presentation gaps
-  as findings, including those in the article as it found them.
+  heading and changes no heading level or code block. It reports as findings every
+  presentation gap the article had before the revision, even one the revision
+  shortened or removed.
 - A review-only run changes no file and reports presentation gaps as findings.
 
 Name each presentation gap by its location: the heading it sits under and the
@@ -210,7 +211,9 @@ Dispatch the editor in a separate context without parent history, so it never
 inherits the writer's own reading of an image; on Codex that means `spawn_agent`
 with `fork_turns` set to `none`. Tell it to read
 `agents/vh-adlc-blog-editor.agent.md` from the installed package itself rather
-than pasting its text. Supply the original and candidate, source-position
+than pasting its text. Give it the resolved docs revision and the path of each
+cached convention page it needs, so it never searches for them outside the
+project. Supply the original and candidate, source-position
 inventory, edit reasons, source evidence, voice references, protected spans and
 the Presentation inputs. For a new article, supply the brief and notes instead of
 an original. Include social copy in a promotion run. Reuse a site-specific critic

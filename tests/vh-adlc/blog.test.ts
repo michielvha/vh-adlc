@@ -486,3 +486,11 @@ describe("visual reading brace expansion", async () => {
     expect(visual.braces("plain")).toEqual(["plain"]);
   });
 });
+
+describe("visual reading editor bounds", () => {
+  test("the editor stays inside the project, package and named pages", () => {
+    const editor = fold(raw(EDITOR));
+    expect(editor).toMatch(/Never list or search their parent directories/);
+    expect(fold(raw(REF))).toMatch(/path of each cached convention page it needs/);
+  });
+});
