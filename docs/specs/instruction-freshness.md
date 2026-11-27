@@ -268,29 +268,37 @@ the plugin removes the field and the rule together, because they ship in one ver
 
 ## Acceptance Criteria
 
-- [ ] AC-01: In a clone whose listed instruction file and project procedure are behind origin's default
+- [x] AC-01: In a clone whose listed instruction file and project procedure are behind origin's default
       branch tip and unchanged locally, `context` reports both as `stale`, and `git show` of each `read`
       value prints the tip's content.
-- [ ] AC-02: A listed file equal to the tip reports `current` with its path. A listed file the current
+      Evidence: `bun test tests/vh-adlc/loop/context-freshness.test.ts tests/vh-adlc/loop/glossary.test.ts --timeout 60000` on macOS at f842355: 25 pass, 0 fail. The test "stale, current and edited files each report their state and the version to read" shows the instruction file and project procedure as `stale` with `<tip>:<path>`, and `git show` prints origin's content. Limitation: local bare-repository origin, no network remote.
+- [x] AC-02: A listed file equal to the tip reports `current` with its path. A listed file the current
       branch changed since it left the tip, committed or uncommitted, reports `edited` with its path,
       even when the tip also differs.
-- [ ] AC-03: When the local settings file is behind the tip, `freshness.settings` is `stale` and the
+      Evidence: `bun test tests/vh-adlc/loop/context-freshness.test.ts tests/vh-adlc/loop/glossary.test.ts --timeout 60000` on macOS at f842355: 25 pass, 0 fail. The same test shows a file equal to the tip as `current`, and a committed and an uncommitted edit of files the tip also changed as `edited` with their paths.
+- [x] AC-03: When the local settings file is behind the tip, `freshness.settings` is `stale` and the
       reading list and lenses are the tip's, including a file the tip added that the clone lacks, which
       reports `stale`.
-- [ ] AC-04: When the local settings are kept and the tip deleted a listed file the clone left
+      Evidence: `bun test tests/vh-adlc/loop/context-freshness.test.ts tests/vh-adlc/loop/glossary.test.ts --timeout 60000` on macOS at f842355: 25 pass, 0 fail. "stale local settings take the reading list and lenses from the tip" shows settings `stale`, the tip-added `e.md` listed as `stale` and the tip's lens. "tip settings that fail to load" keeps the local list and reports a `schema_version` error.
+- [x] AC-04: When the local settings are kept and the tip deleted a listed file the clone left
       unchanged, that file reports `removed` with a null `read`.
-- [ ] AC-05: Without a usable origin or tip (no remote, an unresolvable default branch, a failing
+      Evidence: `bun test tests/vh-adlc/loop/context-freshness.test.ts tests/vh-adlc/loop/glossary.test.ts --timeout 60000` on macOS at f842355: 25 pass, 0 fail. "a listed file the tip deleted reads as removed" shows the clone's edited settings kept and `d.md` reported `removed` with a null `read`.
+- [x] AC-05: Without a usable origin or tip (no remote, an unresolvable default branch, a failing
       fetch, a held ref lock, or no merge base with the tip), `context` exits 0, keeps the local reading list, reports every entry `unverified`
       with a reason naming the cause, and its other fields are unchanged.
-- [ ] AC-06: After `context` runs in a clone behind the tip, `HEAD`, the current branch, the index, the
+      Evidence: `bun test tests/vh-adlc/loop/context-freshness.test.ts tests/vh-adlc/loop/glossary.test.ts --timeout 60000` on macOS at f842355: 25 pass, 0 fail. Five cases (no remote, a missing origin without origin/HEAD or the flag, the same with the flag, a held `refs/remotes/origin/main.lock` with origin ahead, an unrelated root commit) each exit 0, report every entry `unverified` with the matching reason, and equal `loopContext` of the clone's working-tree settings. Limitation: the 30-second timeout path is not exercised; it shares the failed-fetch branch of the code.
+- [x] AC-06: After `context` runs in a clone behind the tip, `HEAD`, the current branch, the index, the
       working tree and every ref except `refs/remotes/origin/<branch>` are unchanged.
-- [ ] AC-07: The seven SDD skills, the orchestrate skill, `references/loop.md` and
+      Evidence: `bun test tests/vh-adlc/loop/context-freshness.test.ts tests/vh-adlc/loop/glossary.test.ts --timeout 60000` on macOS at f842355: 25 pass, 0 fail. "only origin's tracking ref for the default branch moves" compares HEAD, the branch, `status --porcelain=v2`, `write-tree` and `for-each-ref` before and after against an origin with a new tag: only `refs/remotes/origin/main` moved and no tag arrived.
+- [x] AC-07: The seven SDD skills, the orchestrate skill, `references/loop.md` and
       `references/loop-settings.md` direct operations to pass the default branch to `context` and read
       each listed file at its reported version; `references/loop-settings.md` states that the
       conventions revision stays the one resolved from the checkout; and the loop glossary defines
       Instruction freshness.
-- [ ] AC-08: In a clone with no `origin/HEAD`, `context` reports a verified tip both with
+      Evidence: `bun test tests/vh-adlc/loop/context-freshness.test.ts tests/vh-adlc/loop/glossary.test.ts --timeout 60000` on macOS at f842355: 25 pass, 0 fail. The pointer test passes for all eight skills and `references/loop.md`, the rule test passes for `references/loop-settings.md`, the must-pass and must-fail sentence tests pass, and the glossary tests pass with the Instruction freshness row. `check.test.ts`, `direct-operation-compatibility.test.ts` and `proportional-review.test.ts` passed at f5bd1b0 (139 pass, 1 fail on the then-missing version bump, which f842355 fixed: 111 pass, 0 fail).
+- [x] AC-08: In a clone with no `origin/HEAD`, `context` reports a verified tip both with
       `--default-branch` and, through `git ls-remote`, without it.
+      Evidence: `bun test tests/vh-adlc/loop/context-freshness.test.ts tests/vh-adlc/loop/glossary.test.ts --timeout 60000` on macOS at f842355: 25 pass, 0 fail. "a clone without origin/HEAD still verifies" deletes the symbolic ref with `git symbolic-ref --delete` and reports origin's tip with `--default-branch main` and without it (through `git ls-remote`), with no entry `unverified`.
 
 ## Test Plan
 
