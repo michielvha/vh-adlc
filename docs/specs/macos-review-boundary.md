@@ -461,6 +461,128 @@ None.
 | 2026-11-27 | R-6 | spec | `5ae4e466` | gpt-6.2-sol | procedural | 5 blocking, 8 should-fix, 2 nits; first review through the committed Codex command route on macOS (model attested from the session log), full pass |
 | 2026-11-27 | R-7 | spec | `519dbbfd` | gpt-6.2-sol | procedural | 8 blocking, 7 should-fix, 1 nit; Codex command route; convergence trigger fired (R-6 had 5 blocking), revision held for the owner's proportionality answer |
 | 2026-11-27 | R-8 | spec | `cc7bb1ac` | gpt-6.2-sol | procedural | 6 blocking, 8 should-fix; Codex command route; F-05 and F-06 re-raise owner-accepted limits; held for the owner |
+| 2026-11-27 | R-9 | spec | `34633957` | gpt-6.2-sol | procedural | 9 blocking, 8 should-fix; Codex command route; convergence trigger fired again (R-8 had 6 blocking); held for the owner |
+
+### R-9
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Owner summary, Scope (recorded run and protocol exclusion), Design (Recorded unsandboxed run, Documentation), AC-01 to AC-03, AC-06, AC-08, AC-10, AC-11, Test Plan AC-06, Tasks T20 to T22, Open Questions
+EVIDENCE: The R-8 revision puts the record in the reviewer’s clone. Scope still excludes “any protocol change for judging recorded runs.” `plugins/vh-adlc/references/review-protocol.md:43-47` forbids this dispatch instruction, and the pinned feature-document convention requires the reviewer to observe executed evidence for `met`. The owner approved a one-time exception, but neither the canonical instructions nor `cli.ts:55-76,178-196` gives that exception effect. In this review environment, an attempt to start `sandbox-exec` returned `sandbox_apply: Operation not permitted`. [Owner direction on #187](https://github.com/michielvha/vh-adlc/issues/187#issuecomment-7220327075)
+PROPOSAL: Raise an Open Question about how to authorize and deliver the one-time exception under both the repository protocol and the pinned verdict rule. Specify the affected criteria and what the reviewer must verify before relying on the record.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: Frontmatter status description, Owner summary, Scope (recorded run), Design (Recorded unsandboxed run), AC-06, Test Plan AC-06 and AC-10, Task T22
+EVIDENCE: The R-8 revision retains the promise to run the tests “at the exact reviewed commit” in the Owner summary and Scope. Design and T22 now run them at the code commit and dispatch the review at its successor. An endpoint tree comparison can establish which files differ, but the two commits still have different identities. The owner’s direction specifies the exact reviewed commit. [Owner direction on #187](https://github.com/michielvha/vh-adlc/issues/187#issuecomment-7220327075)
+PROPOSAL: Use one target for execution and dispatch with a separate evidence handoff, or obtain explicit agreement to the two-commit procedure and make every statement of the requirement match it.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: blocking
+WHERE: Owner summary, Context (rejected route-run evidence), Scope (recorded run), Design (Recorded unsandboxed run), Test Plan AC-02, Tasks T19 and T22
+EVIDENCE: The R-8 revision still runs candidate tests and the mutation script outside Seatbelt. A fresh clone isolates the checkout under test, while the process retains the implementer’s filesystem access. `tests/vh-adlc/evidence/macos-review-boundary/mutants.py:15-22` also passes the inherited environment to Bun. The pinned `conventions/coding.md:95-97` requires an allowlisted environment for user-supplied code.
+PROPOSAL: Specify a local test context that can start Seatbelt, uses an explicit environment allowlist, and lacks access to the implementer’s credentials and owning checkout. Use that context for all three recorded commands.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: blocking
+WHERE: Frontmatter goal, Owner summary (boundary and pending cases), Scope (write boundary and pending cases), Design (What the route denies, Pre-existing hard links, Documentation), AC-02, AC-07, AC-08, Test Plan AC-02 and AC-08, Tasks T18 and T19
+EVIDENCE: The R-8 revision checks the owning index and HEAD, common `objects` and `refs`, and `packed-refs`, while the boundary promises protection for the Git directories and refs. Git also supports reftable, per-worktree administrative storage, and reflogs that can hold the only references to unpublished work. The new traversal leaves those files outside its link-count check. The same design assumes `--no-hardlinks` makes the private clone self-contained, but Git can carry forward a source repository’s external object alternates. [Git ref storage formats](https://git-scm.com/docs/git-init), [Git repository layout](https://git-scm.com/docs/gitrepository-layout), [Git clone documentation](https://git-scm.com/docs/git-clone)
+PROPOSAL: Define which storage the route protects and keep the review pending whenever it cannot establish that the repository and clone use protected storage. Add a proof that distinguishes a shared ref from a shared object, including packed refs where supported.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: blocking
+WHERE: Frontmatter goal, Owner summary (boundary and pending cases), Scope (write boundary, pending cases, and surviving processes), Design (Pre-existing hard links, Concurrency, failure and rollback, Documentation), AC-02, AC-07, AC-08, Test Plan AC-02 and AC-08, Tasks T18 and T19
+EVIDENCE: The R-8 revision adds a one-time scan of shared Git storage. In `review-route.ts:329-367` the check precedes clone or export preparation, the initial snapshot, and reviewer launch. Design expressly leaves other sessions free to write and lets detached reviewer processes outlive judgment. An ordinary local clone from another session can create aliases after the scan, including after `ready`. The disappearance test checks a failed lookup during the scan and leaves this lifetime gap open. [Git clone documentation](https://git-scm.com/docs/git-clone)
+PROPOSAL: Specify a boundary that keeps Git storage protected for the full lifetime of reviewer processes. Use a disposable fixture to verify the outcome when another session creates a local clone after the preflight.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: blocking
+WHERE: Owner summary (Git hard-link recovery), Context (Background), Design (Pre-existing hard links, Documentation), AC-07, AC-08, Test Plan AC-08, Tasks T18 to T20
+EVIDENCE: The R-8 revision prescribes `git repack -a -d` or recloning for every flagged Git file. In a disposable repository, an ordinary local clone shared object files only, an additional `--no-hardlinks` clone left the source links in place, and repack left a loose ref’s link count at two. In a separate disposable repository, `git repack -a -d` removed a recoverable draft object from an old pack. The planned proof checks the wording and never exercises recovery. [Git clone documentation](https://git-scm.com/docs/git-clone), [Git repack documentation](https://git-scm.com/docs/git-repack)
+PROPOSAL: Give recovery guidance that preserves local data and identifies which repository and alias must be addressed. Prove that the original owning worktree can be reviewed after recovery and that unpublished data survives.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: blocking
+WHERE: Owner summary (model attestation), Scope (session-log forgery limit and Posture A), Design (What the route denies, Route acceptance, Codex route), AC-05, AC-06, Test Plan AC-05 and AC-06, Tasks T21 and T22
+EVIDENCE: Scope excludes “a reviewer that forges the Codex session log the model attestation reads.” `review-route.ts:269-296,371-391` uses that reviewer-writable log to grant eligibility to store a reply as the requested model. The accepted limit therefore leaves the model eligibility decision dependent on evidence the reviewer can forge. [Owner direction on #187](https://github.com/michielvha/vh-adlc/issues/187#issuecomment-7218794661)
+PROPOSAL: Base eligibility for a requested model on evidence outside the reviewer’s write authority. Keep the review pending when that evidence is unavailable.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: blocking
+WHERE: Owner summary (real Codex proof), Design (Recorded unsandboxed run, Route acceptance), AC-06, Test Plan AC-06, Tasks T21 and T22
+EVIDENCE: The R-8 revision makes the implementation transcript show the reviewer reading the committed record. AC-06 also requires that implementation review to finish, its records to be stored and checked, and lint to pass. T22 schedules one implementation run and those later checks. If that run is the formal review, it must return an AC-06 verdict before those parts of its own proof exist. `review-route.ts:381-391` can return `ready` before criterion coverage is checked, and `internal/review/review.go:25-39` checks byte equality only.
+PROPOSAL: Specify a completed proof run whose transcript, target, full criterion record set, storage check and lint result are available to a later formal reviewer. Say which run is diagnostic and which counts toward completion.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: blocking
+WHERE: Owner summary (unsandboxed-run diagnostic), Scope (test-file diagnostic), Design (Loud failure without a boundary, Recorded unsandboxed run), AC-10, Test Plan AC-10, Tasks T18 and T22
+EVIDENCE: The changed AC-10 proof requires the literal substring `needs an unsandboxed run`. The message `The route tests need an unsandboxed run` satisfies the criterion and the Design wording, yet fails that match. The changed row also omits the must-pass and must-fail examples the pinned Test Plan convention requires.
+PROPOSAL: Use a diagnostic check that accepts the stated message and distinguishes it from unrelated failures. List passing and failing examples and require the expected exit status, single failure, skips and non-route passes.
+
+FINDING: F-10
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter `covers`, Design (Recorded unsandboxed run), AC-02, AC-06, Test Plan AC-02 and AC-06, Tasks T19, T21 and T22
+EVIDENCE: The R-8 revision adds the proof scripts to `covers`, but its code-to-review comparison permits changes anywhere in their enclosing evidence directory. Either script can therefore differ from the version at the tested commit and still pass the proposed comparison. The decisive test record also remains outside `covers`, so `internal/fresh/fresh.go:165-193` can report the review fresh after the record is replaced or removed.
+PROPOSAL: Limit the allowed delta to the exact generated record and any permitted document changes. Bind freshness to the record the reviewer actually used.
+
+FINDING: F-11
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner summary (real Codex proof), Design (Delivery), AC-06, Test Plan AC-06, Tasks T21 and T22
+EVIDENCE: The changed AC-06 row promises exact-target route JSON and an unchanged worktree. `run-review.sh:7-16` runs the controller from its own checkout, and `cli.ts:90-104` reads worktree settings for `route`. Matching porcelain status and refs can also miss changed bytes in a file already marked modified, an ignored file, or an index flag.
+PROPOSAL: Pin the controller and route inspection to the proof target. Compare an independent snapshot of file contents, ignored paths, HEAD, index and refs, and verify that a same-status content change fails the check.
+
+FINDING: F-12
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner summary (mutation proof), Design (Recorded unsandboxed run), Test Plan AC-02, AC-03, AC-08 and AC-11, Tasks T5, T10, T19 and T22
+EVIDENCE: The R-8 revision records the mutation script’s complete output, but `mutants.py:21-28` discards the Bun exit code and assertion diagnostics. The script can exit successfully with zero failures for a mutation, and a setup failure can supply a failure count without establishing that the guard was exercised.
+PROPOSAL: Require the mutation script to verify the expected failing test and diagnostic for each mutation. Preserve the subprocess exit statuses and reject setup failures and zero-test runs.
+
+FINDING: F-13
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner summary (protected-tree changes), Scope (pending cases), Design (Pre-existing hard links, Concurrency, failure and rollback, Documentation), AC-08, Test Plan AC-08, Tasks T18 and T19
+EVIDENCE: The R-8 revision retains the promise of a retryable reason when the protected tree changes, but its proof removes a listed file before `lstat`. That test can pass even when the scanner overlooks additions to a visited directory. The revised Design also names `packed-refs` without specifying how it distinguishes a normally absent file from one that vanished during the scan.
+PROPOSAL: Define which changes produce the retryable reason and test each promised case. Include a normal repository without `packed-refs` and examples of pending reasons the changed proof must accept and reject.
+
+FINDING: F-14
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner summary (scratch and pending cases), Scope (scratch overlap and documentation), Design (Scratch overlap, Documentation), AC-07, AC-11, Test Plan AC-07 and AC-11, Tasks T18 to T20
+EVIDENCE: AC-11 promises refusal for a destination above a protected root and for protected descendants in the private clone. Its proof covers the owning root, common Git storage and an owning-worktree descendant. It can pass with either promised check missing. `references/loop-settings.md:39` also says scratch entries are checked by path alone, while the planned edits cover its command-route paragraphs.
+PROPOSAL: Add refusal cases for a strict ancestor and a protected clone descendant. Update the settings row to describe both name validation and the resolved-path check.
+
+FINDING: F-15
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner summary (validation and rollout), Scope (plugin bump and candidate installation), Design (Delivery, Concurrency, failure and rollback), AC-06, Test Plan AC-06, Tasks T7, T21 and T22
+EVIDENCE: The changed proof still runs `cli.ts` directly from branch source. Design identifies `plugin.stale` as a stop in the supported lifecycle, and T8 records that `plugin.stale` is already true in the development checkout. The proof can pass without showing that either installed host can reach review and store its records. The pinned testing convention requires fresh installation and upgrade proof.
+PROPOSAL: Stage the candidate privately through both marketplace layouts and exercise an upgrade through the supported review and record-storage flow before merge.
+
+FINDING: F-16
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter status description, Owner summary (changes since R-5 and validation), Design (Loud failure without a boundary), AC-10, Test Plan AC-10, Tasks T18 and T21
+EVIDENCE: The R-8 Owner summary says the route tests “now fail once” under a sandbox and lists a proof script that fails closed. T18 and T21 still schedule those changes. At `34633957`, `tests/vh-adlc/loop/review-route.test.ts` lacks the single failure registration, and `run-review.sh:15-19` logs the review exit code then returns the status of a reporting command.
+PROPOSAL: Mark both changes as planned in the summary. Report observed results separately with the commit that produced them.
+
+FINDING: F-17
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Pre-existing hard links), Sources
+EVIDENCE: The R-8 revision reports “about a second over 373 objects” without a command, target or output. Its citation `review-route.ts:317` points to the directory walker in this export. The `--no-hardlinks` clone is at line 349.
+PROPOSAL: Cite the command, target and output for the timing claim or remove it. Correct the clone citation.
 
 ### R-8
 
