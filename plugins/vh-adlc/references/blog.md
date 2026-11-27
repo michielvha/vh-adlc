@@ -229,7 +229,13 @@ their evidence and expose changed recommendations or unknowns to the owner.
 Let the editor finish its turn and use its final return; do not interrupt or
 close it after an earlier message. List every entry of the editor's last
 `Presentation repairs` line in the handoff, quoting each entry in the editor's own
-words, label included, on its own line marked `applied` or `open`.
+words, label included, on its own line marked `applied` or `open`. Quote every
+entry even when you also summarize them, for example:
+
+```text
+- applied: irrelevant image: the figure shows a chart, but the caption calls it the plan review screen
+- open: unverified render: phone dark
+```
 When independent dispatch is unavailable, do a self-edit and identify that limit;
 do not claim an independent review or certify prose with an AI-detector score.
 
