@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revised for R-4 under the owner's 2026-11-27 decision (v1 reviews only the conversation it runs in; transcript parsing moves to #185), then for R-5 and R-6. Spec review R-7 is next."
+status: planned
+status_description: "Accepted by the owner on 2026-11-27 at spec review R-7 (f0f8dd4d, no findings); v1 reviews only the conversation it runs in, and transcript parsing is #185. Tasks are next."
 issue: https://github.com/michielvha/vh-adlc/issues/101
 goal: "After an agent session, the owner gets a saved, ranked list of concrete changes to the agent's environment that would have prevented that session's mistakes and waste, each naming where it belongs and whether it has happened before."
 covers:
@@ -423,6 +423,7 @@ None.
 | 2026-11-27 | R-5 | spec | `4f465f0348baea0bba3fbea1c5c6752f6510686a` | claude-opus-5-5 | procedural | Three should-fix and four nit findings |
 | 2026-11-27 | R-6 | spec | `f2fc74e65fddcfb902229042385ba973d2c8d2a8` | claude-opus-5-5 | procedural | One blocking, two should-fix and one nit finding |
 | 2026-11-27 | R-7 | spec | `f0f8dd4ddd76a13f2dc0ea9b071a20a86d38fcf5` | claude-opus-5-5 | procedural | No findings |
+| 2026-11-27 | R-7 | spec | `f0f8dd4ddd76a13f2dc0ea9b071a20a86d38fcf5` | n/a | n/a | accepted by owner |
 
 ### R-1
 
