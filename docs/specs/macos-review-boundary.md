@@ -397,34 +397,40 @@ sentence and links to `loop-settings.md`. The Instruction freshness section and
 
 ## Acceptance Criteria
 
-- [ ] AC-01: On macOS, a command-route review whose reply passes every existing check comes back `ready`.
+- [x] AC-01: On macOS, a command-route review whose reply passes every existing check comes back `ready`.
+      Evidence: `tests/vh-adlc/evidence/macos-review-boundary/recorded-run/record-5168340e.md` (code commit 5168340e, this Mac outside any sandbox): the route tests pass, 69 pass, 5 skip, 0 fail; R-17 at bc5cf01c returned met.
 - [ ] AC-02: On macOS, no reviewer process can change the owning worktree (files, ignored files, index,
       HEAD, refs) or the private clone outside `review_scratch`, during or after the review, either through
       their own paths or by renaming a parent directory. This includes a descendant that detaches into its
       own session, clears its environment and writes after the reviewer has exited. Writes inside
       `review_scratch` and in the temporary directory still succeed.
-- [ ] AC-03: On a host where neither boundary can be applied, including a macOS process already inside a
+- [x] AC-03: On a host where neither boundary can be applied, including a macOS process already inside a
       Seatbelt sandbox, a command-route review stays pending with a reason that names the missing boundary.
-- [ ] AC-04: On a host without `unshare`, `runOwnedClient` with `pidNamespace: true` and no `writeDeny`
+      Evidence: Same record: the nested-sandbox and `boundary: "unavailable"` tests pass, and the boundary-precheck mutation fails the nested-sandbox test; R-17 at bc5cf01c returned met.
+- [x] AC-04: On a host without `unshare`, `runOwnedClient` with `pidNamespace: true` and no `writeDeny`
       runs the client with the `marker` boundary instead of throwing.
-- [ ] AC-05: In this repository, `bun plugins/vh-adlc/scripts/loop/cli.ts route` returns a `command` route
+      Evidence: Same record: the no-unshare subprocess test in `owned-process.test.ts` passes; R-17 at bc5cf01c returned met.
+- [x] AC-05: In this repository, `bun plugins/vh-adlc/scripts/loop/cli.ts route` returns a `command` route
       with model `gpt-6.2-sol` and `model_attestation: codex-session` for both `spec review` and `review`.
+      Evidence: `bun plugins/vh-adlc/scripts/loop/cli.ts route --repo . --operation "spec review"` and `--operation review` print `"route":"command"`, `"model":"gpt-6.2-sol"` and `"model_attestation":"codex-session"` (T8); R-17 at bc5cf01c returned met.
 - [ ] AC-06: On this Mac, real Codex spec reviews through `cli.ts review` are stored with outcome `ready`,
       the served model attested from the session log and `git status` unchanged (R-6 to R-9). A real Codex
       implementation review through the final route code comes back `ready` the same way, its reviewer
       having read the recorded unsandboxed run, with the owning worktree's status and refs unchanged. The
       committed script that ran it fails unless the outcome is `ready` for that commit and nothing changed,
       and keeps the run's Codex transcript.
-- [ ] AC-07: `references/loop-settings.md` states the macOS boundary and what it denies, what stays
+- [x] AC-07: `references/loop-settings.md` states the macOS boundary and what it denies, what stays
       writable, the pending cases, the `-s danger-full-access` requirement for Codex under it, and that tests
       starting their own `sandbox-exec` need a run outside any sandbox; `references/review-protocol.md` names
       the boundary and links to `loop-settings.md`.
+      Evidence: `loop-settings.md` and `review-protocol.md` at bc5cf01c state the AC-07 points (T20); R-17 returned met.
 - [ ] AC-08: On macOS, a command-route review whose owning worktree holds a protected file with a second
       hard link stays pending, with a reason naming that file, and a protected file that disappears or can't
       be read during that check leaves the review pending with a retryable reason instead of an error.
-- [ ] AC-10: Run on a process without a boundary, such as inside a Seatbelt sandbox,
+- [x] AC-10: Run on a process without a boundary, such as inside a Seatbelt sandbox,
       `tests/vh-adlc/loop/review-route.test.ts` reports one failure whose message says the route tests need
       an unsandboxed run, and skips its route tests instead of failing each one.
+      Evidence: Same record: under `sandbox-exec` the route test file reports the single "The route tests need an unsandboxed run" failure, 58 skipped; R-17 at bc5cf01c returned met.
 - [ ] AC-11: On macOS, a `review_scratch` entry that resolves to a protected path, a parent of one, or a path
       inside the Git directory or common Git directory, or a symlink to a path inside a denied path, leaves the
       review pending with a reason naming the entry, while a real scratch directory and a scratch symlink to a
@@ -483,7 +489,8 @@ sentence and links to `loop-settings.md`. The Instruction freshness section and
       Evidence: `bun test --timeout 60000 tests/vh-adlc/loop/settings.test.ts tests/vh-adlc/loop/review-route.test.ts` at T25: 88 pass, 4 fail. The append to the index under `meta /` lands (its digest changed), because `.trim()` drops the space and the deny names a path that does not exist. `tracked/.`, `a/./b` and `./build` load without refusal.
 - [x] T27 `plugins/vh-adlc/scripts/loop/review-route.ts`, `plugins/vh-adlc/scripts/loop/settings.ts`, `tests/vh-adlc/evidence/macos-review-boundary/run-review.sh` - Git paths keep everything but the trailing newline, scratch entries with a `.` component are refused, and the runner accepts only exit 1 from `symbolic-ref` as detached; T26 passes, the mutant script catches every mutation, and a runner whose `symbolic-ref` fails with another code exits nonzero (AC-02, AC-06, AC-11, R-15 F-01, F-02, F-05). R-15 F-03 and F-06 are follow-up #194, below this alpha's threshold by the orchestrator's decision under the owner's delegation.
       Evidence: Git paths now drop only the trailing newline, `settings.ts` refuses scratch entries with a `.` component, and the runner treats only exit 1 from `symbolic-ref` as detached. `bun test --timeout 60000 tests/vh-adlc/loop/ tests/vh-adlc/triage/owned-process.test.ts`: 215 pass, 5 skip, 0 fail, so T26 passes. With a `git` shim whose `symbolic-ref` exits 128, the runner exits 1 with "the state before the review could not be measured", before any review starts. A first version of that guard written as an AND-OR list did not stop the run under `set -e`: that run went on to a full Codex review, which passed. The `if` form fixes it, and the snippet was checked on its own before the rerun.
-- [ ] T22 `tests/vh-adlc/evidence/macos-review-boundary/recorded-run/` - once #182 has reached the branch, the owner-directed recorded run on this Mac outside any sandbox, in a fresh clone of the code commit: the boundary test files, the AC-10 sandboxed invocation and the mutant script, each with command, commit, exit code and output, committed on top of the code commit as commit P; then the `implementation` proof run on P, its records stored as a diagnostic implementation review and its artifacts committed as commit Q under `implementation-proof-P`; then the formal Codex implementation review on Q, its records stored, and `vh-adlc review check` and `vh-adlc lint` passing (AC-01, AC-02, AC-03, AC-06, AC-08, AC-10, AC-11)
+- [x] T22 `tests/vh-adlc/evidence/macos-review-boundary/recorded-run/` - once #182 has reached the branch, the owner-directed recorded run on this Mac outside any sandbox, in a fresh clone of the code commit: the boundary test files, the AC-10 sandboxed invocation and the mutant script, each with command, commit, exit code and output, committed on top of the code commit as commit P; then the `implementation` proof run on P, its records stored as a diagnostic implementation review and its artifacts committed as commit Q under `implementation-proof-P`; then the formal Codex implementation review on Q, its records stored, and `vh-adlc review check` and `vh-adlc lint` passing (AC-01, AC-02, AC-03, AC-06, AC-08, AC-10, AC-11)
+      Evidence: Recorded run at code commit 5168340e (`recorded-run/record-5168340e.md`): boundary tests 69 pass, 5 skip, 0 fail; AC-10 sandboxed run 1 failure, 58 skip; mutant script exit 0, 12/12 caught. Committed as e274ff17. The proof run R-16 on e274ff17 was `ready`, attested `gpt-6.2-sol`, state unchanged, runner exit 0, with artifacts committed at bc5cf01c (`implementation-proof-e274ff17`). The formal Codex implementation review R-17 on bc5cf01c was `ready` and attested, with the state unchanged and artifacts in `implementation-review-bc5cf01c`. Both record sets pass `vh-adlc review check`. Earlier cycles: R-14 at c55aa45a and R-15 at b8c1a07f led to T23 to T27.
 
 ## Open Questions
 
