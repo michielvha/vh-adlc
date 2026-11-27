@@ -282,6 +282,7 @@ None.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-27 | R-1 | spec | `5841585` | claude-opus-5-5 | procedural | 5 should-fix, 4 nits; revision follows |
+| 2026-11-27 | R-2 | spec | `5f5b05b` | claude-opus-5-5 | procedural | 3 should-fix, 5 nits; revision follows |
 
 ### R-1
 
@@ -347,3 +348,61 @@ SEVERITY: nit
 WHERE: Design (States); Scope (Not handled line)
 EVIDENCE: The States table depends on `B`, the merge base of `HEAD` and `T`, and no outcome is defined for when none exists (a shallow clone, or unrelated histories). The Scope line "Not handled: a file that both the current branch and the tip changed ..." does not follow the convention's `Not handled: <the case>, <why> (R-<n> F-<nn>).` form (feature-documents.md:255-256).
 PROPOSAL: Report `unverified` with a reason when no merge base exists. Either restate the limit as a Design decision with its reason, or keep it in Scope until a finding gives it an ID.
+
+### R-2
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan row AC-01, AC-02; Acceptance Criteria AC-02
+EVIDENCE: The row now reads "listing an instruction file, a project procedure and three more files. Origin advances the first two and two of the others; the clone leaves one of them unchanged, edits another with a commit and a third without one, and leaves one file equal to origin." Among the three other files it gives four roles: unchanged, edited with a commit, edited without one, and equal to origin. The counts do not add up. Under the plainest reading (origin advances A and B, the clone leaves A unchanged, commits an edit to B and edits C without committing), no file is left to be `current`, and the uncommitted edit lands on a file the tip did not change. AC-02 needs a `current` file and edited files "even when the tip also differs", committed or uncommitted. Two implementers will build different fixtures, and one of them will not prove AC-02. The R-1 revision rewrote this row.
+PROPOSAL: Give each file one role: instruction file and procedure advanced and unchanged locally (`stale`); one file equal to origin (`current`); one file the tip advanced that the clone edits in a commit; and one file the tip advanced that the clone edits without committing (both `edited`).
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan row AC-07; Acceptance Criteria AC-07; Design (Read rule, "point to that rule in one clause instead of restating it")
+EVIDENCE: The AC-07 proof uses a text pattern to judge free prose. It asserts that each skill and reference "tells operations to pass `--default-branch` and read at the reported version, with a reference to `references/loop-settings.md`", and that loop-settings.md "states that the conventions revision comes from `vh-adlc knowledge` on the checkout". It gives no must-pass or must-fail examples, and feature-documents.md:128-129 requires them: "A proof that judges free text with a pattern lists its must-pass and must-fail examples in the row." The Design also says loop.md:143 and the skills only "point to that rule in one clause instead of restating it". A one-clause pointer that never names `--default-branch` follows the Design but fails this row. A sentence that names the flag without directing anyone to pass it would pass the row.
+PROPOSAL: Give the exact phrases or patterns the test checks, with one must-pass example (for example the skill line `bun scripts/loop/cli.ts context --default-branch <default branch>` followed by a pointer to references/loop-settings.md) and one must-fail example for each assertion. Make the pointer clause the Design asks for satisfy them.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Default branch and fetch; States, `unverified` row); Acceptance Criteria AC-05; Test Plan row AC-05
+EVIDENCE: The R-1 revision added "or no merge base between `HEAD` and the tip (a shallow clone or unrelated histories)" as a cause that makes every entry `unverified`, and the States table now says "No tip or no merge base could be found". AC-05 lists only "no remote, an unresolvable default branch, a failing fetch, or a held ref lock", and the AC-05 row has no shallow or unrelated-history case. An implementation where `git merge-base` throws, so that `context` exits non-zero and every operation in a shallow clone stops before acting, passes every planned check.
+PROPOSAL: Add the missing merge base to AC-05's list. Add an AC-05 case, such as a clone whose branch has history unrelated to origin's, that asserts exit 0, every entry `unverified` and a reason naming the missing merge base.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan row AC-05 (the held-lock case); Design (Default branch and fetch, "A timeout and a held lock both surface as a failed fetch")
+EVIDENCE: The row says "a clone holding `refs/remotes/origin/main.lock`, whose `reason` names the failed fetch" but does not say origin has moved past the clone's tracking ref. Git's fetch leaves an up-to-date remote-tracking ref alone and takes no lock for it, so with an unadvanced origin the fetch succeeds and the case reports a verified tip. I could not observe this: the sandbox refused the scratch git run. It rests on git's documented fetch behaviour.
+PROPOSAL: In this case, say origin is advanced past the clone's `refs/remotes/origin/main` before the lock file is created.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Default branch and fetch, "With `--no-tags`, the fetch moves only `refs/remotes/origin/<branch>`, as `claim` does"); Context (Background, Current state, "`claim` already fetches the default branch and touches only remote-tracking refs")
+EVIDENCE: plugins/vh-adlc/scripts/loop/claim.ts:40 runs `["fetch", "-q", "origin", defaultBranch]` without `--no-tags`, so claim can auto-follow tags into `refs/tags/*`, the very thing R-1 F-03 pointed out. The R-1 revision added the Design sentence. The Context bullet predates it.
+PROPOSAL: Drop "as `claim` does" from the Design sentence, and in Context say claim fetches the default branch without `--no-tags`.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Default branch and fetch)
+EVIDENCE: The R-1 revision added the `git ls-remote --symref origin HEAD` fallback. The 30-second timeout and `GIT_TERMINAL_PROMPT=0` are stated only for the fetch, so the network call before it has no stated bound. The branch name it returns is then used as an argument to `git fetch`, and nothing says the name is validated or separated with `--` (a name beginning with `-` would be read as an option).
+PROPOSAL: Apply the same timeout and prompt guard to `ls-remote`. Check the resolved or passed branch with `git check-ref-format --branch`, or pass it after `--`, and report `unverified` naming `--default-branch` when it fails.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (States, "absent counts as a value, so two absent sides are equal"; Settings file; Read rule, "Read each entry at its `read` value"); Output
+EVIDENCE: In a repository with no settings file locally, at the merge base or at the tip (such as this one, Context line 105), `freshness.settings` classifies as `current` with `read: ".vh-adlc/loop.yaml"`, a path that does not exist. The Read rule says to read "each entry" without saying whether `freshness.settings` is one, and operations do not read the settings file today. One implementer will have operations try to read a missing file, while another will skip it.
+PROPOSAL: Say whether operations read `freshness.settings`, and give an absent settings file a null `read` or leave it out of the entries operations read.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Read rule, "`skills/vh-adlc-spec/SKILL.md:164` ... gain the same pointer", and the skills' one-clause pointer); frontmatter `covers`
+EVIDENCE: Existing text tests outside `covers` pin the lines this Design rewrites. tests/vh-adlc/proportional-review.test.ts:196 expects "judged against the product profile and the files `bun scripts/loop/cli.ts context` lists". tests/vh-adlc/check.test.ts:694 and tests/vh-adlc/direct-operation-compatibility.test.ts:31 expect "scripts/loop/cli.ts context" in the skills and loop.md. `covers` lists only tests/vh-adlc/loop/, and the Design does not say whether these phrases must survive.
+PROPOSAL: State that the rewritten lines keep these phrases. Otherwise, list the three test files in `covers` and in the Design as updated.
