@@ -1,0 +1,8 @@
+2026-11-27T19:11:56Z
+Darwin Mac 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:19:08 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6050 arm64
+codex-cli 0.172.0
+commit=5fe9190d15001eb03f7a396cd29ec896b81cacbb
+kind=implementation
+review_exit=0
+transcript=rollout-2026-11-27T20-11-57-01a21e6b-e6a3-7bd3-912e-9c17c65afa9d.jsonl
+FAIL: the owning worktree changed during the review
