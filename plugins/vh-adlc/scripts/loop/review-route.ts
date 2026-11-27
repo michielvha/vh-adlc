@@ -378,8 +378,9 @@ export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutc
     const namespace = request.boundary !== "unavailable" && pidNamespaceAvailable();
     const seatbelt = request.boundary !== "unavailable" && !namespace && seatbeltAvailable();
     if (!namespace && !seatbelt) return { status: "pending", reason: NO_BOUNDARY };
-    const gitDir = git(repo, ["rev-parse", "--absolute-git-dir"]).toString().trim();
-    const commonDir = git(repo, ["rev-parse", "--path-format=absolute", "--git-common-dir"]).toString().trim();
+    // Only Git's output terminator goes: a path may end in a space.
+    const gitDir = git(repo, ["rev-parse", "--absolute-git-dir"]).toString().replace(/\n$/, "");
+    const commonDir = git(repo, ["rev-parse", "--path-format=absolute", "--git-common-dir"]).toString().replace(/\n$/, "");
     if (seatbelt) {
       const links = protectedLinkCheck(repo, scratch, [join(gitDir, "index"), join(gitDir, "HEAD")]);
       if (links.changed) return { status: "pending", reason: `a protected file changed while the link check read it (${links.changed}); retry the review` };

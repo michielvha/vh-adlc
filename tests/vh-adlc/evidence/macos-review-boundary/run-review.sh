@@ -23,7 +23,8 @@ state() (
   set -e
   git -C "$repo" status --porcelain=v1 --ignored --untracked-files=all
   git -C "$repo" rev-parse HEAD
-  git -C "$repo" symbolic-ref -q HEAD || echo detached
+  # Exit 1 means a detached HEAD; any other failure is a failed measurement.
+  if ref=$(git -C "$repo" symbolic-ref -q HEAD); then echo "$ref"; else rc=$?; [ "$rc" -eq 1 ] || exit 1; echo detached; fi
   git -C "$repo" for-each-ref --format='%(refname) %(objectname)'
   git -C "$repo" ls-files --stage -v
   shasum -a 256 "$(git -C "$repo" rev-parse --absolute-git-dir)/index"
