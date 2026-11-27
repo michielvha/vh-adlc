@@ -304,6 +304,30 @@ None.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-27 | R-1 | spec | `7248ba28` | claude-opus-5-5 | procedural | 1 blocking, 4 should-fix, 4 nits; host route, because the Codex command route cannot run on macOS until this feature exists |
+| 2026-11-27 | R-2 | spec | `c0f89a56` | claude-opus-5-5 | procedural | 0 blocking, 1 should-fix, 2 nits; host route |
+
+### R-2
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan row AC-02 (tests (2) and (5)), AC-02, Design (Profile: "for each parent directory of a denied path, up to `/`"; What the route denies: Git directory and common Git directory)
+EVIDENCE: The existing fixture `repository()` (tests/vh-adlc/loop/review-route.test.ts:23-38) makes the owning worktree as `mkdtemp(join(tmpdir(), "vh-review-route-"))` and runs `git init` in it, so it is a main worktree whose `.git` sits inside `repo`, and its parent directory is `$TMPDIR` itself. Three consequences, all from the AC-02 row this revision rewrote for R-1 F-01 and F-05. First, test (5) (`git branch x`, `git tag -f t`, writing `.git/index`) passes when the route denies only `repo`: neither the `--absolute-git-dir` deny nor the `--git-common-dir` deny is exercised, yet in a linked worktree such as this repository's `.claude/worktrees/<name>` the index, HEAD and every ref live in `/Users/michielvh/code/vh-adlc/.git`, outside `repo`. Test (5) also does not say the stubs target the owning worktree; an implementation reviewer's cwd is the clone (review-route.ts:331), where those commands only touch the clone. Second, test (2) renames only the immediate parent, so an implementation that adds a `literal` deny for the immediate parent and not for the ancestors above it passes. On this Mac, in a fresh `mktemp -d` T with D0=T/gp/parent/repo and literal denies on T/gp/parent and T/gp only, `mv T/gp T/gpx` was refused but `mv T T.x` returned 0, so the grandparent rename route stays open. Third, with today's fixture the parent test (2) renames is `/var/folders/sm/.../T`, the user's per-user temporary directory (`ls -ld` shows its parent `drwxr-xr-x michielvh staff`, so the rename succeeds unconfined). The row requires each test to be "watched failing with the named part of the profile removed", and that watched-failing run of (2) moves the whole `$TMPDIR` away from every other process on the machine until the writer renames it back.
+PROPOSAL: Give the AC-02 tests a fixture of their own: a main checkout nested two levels below a fresh `mkdtemp` directory plus a linked worktree (`git worktree add`) used as the owning worktree, so its Git directory and common Git directory lie outside `repo`. Have test (2) rename the grandparent and, separately, the main checkout directory, and have test (5) run `git -C <owning worktree>` and write the linked worktree's index, each watched failing with the matching deny removed.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Context (Owner summary: "The owner can still pick it at acceptance."), Scope (Not handled: "Posture A, decided by the orchestrator under the owner's delegation ... (R-1 F-04)"), Open Questions ("None.")
+EVIDENCE: The Owner summary offers the owner a choice between posture A and the deny-by-default profile at acceptance, but Scope records the posture as already decided and Open Questions says "None.", which the convention reads as every question answered. An acceptance row therefore records nothing about which posture the owner chose. The delegation cited (ledger #179) asks for the Codex review setup to be configured without asking; it does not name the write posture. This text is new in this revision.
+PROPOSAL: Either drop "The owner can still pick it at acceptance" so the summary matches Scope, or, if the owner is meant to choose, raise the posture as an Open Question with both options.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Owner summary), Scope (third In scope bullet), Design (Pre-existing hard links), AC-08
+EVIDENCE: Scope, Design and AC-08 add a new default: under the macOS boundary, a review whose protected files (including every file in ignored directories, which `treeManifest` hashes, review-route.ts:49-62 and 186-189) already share an inode with another path stays pending. The Owner summary, which the convention asks to cover important defaults and permissions, does not mention this pending outcome. I found no such files in this worktree or the main checkout today (`find ... -type f -links +1` printed nothing), so it changes nothing an implementer builds.
+PROPOSAL: Add one sentence to the Owner summary saying that on macOS a review stays pending, naming the file, when a protected file has a second hard link.
 
 ### R-1
 
