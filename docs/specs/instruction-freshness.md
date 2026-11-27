@@ -55,15 +55,19 @@ The owner decided on 2026-11-27 to leave out a rule against feature work editing
 checkout. This fix removes the harm without it, and repositories that want that protection set
 `implement_worktree: isolated`.
 
-Proof is planned, not yet observed: a new test file builds a bare origin and clones that fall behind,
+Proof was observed in implementation review R-5 at `8c79b67`, which returned all eight criteria as
+met. `tests/vh-adlc/loop/context-freshness.test.ts` builds a bare origin and clones that fall behind,
 then checks every state, the settings fallback, the offline paths and that no ref except the tracking
-ref moved. A text test checks the read rule in every skill and reference. The first spec review asked
+ref moved, and a text test checks the read rule in every skill and reference. Two limits remain: origin
+is a local bare repository, not a network remote, and the 30-second timeout path is not exercised on
+its own, because it shares the failed-fetch code. The first spec review asked
 for five corrections and four smaller fixes, and the second for three corrections and five smaller
 fixes, mostly to make the planned tests exact. The third found that an extra pointer in the spec skill
 would have broken a pinned skill-body test. That pointer and a similar one in `references/loop.md` are
 dropped, because the read rule already decides which version operations hold, and the remaining test
 gaps are closed. The fourth found only two wording slips in this Context section, both fixed, and
-nothing in the normative sections. Acceptance authorizes implementation on a feature branch. Opening the code PR and merging need separate requests.
+nothing in the normative sections. The owner accepted the spec at R-4 and asked to ship it; the code
+PR waits for the owner's merge.
 
 ### Background
 
@@ -343,6 +347,7 @@ None.
 | 2026-11-27 | R-4 | spec | `45cad2a` | claude-opus-5-5 | procedural | 2 nits, both in Context; applied outside the baseline |
 | 2026-11-27 | R-4 | spec | `45cad2a` | n/a | n/a | accepted by owner |
 | 2026-11-27 | R-5 | implementation | `8c79b67` | claude-opus-5-5 | procedural | All eight criteria met |
+| 2026-11-27 | R-6 | spec | `9c0d567` | claude-opus-5-5 | procedural | Drift re-review after merging main: 1 nit in Context, applied outside the baseline |
 
 ### R-1
 
@@ -541,3 +546,12 @@ EVIDENCE: Same run at 8c79b67, all pass. The pointer test passes for all eight S
 CRITERION: AC-08 In a clone with no `origin/HEAD`, `context` reports a verified tip both with `--default-branch` and, through `git ls-remote`, without it.
 VERDICT: met
 EVIDENCE: Same run at 8c79b67, all pass. "a clone without origin/HEAD still verifies" deletes the ref with `git symbolic-ref --delete refs/remotes/origin/HEAD`, then runs `context` with `--default-branch main` and again with no flag. Both runs report `freshness.tip` equal to origin's tip, with no file entry and no settings entry `unverified`. The ls-remote fallback is at freshness.ts:38-43. Limitation: local bare origin. My extra scratch-repository probes (no settings anywhere, a tip that adds the settings file, an invalid branch name) were refused by the host's worktree sandbox and were not observed.
+
+### R-6
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Owner summary, fifth paragraph)
+EVIDENCE: The summary still says "Proof is planned, not yet observed: a new test file builds a bare origin and clones that fall behind ..." and ends with "Acceptance authorizes implementation on a feature branch." The document is now `status: complete`, all eight criteria are ticked with Evidence lines, and the Review Log has R-5 (implementation, `8c79b67`, "All eight criteria met"). conventions/feature-documents.md (Owner summary in Context) says the summary "must agree with them and distinguish planned checks from observed proof. Refresh it when scope, proof or decisions change". I ran `bun test tests/vh-adlc/loop/context-freshness.test.ts tests/vh-adlc/loop/glossary.test.ts tests/vh-adlc/loop/plugin-version.test.ts tests/vh-adlc/direct-operation-compatibility.test.ts tests/vh-adlc/proportional-review.test.ts --timeout 60000` at 9c0d567 and got 70 pass, 0 fail, so the proof has been observed. The paragraph was true at R-4. It went stale when the implementation commits ticked the criteria and R-5 was stored. Nothing in the normative baseline is affected. The origin/main merge brought in pages.ts, review-route.ts and their tests, which do not touch freshness.ts, procedure.ts's contextReport or the read-rule lines. Plugin version 0.34.0 is still a minor bump over origin/main's 0.33.1. `vh-adlc lint` passes.
+PROPOSAL: Rewrite the paragraph to say that the proof was observed in implementation review R-5 at `8c79b67`, with all eight criteria met, and keep the stated limitations: a local bare origin, and the 30-second timeout path not exercised.
