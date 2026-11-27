@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised for spec review R-2; waiting for the next spec review."
+status_description: "Revised for spec review R-3; waiting for the next spec review."
 issue: https://github.com/michielvha/vh-adlc/issues/180
 goal: "An orchestrator archives a sub-session only when the forge shows its work finished, or when another session takes its feature over, or the owner has approved its replacement, and its worktree is kept, and archives nothing outside its workstream that the owner has not picked."
 covers:
@@ -33,8 +33,8 @@ After this change, a sub-session ends in one of two ways, and the reference name
 its issue closed, or the owner has said the work is abandoned. Only then is the session archived. The
 owner accepted that a mistakenly closed issue lets the orchestrator archive such a session. **Taken over** means another session carries the
 feature on, or the owner has approved one to: a paused or stale session's replacement, or a resumed
-copy. A paused session archived under the owner's batched approval before its replacement starts counts
-as taken over; the orchestrator's own plan to replace a session is not that approval. The old
+copy. A paused session archived before its replacement starts counts as taken over, and its archive needs
+the owner's batched approval; the orchestrator's own plan to replace a session approves nothing. The old
 session may be archived before the merge, but only once its handoff or state report, naming its
 worktree, is in the workstream ledger, and only in a way that keeps its worktree, branch and uncommitted
 changes. If the host would delete the worktree, the orchestrator asks the owner first. This brings in
@@ -43,9 +43,10 @@ approval, as before.
 
 The grant covers only the workstream's sub-sessions. When the owner asks for a general cleanup, the
 orchestrator lists every candidate with its work state and archives only the ones the owner picks. A
-picked workstream sub-session still needs its work finished or taken over. The pick doesn't say the work
-is abandoned: for an open one, the orchestrator asks the owner, records the dated answer, and archives
-it only if the answer is that the work is abandoned. The incident table's row
+picked workstream sub-session still needs its work finished or taken over. A picked session that has been
+taken over is archived under the taken-over rule. The pick doesn't say the work is abandoned: for an
+open one that nobody has taken over, the orchestrator asks the owner, records the dated answer, and
+archives it only if the answer is that the work is abandoned. The incident table's row
 for archiving during cleanup points to the rule that now holds the cleanup condition.
 
 The change is rule text in `references/orchestrate.md` and the orchestration row of
@@ -55,8 +56,9 @@ goes up, as with every plugin feature.
 
 No decisions are open. Spec review R-1 found that paused sessions archived before their replacement
 starts fell outside both rules and lost the worktree safeguard; the revision after it closed that gap.
-Spec review R-2 found no blocking issue; this revision names the owner as the approver of a
-replacement and puts the cleanup question into a required sentence. A new review has not run yet, and
+Spec reviews R-2 and R-3 found no blocking issue; the revisions after them name the owner as the
+approver of a replacement, put the cleanup question into a required sentence, and keep that question
+away from sessions that have been taken over. A new review has not run yet, and
 nothing in this document has been executed. Acceptance authorizes building the rule and test changes
 on a feature branch. Merging and releasing still need the owner.
 
@@ -148,12 +150,12 @@ exactly in the reference, under the section its heading names.
 - S-55: Work finished: archive a sub-session only once the forge CLI shows its work item merged, or for work with nothing to merge its issue closed, or the owner has said the work is abandoned, never on the session's own report of done, and only after it has confirmed its cleanup finished; archive finished sub-sessions promptly.
 - S-56: Taken over: when another session takes a sub-session's feature over, or the owner has approved its replacement, the old session may be archived before the merge, but only once its handoff or state report, naming its worktree, is in the workstream ledger, and only in a way that keeps its worktree, branch and uncommitted changes for the session taking over.
 - S-57: Where the host's archive action would remove a taken-over session's worktree, ask the owner before archiving it.
-- S-59: When the owner asks to clean up sessions in general, list every candidate with its work state (PR merged, PR open, waiting on the owner, or nothing to merge) and archive only the ones the owner picks; a picked workstream sub-session is still archived only when its work is finished or it is taken over, and the pick is not a statement that its work is abandoned: for a picked sub-session whose work is open, ask the owner whether it is abandoned, record the dated answer, and archive it only on that answer.
+- S-59: When the owner asks to clean up sessions in general, list every candidate with its work state (PR merged, PR open, waiting on the owner, or nothing to merge) and archive only the ones the owner picks; a picked workstream sub-session is still archived only when its work is finished or it is taken over, and the pick is not a statement that its work is abandoned: for a picked sub-session whose work is open and that no other session has taken over, ask the owner whether it is abandoned, record the dated answer, and archive it only on that answer.
 
 S-45 under Plugin upgrades stays as it is: the batched owner approval still governs archiving paused
-sessions and a replaced stale orchestrator. A paused session S-45 archives has the owner's batched approval of its replacement,
-so it is taken over under S-36 and the glossary, its ledger state report is the report S-56 accepts, and
-S-56 and S-57 apply to it before its replacement starts. The explanation at `orchestrate.md:170-172` becomes redundant with S-56 and S-57 and is
+sessions and a replaced stale orchestrator. A paused session S-45 archives is taken over because S-36 says so,
+and its archive has the owner's batched approval under S-45. Its ledger state report is the report S-56
+accepts, and S-56 and S-57 apply to it before its replacement starts. The explanation at `orchestrate.md:170-172` becomes redundant with S-56 and S-57 and is
 removed, leaving one statement of the rule.
 
 ### How the rules read together
@@ -174,8 +176,9 @@ removed, leaving one statement of the rule.
   owner's approval to recreate one. The ID S-58 stays unused.
 - **Cleanup listing.** The work states are the four the issue names. Sessions outside the workstream
   appear in the list too, but S-54 means none is archived unless the owner picks it. For the
-  workstream's own sub-sessions, S-59 keeps S-55 and S-56 in force: a pick of an open one is not an
-  archive approval, so the orchestrator asks the owner whether its work is abandoned, records the dated
+  workstream's own sub-sessions, S-59 keeps S-55 and S-56 in force: a picked one that has been taken over is archived
+  under S-56, and a pick of an open one that nobody has taken over is not an archive approval, so the
+  orchestrator asks the owner whether its work is abandoned, records the dated
   answer as the Communication section requires, and archives it only on that answer. The goal settles this: the incident began with a general cleanup request.
 
 ### Authority row
