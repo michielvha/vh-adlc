@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised for R-4 under the owner's 2026-11-27 decision: v1 reviews only the conversation it runs in; transcript parsing moves to #185. Spec review R-5 is next."
+status_description: "Revised for R-4 under the owner's 2026-11-27 decision (v1 reviews only the conversation it runs in; transcript parsing moves to #185), then for R-5. Spec review R-6 is next."
 issue: https://github.com/michielvha/vh-adlc/issues/101
 goal: "After an agent session, the owner gets a saved, ranked list of concrete changes to the agent's environment that would have prevented that session's mistakes and waste, each naming where it belongs and whether it has happened before."
 covers:
@@ -19,7 +19,6 @@ covers:
   - docs/user-guides/workflows.md
   - tests/vh-adlc/retro/
   - tests/vh-adlc/check.test.ts
-  - tests/vh-adlc/maintenance/discovery.test.ts
   - tests/vh-adlc/triage/discovery.test.ts
 ---
 
@@ -41,7 +40,9 @@ You ask for a retrospective at the end of a session, and `vh-adlc-retro` reviews
 conversation, as you decided on 2026-11-27. It reads no transcript files. It also reads the
 repository's instruction files, project procedure and check configuration, and your user-level
 instruction and memory files. What compaction has already summarised, it sees only as the summary.
-Reviewing saved or past sessions is #185.
+If compaction also removed the name of a report an earlier retro run in the same conversation saved,
+that report counts as history, and its candidates can show as recurring. Reviewing saved or past
+sessions is #185.
 
 Candidates fall into six categories: navigation, missing deterministic checks, review standards,
 instruction size and no-ops, tool economy, and information access. A mistake with a fixed shape that
@@ -53,18 +54,19 @@ reviewer reads no standards file; that is a separate feature, as you chose.
 Each candidate is high, medium or low. A problem an earlier report raised moves up one level. If a
 rule already covers it, it is a fix that did not hold and is always high.
 
-Reports are saved, redacted, in a per-user folder outside every checkout, one folder per repository,
-shared by all its worktrees. A small script redacts known secret shapes, checks the report's
+Reports are saved, redacted, in a per-user folder outside every checkout that only you can read, one
+folder per repository, shared by all its worktrees. Moving or renaming the main checkout starts a new
+folder, so the history starts again. A small script redacts known secret shapes, checks the report's
 machine-readable block and writes the file. Nothing else is written, committed or sent, apart from
 the plugin's usual binary install and conventions fetch. On Codex the save needs write access to that
 folder. If Codex refuses it, you see the redacted report and nothing is saved.
 
 Proof is planned as script tests plus recorded runs on Claude Code and Codex. Each recorded run
-resumes a fixture conversation with nine planted problems, and a subagent grades the report against a
+resumes a fixture conversation, written in that host's session format, with nine planted problems, and a subagent grades the report against a
 written checklist. These checks are planned, not run.
 
-Spec reviews R-1 to R-4 have run. This revision applies R-4. Four of its findings were about transcript
-parsing and no longer apply now that parsing is out. Review R-5 is next.
+Spec reviews R-1 to R-5 have run. The R-4 findings that only concerned transcript parsing no longer
+apply; the others, and R-5's, are applied. R-5 found nothing blocking. Review R-6 is next.
 Accepting authorizes implementation on a feature branch. Shipping needs your request.
 
 ### Background
@@ -85,10 +87,18 @@ size limits and session discovery, is left to #185.
 - Claude Code and Codex CLI can resume a saved session non-interactively with a new prompt:
   `claude --resume <session-id>` with `--print` (`claude --help`), and
   `codex exec resume [SESSION_ID] [PROMPT]` (`codex exec resume --help`, codex-cli 0.172.0).
+  Claude Code keeps a session as `<config>/projects/<working directory with / and . as ->/<id>.jsonl`;
+  this worktree's sessions are under
+  `~/.claude/projects/-Users-michielvh-code-vh-adlc--claude-worktrees-session-retro/`. Codex CLI keeps
+  `<CODEX_HOME>/sessions/YYYY/MM/DD/rollout-<timestamp>-<id>.jsonl` (R-2 F-01).
+- The plugin writes its saved artifacts owner-only: `mode: 0o600` with exclusive creation at
+  `plugins/vh-adlc/scripts/triage/cli.ts:50`, and folders with `mode:0o700` at
+  `plugins/vh-adlc/scripts/triage/controller-recovery.ts:18`.
 - The plugin's recorded-run harness isolates hosts by relocating their configuration, `CODEX_HOME` for
   Codex and `CLAUDE_CONFIG_DIR` for Claude Code, and passes the host only `PATH`, `HOME`, `LANG`, `TERM`
   and `XDG_CACHE_HOME` (`plugins/vh-adlc/scripts/triage/controller-clients.ts:11`, `:18`, `:20`).
-  Codex keeps user-level memory files in `~/.codex/memories/` and loads them into sessions (R-3 F-03).
+  Codex keeps user-level memory files in `~/.codex/memories/`, among them `MEMORY.md` and
+  `memory_summary.md` (`ls ~/.codex/memories`), and loads them into sessions (R-3 F-03).
 - The loop settings declare a consumer's local rules: `project_procedure`, read by every SDD operation
   including the implementer; `instruction_files`; and `lenses`, applied only by spec reviews
   (`plugins/vh-adlc/references/loop-settings.md:40-42`). The implementation reviewer returns criterion
@@ -107,9 +117,9 @@ size limits and session discovery, is left to #185.
 - The package checker has four skill classes besides the entry: scheduled operations, which must name
   `guides/humanize-prose.md` and contain `vh-adlc knowledge`; content operations, which need valid
   frontmatter; host operations; and coordination operations (`tests/vh-adlc/check.test.ts:16-28`,
-  `:238-279`). Both discovery tests assert nineteen skills, and triage discovery counts eleven
-  engineering skills after excluding the content, host and coordination ones by name
-  (`tests/vh-adlc/triage/discovery.test.ts:13`, `:21-24`; `tests/vh-adlc/maintenance/discovery.test.ts`).
+  `:238-279`). Triage discovery asserts nineteen skills and counts eleven engineering skills after
+  excluding the content, host and coordination ones by name
+  (`tests/vh-adlc/triage/discovery.test.ts:13`, `:21-24`).
   The same test asserts "nineteen skills" and "five content operations" in `docs/user-guides/workflows.md`
   and "nineteen skills" in `docs/get-started/installation.md` (`tests/vh-adlc/triage/discovery.test.ts:51`,
   `:53`), and those pages state the counts at `docs/user-guides/workflows.md:15-17` and
@@ -144,13 +154,13 @@ size limits and session discovery, is left to #185.
   secret patterns, read from the skill when it reaches those steps.
 - Intake routing in `references/lifecycle.md` and retro in the unpinned list of `references/loop.md`.
 - Registration: `retro` in the checker's content operations and in triage discovery's exclusion list,
-  both discovery tests at twenty skills, and the text assertions and pages moving to "twenty skills"
+  the triage discovery count at twenty skills, and the text assertions and pages moving to "twenty skills"
   and "six content operations": `docs/user-guides/workflows.md` (count line and workflow table entry),
   `docs/get-started/installation.md` (count and list), a retro row in `docs/reference/compatibility.md`
   stating the Codex write-access requirement, and an entry in `docs/reference/marketplace.md`.
   Manifest version bumps.
-- Under `tests/vh-adlc/retro/`: a fixture repository, fixture conversations resumable on Claude Code
-  and on Codex, isolated host profiles holding fixture user-level files, seeded earlier reports, and
+- Under `tests/vh-adlc/retro/`: a fixture repository, fixture conversation templates for Claude Code
+  and for Codex with the script that installs them, isolated host profiles holding fixture user-level files, seeded earlier reports, and
   the grader checklist.
 
 Out of scope, by name: reviewing a saved transcript, a past session or another session, and anything
@@ -162,7 +172,12 @@ decision); a report location setting; reading git remotes (owner decisions); and
 other runs.
 
 Not handled: a moved or renamed main checkout starts a new report folder, because the folder key is
-the checkout's common Git directory and no remote is read.
+the checkout's common Git directory and no remote is read (R-4 F-01).
+
+Not handled: when compaction has removed the file name an earlier retro run in this conversation
+printed, that report counts as history from another session, so its candidates can show as recurring
+or as fixes that did not hold; each such candidate names the earlier report, so the owner can see
+where it came from (R-5 F-02).
 
 ## Design
 
@@ -197,9 +212,9 @@ name without a trailing `.git`. Every report names its folder. An absent folder 
 The model reviews the session in its context. It reads the files
 `bun scripts/loop/cli.ts context --repo <dir>` lists, or the root instruction files when there are no
 loop settings, and the always-loaded user-level instruction and memory index files in full. They are
-`<config>/CLAUDE.md` and the project's auto-memory index on Claude Code, and `<CODEX_HOME>/AGENTS.md`
-and `<CODEX_HOME>/memories/` on Codex CLI. It searches the repository's build files, package scripts,
-hooks and CI workflows, the lessons file the project procedure names, and the linked memory notes for
+`<config>/CLAUDE.md` and the project's auto-memory index on Claude Code, and `<CODEX_HOME>/AGENTS.md`,
+`<CODEX_HOME>/memories/MEMORY.md` and `<CODEX_HOME>/memories/memory_summary.md` on Codex CLI. It searches the repository's build files, package scripts,
+hooks and CI workflows, the lessons file the project procedure names, and the other memory notes for
 each candidate's subject, rather than reading them whole. It reads every file it cites, to give the
 line.
 
@@ -263,8 +278,8 @@ says it is a first run.
 The skill pipes the report to `save --dir <dir>` on standard input. `save` redacts it, then parses
 its `retro-report` block and refuses with a reason, writing nothing, unless the block is a valid
 `format: 1` block with every field and only the tokens listed above; the skill then corrects its draft
-and saves again. Otherwise `save` creates the folder if needed, writes the report to
-`.<random>.tmp` in it, links that file to `<UTC time to the second>-<6 random hex>.md` only if the name
+and saves again. Otherwise `save` creates any missing report folders with mode 0700, writes
+the report to `.<random>.tmp` in the folder, created exclusively with mode 0600, links that file to `<UTC time to the second>-<6 random hex>.md` only if the name
 is free (choosing new hex otherwise), removes the temporary file and prints the saved name and its
 redacted text. The skill shows that text, not its own draft. When `save` cannot write, it prints the
 reason and the redacted report, and the skill shows both and says the report was not saved.
@@ -316,7 +331,7 @@ Rollback is reverting the plugin version; a rolled-back version skips reports in
       other than the `<REDACTED>` marker, appears in the saved or shown report, including a secret
       from the fixture user-level memory file that the planted conversation quotes. After the run the
       fixture repository and trackers are unchanged, and the report folder differs only by the new
-      report.
+      report, which, like the folders `save` created, only its owner can read.
 - [ ] AC-07: A second run with seeded earlier reports marks P2 `fix-not-held` and P3 `recurring`, both
       high, citing the seeded report, in the second-run order below; P4 and P5, also raised by a report
       saved earlier in the same conversation and by a `format: 2` report, stay low and `new`, and both
@@ -331,8 +346,15 @@ Rollback is reverting the plugin version; a rolled-back version skips reports in
 ### Fixture table
 
 The fixture repository has a lint configuration with the rule P1 breaks, a CI workflow that does not
-run the lint, no pre-commit or commit-msg hook, and a project procedure file. Each recorded run
-resumes a fixture conversation in an isolated host profile (`CLAUDE_CONFIG_DIR` or `CODEX_HOME`)
+run the lint, no pre-commit or commit-msg hook, and a project procedure file.
+
+Each fixture conversation is a JSON Lines template in its host's session format, started from a short
+real session recorded on that host and edited to plant the problems, with placeholders for the
+fixture repository path and the session id. Before each recorded run, the install script copies the
+fixture repository to a fresh directory, fills the placeholders with that path and a new id, and
+writes the result where the host looks for it: under `<CLAUDE_CONFIG_DIR>/projects/<encoded path>/`
+or `<CODEX_HOME>/sessions/YYYY/MM/DD/`. The run then resumes that id. Each recorded run
+uses an isolated host profile (`CLAUDE_CONFIG_DIR` or `CODEX_HOME`)
 holding the fixture user-level instruction and memory files, with a fresh, empty `XDG_STATE_HOME`
 seeded only with the stated reports for the second run. The conversation plants the problems in
 this order of first evidence: P3, P1, P8, P9, P2, P7, P4. P5 and P6 live only in `AGENTS.md`.
@@ -342,7 +364,7 @@ this order of first evidence: P3, P1, P8, P9, P2, P7, P4. P5 and P6 live only in
 | P1 Mechanical violation | A banned API call the configured lint rule flags, committed | high, new | high, new | Consumer repository |
 | P2 Covered mechanical violation | An edit to a generated file that `AGENTS.md` forbids, caught before commit | medium, covered | high, fix-not-held | Consumer repository |
 | P3 Navigation detour | Twenty searches and reads before finding the settings file (repeated waste) | medium, new | high, recurring | Consumer repository |
-| P4 Oversized output | A vh-adlc plugin script printing a multi-megabyte result that was barely used | low, new | low, new | vh-adlc |
+| P4 Oversized output | A vh-adlc plugin script printing a multi-megabyte result that was barely used, recorded exactly as the host records an oversized result, with its size visible and never the full output inline | low, new | low, new | vh-adlc |
 | P5 No-op instruction | "Save files as UTF-8" in `AGENTS.md`, which restates the host default | low, new | low, new | Consumer repository |
 | P6 Unexercised rule | "Never run migrations against production" in `AGENTS.md` | not listed | not listed | none |
 | P7 Review standard | A committed duplicate of an existing helper that the review step passed | high, new, with the weakness note | high, new | Consumer repository (project procedure) |
@@ -361,7 +383,7 @@ The fixture user-level memory file holds one planted secret, which the conversat
 | --- | --- |
 | AC-01 | `bun test tests/vh-adlc` (content-operation checks, discovery counts of twenty skills and eleven engineering skills, the count text in `workflows.md` and `installation.md`, loop.md and lifecycle.md entries). Recorded runs per host: invoking `vh-adlc-retro` by name, pass when the skill loads; "run a retrospective on this session", pass when intake selects `vh-adlc-retro`; "what went wrong in this session?", pass when the agent asks whether a retrospective or an investigation is meant and runs neither. |
 | AC-02, AC-03, AC-04, AC-05 | A recorded first run per host, resuming the small fixture conversation with the retro request (`claude --print --resume` or `codex exec resume`, Codex in the default `workspace-write` sandbox with the fixture `XDG_STATE_HOME` as a writable root). A fresh read-only subagent on the same host grades the saved report against `tests/vh-adlc/retro/checklist.md`, one item per fixture row and criterion (fields present, severity and status, relative order of planted candidates, home class, P1 and P2 as checks in a new pre-commit hook with P1 running the lint, P2 and P9 covered with their lines, P5 flagged, P6 absent, P7 with the weakness note), and returns `ITEM <id>: PASS` or `ITEM <id>: FAIL <evidence>` per item; pass when every item passes. |
-| AC-06 | `bun test tests/vh-adlc/retro` runs `save` over a report holding one example of every listed shape and key form, including `DB_PASSWORD=`, `GITHUB_TOKEN=`, `STACKWEAVER_HOSTED_SECRET=` and a multi-line PEM block, which must all be redacted, and near-misses that must survive: the word `secretary` in prose, a lone `sk`, a 15-character `AKIA` string, `task-list`, `risk-free`, `disk-usage`, `DB_PASSWORD=<REDACTED>` and `Bearer <REDACTED>`; saving the saved text again must leave it unchanged. In the recorded runs: search the saved report and the shown text with the patterns from `references/retro.md` and for each planted secret, the memory-file secret included (must find none other than the marker); compare `git status --porcelain` and file hash lists of the fixture repository and the report folder before and after (must differ only by the one report); the run log shows no tracker or network command other than the binary install and knowledge fetch. Host-owned files are outside the comparison. |
+| AC-06 | `bun test tests/vh-adlc/retro` runs `save` over a report holding one example of every listed shape and key form, including `DB_PASSWORD=`, `GITHUB_TOKEN=`, `STACKWEAVER_HOSTED_SECRET=` and a multi-line PEM block, which must all be redacted, and near-misses that must survive: the word `secretary` in prose, a lone `sk`, a 15-character `AKIA` string, `task-list`, `risk-free`, `disk-usage`, `DB_PASSWORD=<REDACTED>` and `Bearer <REDACTED>`; saving the saved text again must leave it unchanged; with umask 022, the folders `save` creates have mode 0700 and the report mode 0600. In the recorded runs: search the saved report and the shown text with the patterns from `references/retro.md` and for each planted secret, the memory-file secret included (must find none other than the marker); compare `git status --porcelain` and file hash lists of the fixture repository and the report folder before and after (must differ only by the one report); the run log shows no tracker or network command other than the binary install and knowledge fetch. Host-owned files are outside the comparison. |
 | AC-07 | A recorded second run per host on the variant conversation with the three seeded reports, graded by the checklist's second-run items (P2 and P3 status, severity and `recurs` citing the seeded key, order, P4 and P5 low and `new`, the excluded and the skipped report listed). `bun test tests/vh-adlc/retro` covers `history` with `--exclude`, skipping newer and malformed blocks, ignoring dot-named files, and an empty folder. |
 | AC-08 | `bun test tests/vh-adlc/retro`: `save` on reports with an unparseable block, a `format: 2` block, a missing field and an unlisted category token refuses with a reason and leaves the folder unchanged; a valid report saved by `save` is returned by `history` with every candidate. |
 | AC-09 | `bun test tests/vh-adlc/retro`: `folder` from two worktrees of a temporary repository returns one folder; from a worktree of a bare clone and a second worktree of it, one folder; from two temporary repositories whose main folders share a name, two different folders. |
@@ -377,6 +399,8 @@ None.
 ## Deferred
 
 - D-01: Reviewing saved transcripts, past sessions and other sessions, tracked as #185. From: owner cut on 2026-11-27. Verdict: pending.
+- D-02: Keeping report history when the main checkout moves or is renamed. From: R-4 F-01, stated limit. Verdict: pending.
+- D-03: Excluding an earlier same-conversation report whose file name compaction removed. From: R-5 F-02, stated limit. Verdict: pending.
 
 ## Review Log
 
