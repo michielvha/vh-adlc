@@ -4,6 +4,8 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { loopContext } from "../../../plugins/vh-adlc/scripts/loop/procedure";
+import { loadLoopSettings } from "../../../plugins/vh-adlc/scripts/loop/settings";
 
 const CLI = resolve(import.meta.dir, "../../../plugins/vh-adlc/scripts/loop/cli.ts");
 const made: string[] = [];
@@ -120,7 +122,7 @@ describe("resolving the default branch", () => {
   test("a clone without origin/HEAD still verifies, with and without the flag (AC-08)", () => {
     const { clone, advance } = fixture({ ".vh-adlc/loop.yaml": settings(["AGENTS.md"]), "AGENTS.md": "v1\n" });
     const tip = advance({ "AGENTS.md": "v2\n" });
-    git(clone, "update-ref", "-d", "refs/remotes/origin/HEAD");
+    git(clone, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
     for (const extra of [["--default-branch", "main"], []]) {
       const { code, json } = context(clone, ...extra);
       expect(code).toBe(0);
@@ -128,5 +130,82 @@ describe("resolving the default branch", () => {
       expect(json.freshness.files.some(entry => entry.state === "unverified")).toBe(false);
       expect(json.freshness.settings.state).not.toBe("unverified");
     }
+  });
+});
+
+describe("settings behind the tip", () => {
+  test("stale local settings take the reading list and lenses from the tip, including a file the clone lacks (AC-03)", () => {
+    const { clone, advance } = fixture({ ".vh-adlc/loop.yaml": settings(["AGENTS.md"]), "AGENTS.md": "rules\n" });
+    const tip = advance({ "e.md": "new rule file\n", ".vh-adlc/loop.yaml": settings(["AGENTS.md", "e.md"], undefined, ["tip-lens"]) });
+
+    const { code, json } = context(clone, "--default-branch", "main");
+    expect(code).toBe(0);
+    expect(json.freshness.settings).toEqual({ path: ".vh-adlc/loop.yaml", state: "stale", read: `${tip}:.vh-adlc/loop.yaml` });
+    expect(json.read).toEqual(["AGENTS.md", "e.md"]);
+    expect(byPath(json.freshness)["e.md"]).toEqual({ path: "e.md", state: "stale", read: `${tip}:e.md` });
+    expect(json.lenses).toEqual([{ name: "tip-lens", check: "Check tip-lens.", severity: "nit" }]);
+    expect(json.lensText).toBe("- tip-lens (nit): Check tip-lens.");
+  });
+
+  test("tip settings that fail to load keep the local list and report the error (AC-03)", () => {
+    const { clone, advance } = fixture({ ".vh-adlc/loop.yaml": settings(["AGENTS.md"], undefined, ["local-lens"]), "AGENTS.md": "rules\n" });
+    advance({ ".vh-adlc/loop.yaml": "schema_version: 2\ninstruction_files:\n  - AGENTS.md\n" });
+
+    const { code, json } = context(clone, "--default-branch", "main");
+    expect(code).toBe(0);
+    expect(json.freshness.settings.state).toBe("stale");
+    expect(json.freshness.settings.error).toMatch(/schema_version/);
+    expect(json.read).toEqual(["AGENTS.md"]);
+    expect(json.lenses).toEqual([{ name: "local-lens", check: "Check local-lens.", severity: "nit" }]);
+  });
+});
+
+describe("without a usable origin or tip", () => {
+  const files = { ".vh-adlc/loop.yaml": settings(["AGENTS.md"], "agents/procedure.md", ["local-lens"]), "AGENTS.md": "rules\n", "agents/procedure.md": "procedure\n" };
+  const local = (clone: string) => loopContext(loadLoopSettings(clone, { overridePath: null }));
+  function expectUnverified(clone: string, extra: string[], reason: RegExp) {
+    const { code, json } = context(clone, ...extra);
+    expect(code).toBe(0);
+    expect(json.freshness.tip).toBeNull();
+    expect(json.freshness.reason).toMatch(reason);
+    expect(json.freshness.files.length).toBeGreaterThan(0);
+    for (const entry of json.freshness.files) expect(entry).toEqual({ path: entry.path, state: "unverified", read: entry.path });
+    expect(json.freshness.settings.state).toBe("unverified");
+    expect({ read: json.read, lenses: json.lenses, lensText: json.lensText }).toEqual(local(clone));
+  }
+
+  test("a clone with no remote (AC-05)", () => {
+    const { clone } = fixture(files);
+    git(clone, "remote", "remove", "origin");
+    expectUnverified(clone, ["--default-branch", "main"], /no origin remote/);
+  });
+
+  test("an origin at a missing path, without origin/HEAD or the flag, names --default-branch (AC-05)", () => {
+    const { clone } = fixture(files);
+    git(clone, "remote", "set-url", "origin", join(clone, "missing-origin"));
+    git(clone, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
+    expectUnverified(clone, [], /--default-branch/);
+  });
+
+  test("an origin at a missing path with the flag names the failed fetch (AC-05)", () => {
+    const { clone } = fixture(files);
+    git(clone, "remote", "set-url", "origin", join(clone, "missing-origin"));
+    expectUnverified(clone, ["--default-branch", "main"], /fetching origin\/main failed/);
+  });
+
+  test("a held lock on the tracking ref, with origin ahead, names the failed fetch (AC-05)", () => {
+    const { clone, advance } = fixture(files);
+    advance({ "AGENTS.md": "rules v2\n" });
+    const gitDir = git(clone, "rev-parse", "--absolute-git-dir");
+    mkdirSync(join(gitDir, "refs", "remotes", "origin"), { recursive: true });
+    writeFileSync(join(gitDir, "refs", "remotes", "origin", "main.lock"), "");
+    expectUnverified(clone, ["--default-branch", "main"], /fetching origin\/main failed/);
+  });
+
+  test("a branch with history unrelated to origin's names the missing merge base (AC-05)", () => {
+    const { clone } = fixture(files);
+    git(clone, "checkout", "-q", "--orphan", "unrelated");
+    commit(clone, { "AGENTS.md": "unrelated rules\n" }, "unrelated root");
+    expectUnverified(clone, ["--default-branch", "main"], /merge base/);
   });
 });
