@@ -1,6 +1,6 @@
 // The owned-process runner stops everything a client left behind, including helpers that left its group.
 import { afterAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { markedProcesses, pidNamespaceAvailable, runOwnedClient } from "../../../plugins/vh-adlc/scripts/triage/owned-process";
@@ -77,6 +77,21 @@ describe("the PID namespace boundary", () => {
     expect(result).toMatchObject({ timed_out: true, confirmed: true, boundary: "pid-namespace" });
     await Bun.sleep(1_300);
     expect(existsSync(late)).toBe(false);
+  });
+
+  // A fresh subprocess, because the probe caches its answer per process and this file may have probed already.
+  test("a host without unshare runs the client with the marker boundary instead of throwing", () => {
+    const dir = scratch(), empty = join(dir, "empty-path");
+    mkdirSync(empty);
+    const module = join(import.meta.dir, "../../../plugins/vh-adlc/scripts/triage/owned-process.ts");
+    const script = `const { runOwnedClient } = await import(${JSON.stringify(module)});
+const r = await runOwnedClient(["/bin/sh", "-c", "exit 0"], { cwd: ${JSON.stringify(dir)}, env: { PATH: ${JSON.stringify(empty)} },
+  stdout: ${JSON.stringify(join(dir, "o"))}, stderr: ${JSON.stringify(join(dir, "e"))}, pidNamespace: true }, ${JSON.stringify(limits)});
+console.log(JSON.stringify({ boundary: r.boundary, exit_code: r.exit_code }));`;
+    const run = Bun.spawnSync([process.execPath, "-e", script], { cwd: dir, env: { ...env(), PATH: empty }, stdout: "pipe", stderr: "pipe" });
+    expect(run.stderr.toString()).not.toContain("Executable not found");
+    expect(run.exitCode).toBe(0);
+    expect(JSON.parse(run.stdout.toString().trim().split("\n").at(-1)!)).toEqual({ boundary: "marker", exit_code: 0 });
   });
 });
 

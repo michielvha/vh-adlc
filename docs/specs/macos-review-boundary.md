@@ -296,7 +296,8 @@ applies. The Instruction freshness section and `parseReply` are left alone.
 
 ## Tasks
 
-- [ ] T1 `tests/vh-adlc/loop/owned-process.test.ts` - a subprocess with no `unshare` on `PATH` calls `runOwnedClient(..., { pidNamespace: true })` and expects `boundary: "marker"`; fails because the probe throws `Executable not found` (AC-04)
+- [x] T1 `tests/vh-adlc/loop/owned-process.test.ts` - a subprocess with no `unshare` on `PATH` calls `runOwnedClient(..., { pidNamespace: true })` and expects `boundary: "marker"`; fails because the probe throws `Executable not found` (AC-04)
+      Evidence: `bun test --timeout 60000 tests/vh-adlc/loop/owned-process.test.ts -t "without unshare"` on this Mac fails: the subprocess throws `Executable not found in $PATH: "unshare"` from `pidNamespaceAvailable`, as expected before T2.
 - [ ] T2 `plugins/vh-adlc/scripts/triage/owned-process.ts` - `pidNamespaceAvailable()` returns false on a spawn error; T1 passes and the existing `owned-process.test.ts` and `tests/vh-adlc/triage/owned-process.test.ts` still pass (AC-04)
 - [ ] T3 `tests/vh-adlc/loop/review-route.test.ts` - darwin-only tests on the nested linked-worktree fixture for AC-02 (1) to (5), the nested-sandbox case for AC-03 and the pre-existing hard link for AC-08, plus macOS expectations for the existing preserved-worktree tests; the new tests fail on this Mac at T2 (AC-01, AC-02, AC-03, AC-08)
 - [ ] T4 `plugins/vh-adlc/scripts/triage/owned-process.ts` - the `writeDeny` option, `seatbeltAvailable()` and the profile with subpath, parent `literal` and allow rules passed as `-D` parameters; `ownedClientCompleted` unchanged; `owned-process.test.ts` and the triage owned-process tests pass (AC-02, AC-03)
