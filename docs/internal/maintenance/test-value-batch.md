@@ -100,9 +100,25 @@ test still runs, each from restored pristine state.
 
 The docs-drift typecheck, which includes the docs-drift tests, passes on `4839c6af`.
 
-Not yet observed: CI on the PR head for Linux and macOS, which supplies the per-test before and after
-timings against run 45898546605 (518 seconds for `closure-controller`, 183 for `normal-preparation`), and
-the full plugin checker on the final change.
+CI on the PR head `e2a8e87b`, run [46001117339](https://github.com/michielvha/vh-adlc/actions/runs/46001117339),
+passed on Linux and macOS: 4,426 tests in 281 files, 0 failures, 1,565 seconds for the checker step. Against
+main's run 45898546605 (one run each, so the differences carry run-to-run noise):
+
+| File | Main | PR head |
+| --- | ---: | ---: |
+| `closure-controller.test.ts` | 518 s | 442 s |
+| `normal-preparation.test.ts` | 183 s | 177 s |
+| `run-approval.test.ts` | 0.9 s (1 test) | 1.2 s (2 tests) |
+| `run-directory.test.ts` | 6.1 s (24 tests) | 6.8 s (25 tests) |
+
+In `closure-controller`, the seven tests that use the shared fixture after the first each lost 10 to
+18 seconds, except the mistaken-resume test (55 to 57 s), and the hosted variant, which keeps its own
+build, stayed at 85 s. The saving is 77 seconds, less than the audit's estimate of about 190: restoring the
+fixture costs part of what rebuilding did. Running the refusals once saved about 6 seconds, so proposal 2's
+value in this family is the removed repetition, not time.
+
+Not yet observed: the full plugin checker on the final change on the Mac (queued), which the CI run above
+already covers on CI's hardware.
 
 ## Reviews
 
