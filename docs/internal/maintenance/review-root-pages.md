@@ -29,7 +29,7 @@ Proposed change:
 1. `reviewPages` keeps the convention-path pattern for both `AGENTS.md` files. From the docs revision's `AGENTS.md` it also takes relative Markdown link targets ending in `.md`, anchor and query removed. A target with a scheme, an absolute path or a path that leaves the repository is skipped. For each root page that file links (no directory, other than `AGENTS.md`), it reads the cached page and adds the pages that page links, one level deep. Links in the reviewed repository's `AGENTS.md` name that repository's own files, so they are not requested.
 2. `cacheReviewPages` fetches in up to three rounds: base pages, then pages from the docs `AGENTS.md`, then pages from the root pages it links.
 3. The reviewer reads conventions only from the cache. It may fill the cache with its own `knowledge --page <page>` call when the result names the given revision, as the agent file already allows it to run `knowledge`. If the page is still unreadable, it replies with the single line `PAGE NOT CACHED: <page>` after any header lines the dispatch asks for.
-4. `parseReply` keeps a reply whose records, after the header lines present, open with `FINDING:`, `CRITERION:` or `NO FINDINGS` as records, even when a record quotes the marker (R-2 F-01). In any other reply, a line that starts with `PAGE NOT CACHED:` in any case becomes an error, so `runReviewRoute` returns `pending` with reason `the reviewer stopped: page not cached: <page>`. The line may carry leading list or quote markers, emphasis, backticks and quotes, sit inside a code fence or after a line of prose, and have trailing text (R-1 F-01, R-3 F-01). The page is the first path-like token without trailing dots, or `unnamed` when there is none. No other reply format gets a new check; a malformed reply that names no stop behaves as before.
+4. `parseReply` keeps a reply whose records, after the header lines present, open with `FINDING:`, `CRITERION:` or `NO FINDINGS` as records, even when a record quotes the marker (R-2 F-01). In any other reply, a line that starts with the words `PAGE NOT CACHED` in any case and spacing, followed by a colon, a dash or nothing, becomes an error, so `runReviewRoute` returns `pending` with reason `the reviewer stopped: page not cached: <page>`. The line may carry leading list or quote markers, emphasis, backticks and quotes, including around the words themselves, sit inside a code fence or after a line of prose, and have trailing text (R-1 F-01, R-3 F-01, R-4 F-01). The page is the first path-like token without trailing dots, or `unnamed` when there is none. No other reply format gets a new check; a malformed reply that names no stop behaves as before.
 5. `review-protocol.md` Routes documents both rules.
 6. Test support: the pages stub writes to the cache directory the CLI reads on the current platform, under `HOME/Library/Caches` on macOS. Before this change every stub-backed caching test failed on macOS because the stub wrote only under `XDG_CACHE_HOME`.
 
@@ -70,6 +70,10 @@ After R-2:
 After R-3:
 
 - F-01: the `reply bytes` stop cases gained a fenced stop, a stop after a line of prose and a lowercase stop. They failed on the first-line rule and pass with the new one. Every record case, including both continuation-line quotes, still parses as records. I chose the stop-only alternative over a general record-format check on every reply, which would add a new gate beyond this task.
+
+After R-4:
+
+- F-01: the stop cases gained a bolded label (`**PAGE NOT CACHED**: README.md`), a dash instead of the colon and no separator with double spacing. They failed on the colon-only matcher and pass with the widened one. Every record case still parses as records. Whether to add the general check (pending when records do not open with `FINDING:`, `CRITERION:` or `NO FINDINGS`) is put to the orchestrator as a scope decision.
 
 Not yet run: the full plugin checker, and the Linux-only dispatch tests, which need Linux CI.
 
@@ -148,6 +152,21 @@ EVIDENCE: R-2 F-01 is resolved. A record that quotes the marker on a continuatio
 PROPOSAL: Use the alternative R-1 F-01 offered. Have runReviewRoute return `pending` when the records after the header lines do not start with `FINDING:`, `CRITERION:` or `NO FINDINGS`, and give the reason "page not cached" when the text contains a `PAGE NOT CACHED:` line. Or skip a fence-only line before taking the first line. Add the fenced and preamble replies to the `reply bytes` stop cases.
 ```
 
+### R-4
+
+Target: `24f0072abeae47ad5d3fbfc4f04e2e9b27ec6e10`
+Model: claude-opus-5-5
+Isolation: procedural
+
+```text
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: plugins/vh-adlc/scripts/loop/review-route.ts parseReply (lines 242 to 255) and runReviewRoute (ready return); plugins/vh-adlc/references/review-protocol.md (Routes, "allowing list or quote markers, emphasis, backticks, code fences, a line of prose before it and trailing text after it"); docs/internal/maintenance/review-root-pages.md (Definition Outcome, Proposed change step 4, Evidence "After R-3" F-01); tests/vh-adlc/loop/review-route.test.ts ("reply bytes")
+EVIDENCE: R-3 F-01 is resolved for the forms it named. I ran parseReply from a scratch `bun -e` at the target. "```text\nPAGE NOT CACHED: README.md\n```", a stop after a line of prose, and "Page not cached: `README.md`" each return {"error":"the reviewer stopped: page not cached: README.md"}. Records that quote the marker on a continuation line still parse as records. Both targeted runs pass on macOS: `bun test tests/vh-adlc/loop/pages.test.ts` (2 pass, 13 expect calls) and `-t "reply bytes"` (2 pass, 17 expect calls). The matcher still needs the literal `PAGE NOT CACHED:` with the colon directly after the words, and the protocol promises more than that. "MODEL: m\nTARGET: abcdef1\n\n**PAGE NOT CACHED**: README.md\n" returned {"model":"m","target":"abcdef1","records":"**PAGE NOT CACHED**: README.md\n"}. So did "PAGE NOT CACHED - README.md" and "PAGE NOT CACHED README.md". runReviewRoute returns `ready` with those records, and the protocol tells the dispatcher to store them under `### R-<n>`. The Outcome says this must never happen, and the protocol says emphasis is allowed. Bolding only the label is ordinary model Markdown. This is the fourth round of the same fail-open class (R-1 F-01, R-3 F-01, R-4 F-01). On the author's choice: the stop-only matcher cannot give the Outcome's "never as a record" guarantee, because every pass only closes the forms it lists. The harm stays small. `vh-adlc lint` flags the stored text as `review-records-malformed` (internal/doc/lint.go line 146), so the failure surfaces at the next gate, and the profile is a few developers on alpha. I don't judge the missing general record-format check a separate defect. Its absence only matters through this stop class.
+PROPOSAL: Allow emphasis, backticks and quotes between the words and the colon, and make the colon optional (for example `/^PAGE\s+NOT\s+CACHED[*_`'"]*\s*[:\-]?/i`). Add the bold-label form to the `reply bytes` stop cases. Or narrow the protocol sentence to what the matcher actually allows. A check limited to "pending when the records don't open with FINDING:, CRITERION: or NO FINDINGS" would close the class for good, if the orchestrator accepts that as inside the task.
+```
+
 ## State
 
-Review pending: R-3 F-01 is fixed and needs a new review; R-2 F-02 waits for a Linux run of the two dispatch tests. Local candidate.
+Review pending: R-4 F-01 is fixed and needs a new review, after the orchestrator decides on the general record check; R-2 F-02 waits for a Linux run of the two dispatch tests. Local candidate.

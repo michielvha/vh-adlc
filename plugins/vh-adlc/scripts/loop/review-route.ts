@@ -242,12 +242,13 @@ export function parseReply(reply: string): { model: string; target: string; reco
   // A reviewer that cannot read a convention page from the cache stops on its own line; that is a pending
   // review for the dispatcher, never a record, whatever header lines came before it. Replies whose records
   // open as records do (FINDING:, CRITERION: or NO FINDINGS) are records, even when they quote the marker.
-  // In any other reply a marker line stops the review, matched leniently: any case, list or quote markers,
-  // emphasis, backticks, code fences, a line of prose before it and trailing text after it.
+  // In any other reply a marker line stops the review, matched leniently: any case and spacing, list or quote
+  // markers, emphasis, backticks, a colon, a dash or nothing after the words, code fences, a line of prose
+  // before it and trailing text after it.
   const lines = reply.split(/\r?\n/).map(text => text.trim()).filter(Boolean).filter(text => !/^(?:MODEL|TARGET): /.test(text));
   if (!/^(?:FINDING:|CRITERION:|NO FINDINGS)/.test(lines[0] ?? "")) {
     for (const text of lines) {
-      const stop = /^PAGE NOT CACHED:[*_`'"\s]*(.*)$/i.exec(text.replace(/^[\s>*+\-\d.)`'"_]*/, ""));
+      const stop = /^PAGE\s+NOT\s+CACHED\b[*_`'"]*\s*[:\-–—]?[*_`'"\s]*(.*)$/i.exec(text.replace(/^[\s>*+\-\d.)`'"_]*/, ""));
       if (!stop) continue;
       const page = /[A-Za-z0-9_\/-][A-Za-z0-9._\/-]*/.exec(stop[1]!)?.[0]?.replace(/\.+$/, "");
       return { error: `the reviewer stopped: page not cached: ${page || "unnamed"}` };

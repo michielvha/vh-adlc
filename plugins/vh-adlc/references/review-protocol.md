@@ -28,8 +28,9 @@ Before dispatching, read the reviewer role's route:
   read a page from the cache, after its own `knowledge` call for that revision where it can make one,
   replies `PAGE NOT CACHED: <page>` instead of records and never reads it from a local clone. The
   command route returns `pending` when a reply whose records don't open with `FINDING:`, `CRITERION:` or
-  `NO FINDINGS` has that line in any case, allowing list or quote markers, emphasis, backticks, code
-  fences, a line of prose before it and trailing text after it. A record that quotes the line stays a
+  `NO FINDINGS` has that line in any case and spacing, allowing list or quote markers, emphasis,
+  backticks, a colon, a dash or nothing after the words, code fences, a line of prose before it and
+  trailing text after it. A record that quotes the line stays a
   record. A host dispatch also stores
   nothing and reports `review pending` with that page.
 

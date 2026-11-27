@@ -365,7 +365,8 @@ describe("reply bytes", () => {
       ["MODEL: m\nTARGET: abcdef1\n\nPAGE NOT CACHED: README.md.\n", "README.md"], ["MODEL: m\nTARGET: abcdef1\n\nPAGE NOT CACHED: `guides/a.md`\n", "guides/a.md"],
       ["MODEL: m\nTARGET: abcdef1\n\n- **PAGE NOT CACHED:** \"README.md\"\n", "README.md"], ["MODEL: m\nTARGET: abcdef1\n\n> PAGE NOT CACHED:\n", "unnamed"],
       ["MODEL: m\nTARGET: abcdef1\n\n```\nPAGE NOT CACHED: README.md\n```\n", "README.md"], ["I could not read the page from the cache.\nPAGE NOT CACHED: README.md", "README.md"],
-      ["MODEL: m\nTARGET: abcdef1\n\nPage not cached: README.md\n", "README.md"]] as const)
+      ["MODEL: m\nTARGET: abcdef1\n\nPage not cached: README.md\n", "README.md"], ["MODEL: m\nTARGET: abcdef1\n\n**PAGE NOT CACHED**: README.md\n", "README.md"],
+      ["MODEL: m\nTARGET: abcdef1\n\nPAGE NOT CACHED - README.md\n", "README.md"], ["MODEL: m\nTARGET: abcdef1\n\nPAGE  NOT CACHED README.md\n", "README.md"]] as const)
       expect([reply, parseReply(reply)]).toEqual([reply, { error: `the reviewer stopped: page not cached: ${page}` }]);
     // Only the first line after the header lines can stop the review: a record that quotes the marker,
     // inside a line or on a continuation line of its own, is still a record.
