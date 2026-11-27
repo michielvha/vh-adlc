@@ -239,6 +239,10 @@ export function removeExport(dir: string) {
 
 /** Splits a reply into its two header lines and the records after them. */
 export function parseReply(reply: string): { model: string; target: string; records: string } | { error: string } {
+  // A reviewer that cannot read a convention page from the cache stops on its own line; that is a pending
+  // review for the dispatcher, never a record, whatever header lines came before it.
+  const uncached = /^PAGE NOT CACHED: (\S+)\r?$/m.exec(reply);
+  if (uncached) return { error: `the reviewer stopped: page not cached: ${uncached[1]}` };
   // Only the two header lines and the blank lines around them are removed; the records keep their bytes.
   let at = 0;
   const line = (): string | undefined => {
