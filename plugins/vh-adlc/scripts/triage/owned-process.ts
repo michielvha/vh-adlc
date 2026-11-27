@@ -23,7 +23,7 @@ export type OwnedResult = {
   boundary: "pid-namespace" | "seatbelt" | "marker";
 };
 /** Paths no client process may write (with each of their parent directories), and paths inside them it still may. */
-export type WriteDeny = { deny: string[]; allow: string[] };
+export type WriteDeny = { deny: string[]; allow: string[]; /** The caller already resolved and validated every path. */ resolved?: boolean };
 
 export const SANDBOX_EXEC = "/usr/bin/sandbox-exec";
 let seatbeltProbe: boolean | undefined;
@@ -65,7 +65,8 @@ function parentsOf(path: string): string[] {
  * allows carve scratch directories out of the denies.
  */
 export function seatbeltPrefix(writeDeny: WriteDeny): string[] {
-  const deny = [...new Set(writeDeny.deny.map(resolvedPath))], allow = [...new Set(writeDeny.allow.map(resolvedPath))];
+  const resolve = writeDeny.resolved ? (path: string) => path : resolvedPath;
+  const deny = [...new Set(writeDeny.deny.map(resolve))], allow = [...new Set(writeDeny.allow.map(resolve))];
   const parents = [...new Set(deny.flatMap(parentsOf))];
   const parameters: string[] = [];
   const rules = (prefix: string, kind: "subpath" | "literal", paths: string[]) => paths.map((path, i) => {

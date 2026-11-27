@@ -328,7 +328,15 @@ const NO_BOUNDARY = "no process boundary on this host keeps reviewer processes o
  */
 export function protectedLinkCheck(root: string, scratch: string[], extra: string[],
   hooks: { afterList?: (dir: string) => void } = {}): { linked?: string; changed?: string } {
-  for (const path of extra) { try { const info = lstatSync(path); if (info.isFile() && info.nlink > 1) return { linked: path }; } catch { /* absent */ } }
+  for (const path of extra) {
+    let info;
+    // A fresh repository may have no index yet; any other failure means the metadata changed under the check.
+    try { info = lstatSync(path); } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+      return { changed: path };
+    }
+    if (info.isFile() && info.nlink > 1) return { linked: path };
+  }
   // Another session may remove or lock a file between the listing and its lstat: that is a retry, not an error.
   const walk = (path: string): { linked?: string; changed?: string } | undefined => {
     let names: string[];
@@ -352,10 +360,9 @@ export function protectedLinkCheck(root: string, scratch: string[], extra: strin
  * of one, into a Git directory, or, through a symlink, to anywhere inside a denied path. The snapshot skips
  * a scratch entry by its declared path, not by what it points at.
  */
-function scratchOverlap(allows: { entry: string; declared: string }[], deny: string[], gitDirs: string[]): { entry: string; resolved: string } | undefined {
-  const inside = (path: string, dir: string) => path === dir || path.startsWith(`${dir}/`);
-  for (const { entry, declared } of allows) {
-    const resolved = resolvedPath(declared);
+function scratchOverlap(allows: { entry: string; declared: string; resolved: string }[], deny: string[], gitDirs: string[]): { entry: string; resolved: string } | undefined {
+  const inside = (path: string, dir: string) => path === dir || dir === "/" || path.startsWith(`${dir}/`);
+  for (const { entry, declared, resolved } of allows) {
     if (deny.some(dir => inside(dir, resolved)) || gitDirs.some(dir => inside(resolved, dir))
       || resolved !== declared && deny.some(dir => inside(resolved, dir))) return { entry, resolved };
   }
@@ -390,8 +397,10 @@ export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutc
     // Under the macOS boundary no reviewer process may write what the before-and-after check judges. The
     // profile is built from these resolved paths, after no scratch allow is shown to open a protected one.
     const deny = [repo, gitDir, commonDir, ...(cloneDir ? [cloneDir] : []), ...(exportDir ? [exportDir] : [])].map(resolvedPath);
+    // Each allow is resolved once: the overlap check and the profile see the same path.
     const allows = [...scratch.map(entry => ({ entry, declared: join(repo, entry) })),
-      ...(cloneDir ? scratch.map(entry => ({ entry, declared: join(cloneDir!, entry) })) : [])];
+      ...(cloneDir ? scratch.map(entry => ({ entry, declared: join(cloneDir!, entry) })) : [])]
+      .map(allow => ({ ...allow, resolved: resolvedPath(allow.declared) }));
     if (seatbelt) {
       const overlap = scratchOverlap(allows, deny, [resolvedPath(gitDir), resolvedPath(commonDir)]);
       if (overlap) return { status: "pending", reason: `the review_scratch entry ${overlap.entry} resolves onto a protected path (${overlap.resolved}), so allowing writes there would open it` };
@@ -406,7 +415,7 @@ export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutc
     const env = Object.fromEntries(Object.entries({ ...process.env, ...request.env }).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
     let result;
     try {
-      const writeDeny = { deny, allow: allows.map(allow => resolvedPath(allow.declared)) };
+      const writeDeny = { deny, allow: allows.map(allow => allow.resolved), resolved: true };
       result = await runOwnedClient(argv, { cwd: exportDir ?? cloneDir ?? repo, env, stdout, stderr, pidNamespace: namespace, writeDeny },
         { timeout_ms: request.timeoutMs ?? 15 * 60_000, grace_ms: 500, reap_ms: 2_000 });
     } catch (error) { return { status: "pending", reason: `the reviewer command could not start: ${(error as Error).message}` }; }

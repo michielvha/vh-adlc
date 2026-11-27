@@ -19,6 +19,8 @@ MUTANTS = {
     "no link-count check": (RR, "if (links.linked) return", "if (links.linked && false) return"),
     "no disappearing-file guard": (RR, "try { info = lstatSync(join(root, child)); } catch { return { changed: child }; }", "info = lstatSync(join(root, child));"),
     "no scratch overlap check": (RR, "if (overlap) return", "if (overlap && false) return"),
+    "no filesystem-root containment": (RR, 'path === dir || dir === "/" || path.startsWith', "path === dir || path.startsWith"),
+    "no Git metadata error guard": (RR, "      return { changed: path };\n", "      continue;\n"),
     "no boundary precheck": (RR, 'if (!namespace && !seatbelt) return { status: "pending", reason: NO_BOUNDARY };', ""),
 }
 env = dict(os.environ, PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:" + os.environ["PATH"])
