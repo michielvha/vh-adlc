@@ -38,7 +38,8 @@ Pass conditions:
 
 - L-08 is raised at its minimum severity on the Claude route, and L-10 on the Codex route, in at least 2 of
   6 passes, or 3 of 12. A single hit could be chance. When a route stops at 6 passes with exactly one hit,
-  a second set of 6 runs on a fresh copy, and the route is judged on all 12.
+  a second set runs on a fresh copy, and the route is judged on 12 passes: the first 6 and the second
+  set's first 6.
 - No label the new brief raised reliably, in 6 or more of 12 passes, is lost. The 16 label and route pairs
   it raised less often are reported but do not decide the result, because they could miss by chance alone.
 - The mean of blocking findings per pass stays within the new brief's normal spread on each route, so the
@@ -172,10 +173,14 @@ check that both commits carry the sentence byte for byte.
   to reach 3 of 12. For a sentence that restores the label at 1 in 3 passes, that outcome would come up
   about 11% of the time on the host route and 23% on the command route, where fewer unrelated labels
   trigger the extension. This rule is declared before the replay: when a route stops at 6 passes with its
-  label at exactly 1 of 6, one more 6-pass set of that route runs on a second fresh copy of the case
-  directory. AC-02, AC-03 and AC-04 then judge that route on the 12 passes of both sets together, with
-  retention counted from both sets' verdict files by the harness's rule. This stays within the budget of
-  12 counted passes per route. No other outcome gets a second set.
+  label at exactly 1 of 6, one more set of that route runs on a second fresh copy of the case directory.
+  Only that set's counted passes 1 to 6, by pass number, count. The harness may start passes 7 to 12 on
+  the second copy, because its own extension still applies there (`run.ts:578`), so the run is stopped
+  once pass 6 is stored. Any later pass it stored is listed in the results as not counted. AC-02, AC-03
+  and AC-04 then judge that route on exactly 12 passes: the first set's 6 and the second set's passes 1 to
+  6, with retention counted from those passes' verdict files by the harness's rule. The budget therefore
+  stays at 12 counted passes per route, plus at most one pass started before the stop. No other outcome
+  gets a second set.
 - AC-03 checks only the 59 pairs the new brief raised in 6 or more of 12 passes: the 75 enterprise pass
   rows except the 16 the Background names. For each of them a chance failure is under 0.1%. Eight of the 16 lower-rate pairs can fail
   at all under the rule, and a sentence with no effect would make at least one of those eight fail about 16%
