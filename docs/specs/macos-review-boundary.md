@@ -543,6 +543,44 @@ None.
 | 2026-11-27 | R-16 | implementation | `e274ff17` | gpt-6.2-sol | procedural | diagnostic AC-06 proof run on the final code (C3 `5168340e`) through the Codex command route: ready, attested, worktree unchanged; its artifacts are the AC-06 proof for the formal review |
 | 2026-11-27 | R-17 | implementation | `bc5cf01c` | gpt-6.2-sol | procedural | formal Codex implementation review: AC-01, AC-03, AC-04, AC-05, AC-07 and AC-10 met; AC-02, AC-06, AC-08 and AC-11 not met on edge cases, to be residualised by the orchestrator's decision |
 | 2026-11-27 | R-18 | spec | `6282c941` | claude-opus-5-5 | procedural | 1 blocking, 1 should-fix, 1 nit; host route, owner-directed drift re-review after #182 merged covered files; held for the owner on the reviewer environment |
+| 2026-11-27 | R-19 | spec | `29fc0f7c` | claude-opus-5-5 | procedural | 2 blocking, 3 should-fix; host route; convergence trigger fired (R-18 had 1 blocking), held for the owner on credential stores |
+
+### R-19
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Context (Owner summary, trade-offs paragraph: "tokens in the session that runs the review, such as `GH_TOKEN` or cloud keys, never reach reviewer commands or the candidate's tests"), Design (Reviewer environment; What the route denies: "Writes everywhere else stay allowed"; Profile: `(allow default)`), Scope (Not handled: writes outside the protected paths)
+EVIDENCE: The profile is `(version 1)(allow default)` plus write denies only (Design, Profile), so every reviewer process and the candidate's tests can read anything the user can. On this Mac `~/.config/gh/hosts.yml` (mode 0600) and `~/.codex/auth.json` (mode 0600) exist and `gh` is at `/opt/homebrew/bin/gh`, so a reviewer command can run `gh auth token` or read those files and, with the network access the Codex route gives it, send the same GitHub credential the summary says never reaches it. The allowlist removes only the copy in the environment. No Scope line states this: posture A covers writes outside the protected paths and network reach, not reading credential stores, and R-18 F-01 had already pointed at "reading credentials" as unanswered. The R-18 revision answered only the environment half and then added the summary sentence, which overstates what the change delivers. The product profile names the user's credentials as at stake, and reaching a credential is in the always-blocking class.
+PROPOSAL: Correct the summary sentence to say only environment-held tokens are withheld, and either add Seatbelt read denies for credential stores the reviewer does not need (for example `~/.config/gh`, `~/.ssh`, `~/.aws`, keychains) with a criterion and test, or, because keeping them readable is a security-posture choice, raise it as an Open Question for the owner rather than a silent default.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: Design (Recorded unsandboxed run: "The Codex reviewer judges AC-01 to AC-03, AC-08, AC-10 and AC-11 from the record"; The AC-06 proof runs), Test Plan (AC-12), Tasks (T30)
+EVIDENCE: The AC-12 proof is a test in `tests/vh-adlc/loop/review-route.test.ts` that runs the route "on every platform with a boundary". Design says a Codex implementation reviewer runs inside the route's profile, where Seatbelt cannot nest, and the Loud failure paragraph says that file then "skips every test that runs the route". So the formal reviewer cannot execute the AC-12 test, and the owner-directed exception that lets it judge from the recorded run is limited to AC-01 to AC-03, AC-08, AC-10 and AC-11. Likewise the AC-06 proof-run paragraph says the formal review judges AC-06 from the proof artifacts, but the Test Plan assigns AC-12's authentication and attestation half to those artifacts without the Design granting that. T30 lists AC-12 among the criteria it advances. Under the protocol's rule against judging stored results, the formal review can return AC-12 only as not verified, so the criterion cannot be met as planned.
+PROPOSAL: Add AC-12 to the criteria the reviewer judges from the recorded run (the sentinel test) and from the AC-06 proof artifacts (authentication and attestation), in Design and the AC-12 Test Plan row, and say the recorded run includes the sentinel test.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-12), Design (Reviewer environment: "The owned-process marker is added by `runOwnedClient` as before")
+EVIDENCE: AC-12 says the reviewer "and every process it starts see only the allowlisted environment variables and `request.env`". `owned-process.ts:171` spawns with `{ ...options.env, [OWNER_MARKER_VARIABLE]: marker }` (`VH_ADLC_OWNED_PROCESS`, `owned-process.ts:95`), which the Design keeps, and the `sh -c` wrapper in the committed argv and any shell Codex starts add `PWD`, `SHLVL` and `_`. Read literally, the "see only" clause fails a correct implementation; only the following clause ("never another variable of the controller's environment") states the intent. Strict reviewers on this document have rated edge cases not met (R-17), so two reviewers could judge AC-12 differently.
+PROPOSAL: Reword AC-12 so that no variable of the controller's environment reaches the reviewer or its descendants except the allowlisted ones and `request.env`, naming the owned-process marker as the one variable the route adds.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan (AC-12)
+EVIDENCE: The row sets one sentinel, `VH_REVIEW_SENTINEL`, and checks that the record holds `PATH` and `HOME`, lacks the sentinel and contains a `request.env` variable. A denylist that strips unknown `VH_*` names, or an allowlist that also passes `GIT_*`, `SSH_AUTH_SOCK`, `GH_TOKEN` or cloud keys, passes that check while breaking the Design's exact list. The proof can pass on a wrong implementation.
+PROPOSAL: Set several controller variables (for example a `GH_TOKEN`-style name, `GIT_DIR` and `SSH_AUTH_SOCK` stand-ins) and assert every name in the recorded `env` belongs to the allowlist, `request.env`, the owned-process marker, or a named set the stub's own shell adds.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context (Owner summary: "This revision resets those ticks and residuals. Still planned: ..."), Acceptance Criteria (AC-02, AC-06, AC-08, AC-11), Tasks (T30)
+EVIDENCE: The diff removes the #195 residuals from AC-02, AC-06, AC-08 and AC-11, as a normative revision requires, and T30 plans a new formal review that advances "AC-01 to AC-08, AC-10 to AC-12". No task fixes R-17 F-01 to F-04 and no Scope line states them as limits, so the code behind those four not-met verdicts is unchanged and the new formal review will return them not met again. The allowlist does not touch R-17 F-01: the route's private clone at `review-route.ts:394` runs `git clone` with no `env`, so it still inherits `GIT_INDEX_FILE` from the controller. The summary does not tell the owner that these four criteria will need the owner's residual decision again (a residual needs the owner's decision per `conventions/feature-documents.md`), or that fixing them is the alternative. One implementer would add fix tasks; another would re-residualise after T30.
+PROPOSAL: Say in the Owner summary and in T30 what happens to R-17 F-01 to F-04: either add fix tasks, or state that the owner will be asked to residualise those four criteria to #195 again after the new formal review.
 
 ### R-18
 
