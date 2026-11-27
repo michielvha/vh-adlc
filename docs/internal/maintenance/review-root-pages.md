@@ -73,7 +73,11 @@ After R-3:
 
 After R-4:
 
-- F-01: the stop cases gained a bolded label (`**PAGE NOT CACHED**: README.md`), a dash instead of the colon and no separator with double spacing. They failed on the colon-only matcher and pass with the widened one. Every record case still parses as records. Whether to add the general check (pending when records do not open with `FINDING:`, `CRITERION:` or `NO FINDINGS`) is put to the orchestrator as a scope decision.
+- F-01: the stop cases gained a bolded label (`**PAGE NOT CACHED**: README.md`), a dash instead of the colon and no separator with double spacing. They failed on the colon-only matcher and pass with the widened one. Every record case still parses as records. Whether to add the general check (pending when records do not open with `FINDING:`, `CRITERION:` or `NO FINDINGS`) was put to the orchestrator as a scope decision. The answer on 2026-11-27 keeps it out of this change, with the owner able to raise it as a separate follow-up issue.
+
+Residual risk, accepted: the stop matcher closes only the stop forms it recognizes. A stop reply formatted in some other way, in a reply that does not open with records, can still come back `ready` and be stored. `vh-adlc lint` then flags the stored text as `review-records-malformed`, so the next gate fails closed. The operator sees a malformed review instead of the page-not-cached reason.
+
+Ship: the owner asked for a PR so Linux CI runs the two dispatch tests ([owner answer on #142](https://github.com/michielvha/vh-adlc/issues/142#issuecomment-7215556697)), and skipped the Mac full-suite run.
 
 Not yet run: the full plugin checker, and the Linux-only dispatch tests, which need Linux CI.
 
@@ -169,4 +173,4 @@ PROPOSAL: Allow emphasis, backticks and quotes between the words and the colon, 
 
 ## State
 
-Review pending: R-4 F-01 is fixed and needs a new review, after the orchestrator decides on the general record check; R-2 F-02 waits for a Linux run of the two dispatch tests. Local candidate.
+Review pending: R-4 F-01 is fixed and needs a new review; R-2 F-02 waits for a Linux run of the two dispatch tests. Local candidate.
