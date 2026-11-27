@@ -86,6 +86,7 @@ After the first CI run on [PR #182](https://github.com/michielvha/vh-adlc/pull/1
 
 - `checker-macos` failed two package checks that this change caused. `a package change comes with a version change` needs a new plugin version, so both `plugin.json` files move to 0.33.1. `no em dash or en dash` found the literal en and em dash in the stop matcher's separator class in `review-route.ts`. They are now written as the escapes `\u2013` and `\u2014`, which matches the same characters. Both checks and the `reply bytes` tests pass locally after the change.
 - `verify` failed in `TestBoundary` (`cmd/vh-adlc`, `golden_test.go:338`). Its first error is `open .../.git/objects/maintenance.lock: no such file or directory` inside the test's fixture repository. No Go file changed here, and the last `main` run at the task base passed this job.
+- The Linux `checker` job (bun 1.4.5, `bun test tests/vh-adlc --parallel --timeout 60000`) ran 4427 passing and 2 failing tests. The two failures were the same package checks as on macOS, fixed above. Both new end-to-end dispatch tests passed: `review pages > a docs revision whose AGENTS.md routes through README.md has README.md and the pages it links cached before the reviewer starts` and `replies > a page the reviewer could not read from the cache leaves the review pending`. The two existing review-pages tests and `pages.test.ts` passed as well. This closes R-2 F-02 for the source at `0887fee9`, which differs from the fixed head only in the version and the escaped regex characters.
 - `remote-gui` failed `two inline taps edit a URL and a field through stock Chromium and noVNC` (`tests/remote-gui/mobile.e2e.test.js:553`). A typed combining accent (U+0301) did not arrive in the field. This change touches no remote-gui file, and the last `main` run at the task base passed this job.
 
 ## Reviews
@@ -217,4 +218,4 @@ NO FINDINGS
 
 ## State
 
-The independent review is current with no open findings (R-7 at `fc6b45f9`). Not complete yet: the two end-to-end dispatch tests still have to pass in Linux CI on the PR the owner asked for.
+The independent review is current with no open findings (R-7 at `fc6b45f9`). The two end-to-end dispatch tests passed in Linux CI (run 45980312542). Remaining: CI on the pushed head, with the package checks fixed. Merging waits for the owner.
