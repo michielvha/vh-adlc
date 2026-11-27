@@ -243,6 +243,7 @@ None.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-27 | R-1 | spec | `f201f8d2` | claude-opus-5-5 | procedural | 1 blocking, 2 should-fix, 4 nit |
 | 2026-11-27 | R-2 | spec | `42990be2` | claude-opus-5-5 | procedural | 0 blocking, 1 should-fix, 2 nit |
+| 2026-11-27 | R-3 | spec | `eef99624` | claude-opus-5-5 | procedural | 0 blocking, 1 should-fix, 0 nit |
 
 ### R-1
 
@@ -317,6 +318,15 @@ SEVERITY: nit
 WHERE: Design (The replay: AC-04 bullet "A sentence with no effect exceeds it about 2% of the time"); Owner summary (third pass condition)
 EVIDENCE: Two standard errors one-sided is about 2.3% per route. AC-04 fails when either route exceeds its bound, so for a sentence with no effect the chance that AC-04 fails is about 1 - 0.977^2, about 4.5%. The bounds themselves check out: 5.67 + 2 x 1.44 x 0.5 = 7.11, 21.25 + 2 x 3.41 x 0.5 = 24.66, and 6.85 and 24.03 with n = 12.
 PROPOSAL: Say "about 2% per route, about 4.5% that either route exceeds it".
+
+### R-3
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (The replay: the second-set bullet "one more 6-pass set of that route runs on a second fresh copy ... judge that route on the 12 passes of both sets together ... This stays within the budget of 12 counted passes per route"); Owner summary (first pass condition "a second set of 6 runs on a fresh copy, and the route is judged on all 12", and "It costs 6 counted passes per route, or 12 when any label still fails after 6"); Scope (Out of scope: "the replay budget is up to 12 counted passes per route"); Acceptance Criteria AC-02 and AC-04; Test Plan AC-02, AC-03 row and AC-04 row
+EVIDENCE: This traces to the R-2 F-01 change. On the second fresh copy the harness starts a new set of 6 and still applies its own extension. Right after the first 6 it runs `if (failing().length && selected.includes("new")) await pass("new", FIRST_PASSES.new + FIRST_PASSES.confirm);` (tests/vh-adlc/replay/run.ts:578, FIRST_PASSES at run.ts:48). Nothing caps it at 6. On the host route, using the stored new-brief rates in results.md:115-164, some other failable label (L-41 2/12, L-35 3/12, L-15 and L-32 5/12, L-18 and L-24 at any severity 4/12, and others) misses all 6 passes about 59% of the time. L-08 itself misses all 6 about 9% of the time at a rate of 1 in 3. So the second set often runs to 12, which makes 18 counted passes for the route. Design calls it "one more 6-pass set" and says the budget stays at 12, which is then false. It also leaves open which 12 passes AC-02, AC-03 and AC-04 judge: the first 6 of the second copy, all 18, or a chosen subset. AC-04 gives no bound for n = 18. Two careful implementers would count different passes, and a free choice of subset could turn a miss into a pass. I recomputed the 11% and 23% figures (0.263 x 0.41 and 0.263 x 0.857) and the AC-04 bounds, and they check out.
+PROPOSAL: State that the second set counts only its passes 1 to 6, by pass number, and that any passes the harness adds beyond 6 on the second copy are recorded but not counted. Alternatively, say the route is judged on all 18 passes, with the AC-02 threshold and the AC-04 bound given for 18, and state the real budget in the Owner summary, Scope and Design.
 
 ## Sources
 
