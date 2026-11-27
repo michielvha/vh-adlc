@@ -171,6 +171,16 @@ EVIDENCE: R-3 F-01 is resolved for the forms it named. I ran parseReply from a s
 PROPOSAL: Allow emphasis, backticks and quotes between the words and the colon, and make the colon optional (for example `/^PAGE\s+NOT\s+CACHED[*_`'"]*\s*[:\-]?/i`). Add the bold-label form to the `reply bytes` stop cases. Or narrow the protocol sentence to what the matcher actually allows. A check limited to "pending when the records don't open with FINDING:, CRITERION: or NO FINDINGS" would close the class for good, if the orchestrator accepts that as inside the task.
 ```
 
+### R-5
+
+Target: `2639a6ad7f4834b8ce3e6ac9590f26d5a90b9def`
+Model: claude-opus-5-5
+Isolation: procedural
+
+```text
+NO FINDINGS
+```
+
 ## State
 
-Review pending: R-4 F-01 is fixed and needs a new review; R-2 F-02 waits for a Linux run of the two dispatch tests. Local candidate.
+The independent review is current with no open findings (R-5 at `2639a6ad`). Not complete yet: the two end-to-end dispatch tests still have to pass in Linux CI on the PR the owner asked for.
