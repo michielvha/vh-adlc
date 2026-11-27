@@ -580,6 +580,44 @@ None.
 | 2026-11-27 | R-17 | implementation | `bc5cf01c` | gpt-6.2-sol | procedural | formal Codex implementation review: AC-01, AC-03, AC-04, AC-05, AC-07 and AC-10 met; AC-02, AC-06, AC-08 and AC-11 not met on edge cases, to be residualised by the orchestrator's decision |
 | 2026-11-27 | R-18 | spec | `6282c941` | claude-opus-5-5 | procedural | 1 blocking, 1 should-fix, 1 nit; host route, owner-directed drift re-review after #182 merged covered files; held for the owner on the reviewer environment |
 | 2026-11-27 | R-19 | spec | `29fc0f7c` | claude-opus-5-5 | procedural | 2 blocking, 3 should-fix; host route; convergence trigger fired (R-18 had 1 blocking), held for the owner on credential stores |
+| 2026-11-27 | R-20 | spec | `4a90e8cb` | claude-opus-5-5 | procedural | 1 blocking, 4 should-fix; host route, owner-directed |
+
+### R-20
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design (Credential read denies), Acceptance Criteria (AC-13), Test Plan (AC-13), Scope (In scope: "On macOS, the profile refuses reads of a fixed list of credential stores"), Context (Owner summary, trade-offs paragraph: "On macOS the profile also refuses reads of a fixed list of credential stores")
+EVIDENCE: The Design adds only `(deny file-read* (subpath (param "R0")) ...)` and `(literal (param "Rn"))` rules. It adds no write deny on the stores and no literal deny on their parent directories, though the write boundary needed exactly that against renames (R-1). I measured this on this Mac in a scratch directory under /private/tmp. With `(version 1)(allow default)(deny file-read* (subpath (param "R0")) (literal (param "R1")))`, R0 was home/.ssh and R1 was home/.netrc. `cat` and `ls` on .ssh were refused, and so were `ln` and `cp -c` of the key. But `mv home/.ssh home/moved && cat home/moved/id_test` printed the secret and exited 0. `mv home/.netrc home/n2 && cat home/n2` printed the file. `mv home h2 && cat h2/.ssh/id_test` printed the secret. Then I added `(deny file-write* (subpath R0) (literal R1) (literal P0) (literal P1))`, with P0 and P1 the parent directories. All three renames failed with "Operation not permitted", and creating a new file beside the stores and reading notes.txt still worked. So an implementer who follows the Design builds a deny that any reviewer command can get past with one `mv`, and AC-13 ("no reviewer process can read the fixed credential stores") is not met. The AC-13 test only tries direct reads, so it passes on that wrong implementation. Reaching a credential is in the always-blocking class, and the product profile names the user's credentials as at stake. This traces to the change this revision made (the new Credential read denies paragraph).
+PROPOSAL: In Design, also deny `file-write*` on each store path (subpath for directories, literal for files) and add a `literal` write deny on every parent of a store up to `/`, as the write boundary does. Then add a case to the AC-13 test where the stub renames a store, and a case where it renames a parent such as `.config`, and reads through the new path; both reads must be refused. Add a mutant for each new rule.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan (AC-13), Acceptance Criteria (AC-13), Design (Credential read denies)
+EVIDENCE: The fake home in the row holds `.ssh/id_test`, `.aws/credentials`, `.config/gh/hosts.yml`, `.netrc` and an unlisted `notes.txt`. The row then says "All five listed reads are refused, notes.txt is read". Only four listed stores are in the fixture, so read literally the row asks for a refusal that contradicts its own next clause. AC-13 and the Design name eight stores, but the test leaves out `.kube`, `.docker`, `.config/gcloud` and `.git-credentials`. An implementation that drops any of those four, or treats `.git-credentials` as a directory and not a literal file, passes the row. The mutant step ("the read denies removed") removes them all at once and does not catch that.
+PROPOSAL: Put a file under every one of the eight stores in the fake home, with `.netrc` and `.git-credentials` as plain files. Assert that all eight reads are refused and that `notes.txt` is read, and fix the count.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Recorded unsandboxed run: "The Codex reviewer judges AC-01 to AC-03, AC-08 and AC-10 to AC-13 from the record ... The AC-12 authentication and attestation half is judged from the AC-06 proof artifacts"; The AC-06 proof runs), Test Plan (AC-13: "That Codex still runs and attests with the denies is the AC-06 proof run"), Tasks (T30)
+EVIDENCE: AC-13 ends with "and Codex still runs and attests". The recorded run cannot show that half, because it contains only stub reviewers. The Design grants judging from the AC-06 proof artifacts only for "The AC-12 authentication and attestation half", and the AC-06 paragraph says the formal review "judges AC-06 from them". The Test Plan assigns the AC-13 Codex half to the AC-06 proof run without the Design granting it. This is the same gap that R-19 F-02 raised for AC-12, and the R-19 revision fixed it for AC-12 only. The protocol has a rule against judging stored results, so a strict implementation reviewer could return AC-13 as not verified.
+PROPOSAL: Extend the sentence in the Recorded unsandboxed run paragraph so the AC-12 and AC-13 Codex halves are both judged from the AC-06 proof artifacts.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope (Not handled: "the macOS Keychain and credential files outside the fixed list"), Design (Credential read denies: "Under the PID namespace on Linux there is no read deny"), Context (Owner summary, trade-offs paragraph)
+EVIDENCE: The committed `loop.yaml` sends both reviewer roles to Codex on Linux as well (Design, Codex route: "The same argv runs on Linux"). There, every store on the fixed list stays readable to reviewer commands, which have network access. Only one sentence in Design says so. The stated limit added for R-19 F-01 names only the Keychain and files outside the list. The owner's option B on #187 says "deny reads in the Seatbelt profile", so the Linux exposure falls under that decision, but neither Scope nor the Owner summary records it. An owner reading the stated limits would not see that the listed stores stay open on Linux. Reaching a credential is in the always-blocking class, so the document has to record the owner's acceptance; leaving it to inference is not enough.
+PROPOSAL: Extend the R-19 F-01 Not handled line so it also says that on Linux the PID namespace denies no reads, so the listed stores stay readable there, decided by the owner on #187 (option B). Add one clause to the Owner summary saying the same.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context (Owner summary, trade-offs paragraph: "Something planted there could change the worktree later"), Scope (Not handled: writes outside the protected paths)
+EVIDENCE: The summary now says the profile "refuses reads of a fixed list of credential stores". In the same paragraph, reviewer tool commands can write to `~/Library/LaunchAgents`, crontab and shell startup files, and the summary gives only one consequence: such a plant "could change the worktree later". Anything planted there runs later outside the profile. A line added to `~/.zshrc` during a review can read `~/.ssh` the next time the owner opens a terminal. So the read deny only covers reads made during the review. The posture A limit covers deferred execution in general, but the summary does not tell the owner it also undoes the new read deny. That is the same kind of overstatement R-19 F-01 asked to have corrected.
+PROPOSAL: In the Owner summary, say that anything planted outside the protected paths runs later outside the profile, so it can also read the denied stores, and that the read deny covers only reviewer processes while the review runs.
 
 ### R-19
 
