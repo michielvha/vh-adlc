@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Spec review R-23 is clean; waiting for owner re-acceptance."
+status: planned
+status_description: "Accepted at R-23; re-entering implementation."
 issue: https://github.com/michielvha/vh-adlc/issues/187
 branch: feat/macos-review-boundary
 goal: "Spec and implementation reviews in this repository run on Codex from a Mac, with no owner step per review, and no reviewer process can change the owning worktree or the private clone once the review has been judged."
@@ -608,6 +608,7 @@ None.
 | 2026-11-27 | R-21 | spec | `bfeba473` | claude-opus-5-5 | procedural | 1 blocking, 2 should-fix; host route; convergence trigger fired (R-20 had 1 blocking), held for the owner |
 | 2026-11-27 | R-22 | spec | `a1d16f9d` | claude-opus-5-5 | procedural | 1 blocking, 1 should-fix; host route; mechanical fixes in the same layer, applied by the orchestrator's standing instruction |
 | 2026-11-27 | R-23 | spec | `0ad167e1` | claude-opus-5-5 | procedural | clean: 0 blocking, 1 should-fix (Tasks order, applied outside the baseline), 1 nit unapplied; host route, owner-directed |
+| 2026-11-27 | R-23 | spec | `0ad167e1` | n/a | n/a | accepted by owner |
 
 ### R-23
 
