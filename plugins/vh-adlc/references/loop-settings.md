@@ -17,6 +17,7 @@ no settings file, every loop role keeps the host default and no binary is needed
 | Primary worktree | The first entry of `git worktree list`; with `implement_worktree: isolated`, implement never writes there. |
 | No publication path | The delivery verdict for a merge commit that carries the skip marker and touches only skip-eligible paths. |
 | Delivered | A feature whose release paths have all published, or whose merge has no publication path. |
+| Instruction freshness | The state `context` reports for a listed file against origin's default branch tip, with the version an operation reads. |
 
 ## Roles
 
@@ -121,8 +122,9 @@ rejected push keeps the local claim commit, creates no feature branch and report
 `bun scripts/loop/cli.ts isolation --host-worktree-tool true|false` says whether to continue, to ask the
 host's own worktree tool for a worktree, or to stop before writing.
 
-`bun scripts/loop/cli.ts context --repo <dir>` prints the reading list (instruction files, then the
-project procedure), the lenses, and `plugin`: the running plugin version and, where the host keeps an
+`bun scripts/loop/cli.ts context --repo <dir> [--default-branch <branch>]` prints the reading list
+(instruction files, then the project procedure), the lenses, `freshness` (see Instruction freshness
+below), and `plugin`: the running plugin version and, where the host keeps an
 install record, the installed one. A host keeps the plugin a session started with, so after an update
 `plugin.stale` is true until the session restarts, and operations stop before writing. When a `vh-adlc`
 on PATH is not the plugin's locked binary, because its digest does not match the lock, `plugin.binary_warning`
@@ -140,6 +142,37 @@ without that boundary, a command-route review stays pending.
 Feature reservations use the adopted remote's committed `.vh-adlc/work-ownership.yaml`,
 independent of local loop overrides or a stale feature checkout. See
 [reservation adoption](authority.md#reservation-adoption) before enabling them.
+
+## Instruction freshness
+
+A checkout behind the default branch holds old copies of the repository's rules, and nothing in the
+files says so. `context` therefore fetches origin's default branch, with `--no-tags` and a 30-second
+timeout, which moves only `refs/remotes/origin/<branch>`. It then compares the settings file and each
+listed file with that tip and with the merge base of `HEAD` and the tip:
+
+| State | When | `read` |
+| --- | --- | --- |
+| `current` | The local copy equals the tip's | the path |
+| `edited` | The local copy differs from the tip's and from the merge base's: this branch changed it | the path |
+| `stale` | The local copy equals the merge base's, and the tip changed it | `<tip sha>:<path>` |
+| `removed` | The local copy equals the merge base's, and the tip deleted it | `null` |
+| `unverified` | No tip or merge base could be found; `freshness.reason` says why | the path |
+
+When the settings file itself is `stale`, the reading list and lenses come from the tip's settings, so
+a rule file added on the default branch is listed too. If the tip's settings fail to load,
+`freshness.settings.error` says why and the local list stays.
+
+Every operation that reads these files follows the same rule:
+
+- Run `context` with `--default-branch <default branch>`. Without it, `context` uses `origin/HEAD` or
+  asks origin with `git ls-remote`.
+- Read each entry of `freshness.files` at its `read` value: a path with the file tools, a revision with
+  `git show <read>`. Skip `removed` entries. On `unverified`, read the local copies and open the report
+  with a line naming `freshness.reason`. `freshness.settings` is not read; it says which settings
+  supplied the list.
+- The conventions revision is always the one `vh-adlc knowledge` resolves from the checkout. A pin line
+  in a copy read from the tip changes neither the revision the operation follows nor the one it passes
+  to the binary and reviewers, so the operation and the binary's gates judge by the same conventions.
 
 ## Per-user override
 

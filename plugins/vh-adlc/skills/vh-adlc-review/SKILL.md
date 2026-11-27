@@ -23,7 +23,7 @@ Independent read-only review does not acquire a reservation.
 
 This operation's loop role and route come from `.vh-adlc/loop.yaml` through
 `bun scripts/loop/cli.ts route` (`references/loop-settings.md`); without the file, every role keeps the
-host default. Before acting, read every file `bun scripts/loop/cli.ts context` lists: the repository's instruction
+host default. Before acting, run `bun scripts/loop/cli.ts context --default-branch <default branch>` and read every file it lists at the version `references/loop-settings.md` (Instruction freshness) names: the repository's instruction
 files and its project procedure, whose local rules apply alongside this procedure. If its `plugin.stale` is true, stop before any write and report its `warning`: the session runs an older plugin than the host has installed. If it reports `plugin.binary_warning`, run only the binary `scripts/ensure-vh-adlc.sh` prints, never a `vh-adlc` found on PATH. A reviewer role's `command` route runs through `bun scripts/loop/cli.ts review` in place
 of the host dispatch described below, as `references/review-protocol.md` (Routes) describes: a `ready`
 outcome is stored like a host reviewer's records, and a `pending` outcome leaves the review pending. A
