@@ -21,6 +21,7 @@ Affected paths:
 - `tests/vh-adlc/loop/cli.test.ts`
 - `tests/vh-adlc/loop/review-route.test.ts`
 - `docs/internal/maintenance/review-root-pages.md`
+- `plugins/vh-adlc/plugin.json` and `plugins/vh-adlc/.claude-plugin/plugin.json` (version 0.33.0 to 0.33.1, which the plugin checker requires for any package change)
 
 Verification inputs: the files above, `plugins/vh-adlc/scripts/loop/cli.ts` (unchanged, the review dispatch), `internal/knowledge/knowledge.go` (`cleanPages` accepts root and nested clean relative pages, so the binary needs no change), and the docs `AGENTS.md` and `README.md` at `e79eaa6`.
 
@@ -80,6 +81,12 @@ Residual risk, accepted: the stop matcher closes only the stop forms it recogniz
 Ship: the owner asked for a PR so Linux CI runs the two dispatch tests ([owner answer on #142](https://github.com/michielvha/vh-adlc/issues/142#issuecomment-7215556697)), and skipped the Mac full-suite run.
 
 Not yet run: the full plugin checker, and the Linux-only dispatch tests, which need Linux CI.
+
+After the first CI run on [PR #182](https://github.com/michielvha/vh-adlc/pull/182) (run 45980312542 at `0887fee9`):
+
+- `checker-macos` failed two package checks that this change caused. `a package change comes with a version change` needs a new plugin version, so both `plugin.json` files move to 0.33.1. `no em dash or en dash` found the literal en and em dash in the stop matcher's separator class in `review-route.ts`. They are now written as `–` and `—`, which matches the same characters. Both checks and the `reply bytes` tests pass locally after the change.
+- `verify` failed in `TestBoundary` (`cmd/vh-adlc`, `golden_test.go:338`). Its first error is `open .../.git/objects/maintenance.lock: no such file or directory` inside the test's fixture repository. No Go file changed here, and the last `main` run at the task base passed this job.
+- `remote-gui` failed `two inline taps edit a URL and a field through stock Chromium and noVNC` (`tests/remote-gui/mobile.e2e.test.js:553`). A typed combining accent (U+0301) did not arrive in the field. This change touches no remote-gui file, and the last `main` run at the task base passed this job.
 
 ## Reviews
 
@@ -183,4 +190,4 @@ NO FINDINGS
 
 ## State
 
-The independent review is current with no open findings (R-5 at `2639a6ad`). Not complete yet: the two end-to-end dispatch tests still have to pass in Linux CI on the PR the owner asked for.
+Review pending: the CI fixes (version bump and the dash escapes) changed source after R-5 at `2639a6ad`, so a new review is needed. Not complete yet: the two end-to-end dispatch tests still have to pass in Linux CI on the PR the owner asked for.
