@@ -230,6 +230,7 @@ None.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-27 | R-1 | spec | `f201f8d2` | claude-opus-5-5 | procedural | 1 blocking, 2 should-fix, 4 nit |
+| 2026-11-27 | R-2 | spec | `42990be2` | claude-opus-5-5 | procedural | 0 blocking, 1 should-fix, 2 nit |
 
 ### R-1
 
@@ -281,6 +282,29 @@ SEVERITY: nit
 WHERE: Context (Owner summary: "Reading the stored review records showed why ... The new reviewer still writes the wider finding, but frames it around one consequence and drops the clause"); Context (Background, the bullet "The analysis rules out two other explanations")
 EVIDENCE: The analysis presents the side-point pattern as what the records show, says no rule change is confirmed, and keeps chance open: "Chance remains possible for both" (docs/internal/analysis/proportional-review-label-losses.md:144-153). For L-10 on Codex it reports 9 of 13 passes that do not raise the defect and 2 that fold it into a blocking finding (analysis:132-142). So "drops the clause" describes only part of the passes. Background lists the two explanations that are ruled out but leaves out chance, which is not.
 PROPOSAL: Say the records point to dropped side points as the likely cause, that chance is not excluded, and that the replay tests the cause.
+
+### R-2
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-02; Design (The replay: the bullet on 6 passes extended to 12, the AC-02 bullet, and "A failure under any criterion counts as a failure. It is not rerun to get a pass."); Test Plan AC-02, AC-03 row; Owner summary (first pass condition)
+EVIDENCE: The harness extends the new set to 12 only when some label fails retention after 6, and a label fails only at 0 hits at its minimum (tests/vh-adlc/replay/run.ts:268-270, run.ts:578). So with L-08 at 0 of 6 the set goes to 12 and AC-02 can still pass at 3 of 12. With L-08 at 1 of 6 and no other host label failing, the set stays at 6 and AC-02 fails for good, because Design forbids a rerun. One hit is then worse than none, and whether L-08 gets 6 more passes depends on unrelated labels such as host L-41 (2/12, about 33% chance of 0 in 6) and L-35 (3/12, about 18%; results.md:149,155). For a sentence that brings L-08 back to 1 in 3 passes, well above noise, P(exactly 1 of 6) is about 26%, and roughly half of those runs are not extended, so about 13% of working replays fail AC-02 on this path alone. At the old rate of 2 in 3 it is still about 2.5%. This traces to the R-1 F-03 change, which raised the bar from 1 hit to 2 of 6 without changing when the harness extends.
+PROPOSAL: Make the 1-of-6 outcome inconclusive rather than failing, for example by always counting 12 new passes per route (within the stated budget) or by stating how 6 more passes are run when L-08 or L-10 has exactly 1 of 6. Otherwise state this false-fail risk in the Owner summary for the owner to accept.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan AC-02, AC-03 row ("none of the 59 pairs named in Background"); Design (The replay: AC-03 bullet "listed by complement in the Background"); Acceptance Criteria AC-03
+EVIDENCE: Background (lines 98-104) names only the 16 lower-rate pairs. The 59 pairs are never listed; they are the 75 pass rows of results.md:65-164 minus those 16. I recomputed this and got 75, 59 and the same 16, so the set is well defined. But the Test Plan says the 59 are "named in Background", which they are not.
+PROPOSAL: In the Test Plan row, say "the 59 pairs Background defines: the 75 enterprise pass rows except the 16 it names".
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design (The replay: AC-04 bullet "A sentence with no effect exceeds it about 2% of the time"); Owner summary (third pass condition)
+EVIDENCE: Two standard errors one-sided is about 2.3% per route. AC-04 fails when either route exceeds its bound, so for a sentence with no effect the chance that AC-04 fails is about 1 - 0.977^2, about 4.5%. The bounds themselves check out: 5.67 + 2 x 1.44 x 0.5 = 7.11, 21.25 + 2 x 3.41 x 0.5 = 24.66, and 6.85 and 24.03 with n = 12.
+PROPOSAL: Say "about 2% per route, about 4.5% that either route exceeds it".
 
 ## Sources
 
