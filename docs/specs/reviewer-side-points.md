@@ -1,7 +1,8 @@
 ---
-status: planned
-status_description: "Accepted by the owner at R-6 (089a0707); tasks next, then the replay on a copy of the enterprise case."
+status: in-progress
+status_description: "Claimed on feat/reviewer-side-points; next the experiment commit and the host replay on a copy of the enterprise case."
 issue: https://github.com/michielvha/vh-adlc/issues/172
+branch: feat/reviewer-side-points
 goal: "A spec reviewer that finds a secondary defect while writing up a wider finding reports it, either inside that finding or as a finding of its own, so the enterprise replay labels L-08 and L-10 pass retention again without more blocking findings per pass."
 covers:
   - plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md
