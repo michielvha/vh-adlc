@@ -5,16 +5,35 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSy
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { runReviewRoute, snapshot, type ReviewOutcome } from "../../../plugins/vh-adlc/scripts/loop/review-route";
+import { pidNamespaceAvailable, seatbeltAvailable } from "../../../plugins/vh-adlc/scripts/triage/owned-process";
 import { pagesStub } from "./pages-stub";
 
 const made: string[] = [];
+
+// Route tests need a process boundary: a PID namespace or a sandbox-exec write profile. Inside another
+// Seatbelt sandbox neither works, so they would each fail obscurely; report that once instead.
+const ROUTE_BOUNDARY = pidNamespaceAvailable() || seatbeltAvailable();
+const routed = ROUTE_BOUNDARY ? test : test.skip;
+if (!ROUTE_BOUNDARY)
+  test("the route tests need an unsandboxed run", () => {
+    throw Error("The route tests need an unsandboxed run: this process is inside a Seatbelt sandbox, which cannot nest, "
+      + "or the host has no PID namespace. Run them outside any sandbox; a command-route reviewer judges them from a recorded run.");
+  });
 afterAll(() => {
   for (const dir of made) { Bun.spawnSync(["chmod", "-R", "u+w", dir]); rmSync(dir, { recursive: true, force: true }); }
 });
 
+/** Git's repository-local variables, which a hook sets for the repository it acts on; fixtures must not inherit them. */
+const REPOSITORY_LOCAL_GIT = ["GIT_DIR", "GIT_INDEX_FILE", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY",
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE", "GIT_PREFIX"];
+function fixtureEnvironment() {
+  const env: Record<string, string | undefined> = { ...process.env };
+  for (const name of REPOSITORY_LOCAL_GIT) delete env[name];
+  return env;
+}
 function git(root: string, ...args: string[]) {
   const run = Bun.spawnSync(["git", ...args], { cwd: root, stdout: "pipe", stderr: "pipe",
-    env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" } });
+    env: { ...fixtureEnvironment(), GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" } });
   if (run.exitCode !== 0) throw Error(`git ${args.join(" ")}: ${run.stderr.toString()}`);
   return run.stdout.toString().trim();
 }
@@ -83,13 +102,13 @@ async function refusedOrPending(root: string, outcome: Promise<ReviewOutcome>, r
 }
 
 describe("replies", () => {
-  test("a matching reply is ready to store, with the records after both header lines", async () => {
+  routed("a matching reply is ready to store, with the records after both header lines", async () => {
     const { root, commit } = repository();
     const outcome = await review(root, commit, stub("", ok(commit)));
     expect(outcome).toMatchObject({ status: "ready", model: "gpt-6.1-sol", target: commit, records: "NO FINDINGS\n", isolation: "procedural" });
   });
 
-  test("the placeholders carry the model, the prompt text in a file and the export directory", async () => {
+  routed("the placeholders carry the model, the prompt text in a file and the export directory", async () => {
     const { root, commit } = repository();
     const script = stub(`[ "$1" = gpt-6.1-sol ] || exit 7\ngrep -q "Review docs/specs/feature.md at ${commit}" "$2" || exit 8\n[ -f "$3/docs/specs/feature.md" ] || exit 9`, ok(commit));
     expect((await review(root, commit, script, { kind: "spec" })).status).toBe("ready");
@@ -102,17 +121,17 @@ describe("replies", () => {
     ["no header", () => "NO FINDINGS", "MODEL"],
     ["no target line", () => "MODEL: gpt-6.1-sol\n\nNO FINDINGS", "TARGET"],
   ] as const)
-    test(`${name} leaves the review pending`, async () => {
+    routed(`${name} leaves the review pending`, async () => {
       const { root, commit } = repository();
       pending(await review(root, commit, stub("", reply(commit))), reason);
     });
 
-  test("a non-zero exit leaves the review pending", async () => {
+  routed("a non-zero exit leaves the review pending", async () => {
     const { root, commit } = repository();
     pending(await review(root, commit, stub("exit 3", ok(commit))), "exit");
   });
 
-  test("a reviewer that hangs is stopped and the review stays pending", async () => {
+  routed("a reviewer that hangs is stopped and the review stays pending", async () => {
     const { root, commit } = repository();
     pending(await review(root, commit, stub("sleep 30", ok(commit)), { timeoutMs: 1_000 }), "timed out");
   });
@@ -130,13 +149,13 @@ describe("the owning worktree is preserved", () => {
     ["an overwritten assume-unchanged file", root => git(root, "update-index", "--assume-unchanged", "README.md"), "echo changed > README.md"],
   ];
   for (const [name, before, body] of changes)
-    test(`${name} leaves the review pending`, async () => {
+    routed(`${name} leaves the review pending`, async () => {
       const { root, commit } = repository();
       before(root);
       await refusedOrPending(root, review(root, commit, stub(body, ok(commit))), "changed");
     });
 
-  test("writes inside a declared scratch directory are allowed", async () => {
+  routed("writes inside a declared scratch directory are allowed", async () => {
     const { root, commit } = repository();
     expect((await review(root, commit, stub("echo out > build/result.txt", ok(commit)))).status).toBe("ready");
   });
@@ -144,7 +163,7 @@ describe("the owning worktree is preserved", () => {
 
 describe("reviewer processes", () => {
   const late = (file: string) => `(sleep 1; echo late > ${file}) &`;
-  test("a helper left running after success is stopped before the final check", async () => {
+  routed("a helper left running after success is stopped before the final check", async () => {
     const { root, commit } = repository();
     const marker = join(root, "src/late.txt");
     expect((await review(root, commit, stub(late(marker), ok(commit)))).status).toBe("ready");
@@ -152,7 +171,7 @@ describe("reviewer processes", () => {
     expect(existsSync(marker)).toBe(false);
   });
 
-  test("a helper left running after a timeout is stopped", async () => {
+  routed("a helper left running after a timeout is stopped", async () => {
     const { root, commit } = repository();
     const marker = join(root, "src/late.txt");
     pending(await review(root, commit, stub(`${late(marker)}\nsleep 30`, ok(commit)), { timeoutMs: 500 }), "timed out");
@@ -160,7 +179,7 @@ describe("reviewer processes", () => {
     expect(existsSync(marker)).toBe(false);
   });
 
-  test("a helper that detached into its own session is stopped too", async () => {
+  routed("a helper that detached into its own session is stopped too", async () => {
     const { root, commit } = repository();
     const marker = join(root, "src/late.txt");
     // The stub exits only after the helper has left the process group, so a group kill alone misses it.
@@ -172,7 +191,7 @@ describe("reviewer processes", () => {
     expect(existsSync(marker)).toBe(false);
   });
 
-  test("a cleanup that cannot confirm every process stopped leaves the review pending", async () => {
+  routed("a cleanup that cannot confirm every process stopped leaves the review pending", async () => {
     const { root, commit } = repository();
     const outcome = await runReviewRoute({ repo: root, commit, kind: "implementation", document: "docs/specs/feature.md",
       route: { model: "gpt-6.1-sol", argv: [stub("", ok(commit)), "{prompt_file}"] }, prompt: "p", scratch: [], timeoutMs: 5_000,
@@ -182,20 +201,20 @@ describe("reviewer processes", () => {
 });
 
 describe("file-only spec reviews read the committed export", () => {
-  test("an uncommitted instruction edit never reaches the reviewer", async () => {
+  routed("an uncommitted instruction edit never reaches the reviewer", async () => {
     const { root, commit } = repository();
     writeFileSync(join(root, "AGENTS.md"), "live uncommitted instructions\n");
     const script = stub(`[ "$(pwd)" = "$3" ] || exit 5\ngrep -q "committed instructions" AGENTS.md || exit 6\n! grep -q live AGENTS.md || exit 9`, ok(commit));
     expect((await review(root, commit, script, { kind: "spec" })).status).toBe("ready");
   });
 
-  test("the export is read-only", async () => {
+  routed("the export is read-only", async () => {
     const { root, commit } = repository();
     const script = stub(`if echo x > "$3/written.txt" 2>/dev/null; then exit 4; fi`, ok(commit));
     expect((await review(root, commit, script, { kind: "spec" })).status).toBe("ready");
   });
 
-  test("a committed symlink that escapes the export leaves the review pending", async () => {
+  routed("a committed symlink that escapes the export leaves the review pending", async () => {
     const live = realpathSync(mkdtempSync(join(tmpdir(), "vh-review-live-")));
     made.push(live);
     writeFileSync(join(live, "instructions.md"), "live\n");
@@ -231,32 +250,32 @@ printf '%s\\n' '{"type":"turn.completed"}'
   }
   const homeDir = () => { const dir = realpathSync(mkdtempSync(join(tmpdir(), "vh-review-home-"))); made.push(dir); return dir; };
 
-  test("a session log that records the requested model lets a MODEL: unknown reply be stored, recording the attested model", async () => {
+  routed("a session log that records the requested model lets a MODEL: unknown reply be stored, recording the attested model", async () => {
     const { root, commit } = repository(), home = homeDir();
     const outcome = await attested(root, commit, codex(`MODEL: unknown\nTARGET: ${commit}\n\nNO FINDINGS`, "gpt-6.1-sol", home), home);
     // Since T55 records keep their exact bytes; this stub's reply has no final newline.
     expect(outcome).toMatchObject({ status: "ready", model: "gpt-6.1-sol", records: "NO FINDINGS" });
   });
-  test("a session log that records another model leaves the review pending", async () => {
+  routed("a session log that records another model leaves the review pending", async () => {
     const { root, commit } = repository(), home = homeDir();
     pending(await attested(root, commit, codex(`MODEL: unknown\nTARGET: ${commit}\n\nNO FINDINGS`, "gpt-5.3-codex", home), home), "attest");
   });
-  test("a session log with no recorded model leaves the review pending", async () => {
+  routed("a session log with no recorded model leaves the review pending", async () => {
     const { root, commit } = repository(), home = homeDir();
     pending(await attested(root, commit, codex(`MODEL: unknown\nTARGET: ${commit}\n\nNO FINDINGS`, null, home), home), "attest");
   });
-  test("a missing session log leaves the review pending", async () => {
+  routed("a missing session log leaves the review pending", async () => {
     const { root, commit } = repository(), home = homeDir();
     pending(await attested(root, commit, codex(`MODEL: unknown\nTARGET: ${commit}\n\nNO FINDINGS`, "gpt-6.1-sol", home, false), home), "attest");
   });
-  test("a self-report naming a different model leaves the review pending even when the log attests the requested one", async () => {
+  routed("a self-report naming a different model leaves the review pending even when the log attests the requested one", async () => {
     const { root, commit } = repository(), home = homeDir();
     pending(await attested(root, commit, codex(`MODEL: claude-opus-5-5\nTARGET: ${commit}\n\nNO FINDINGS`, "gpt-6.1-sol", home), home), "model");
   });
 });
 
 describe("preservation hardening", () => {
-  test("a same-size replacement inside an ignored directory that keeps its modification time leaves the review pending", async () => {
+  routed("a same-size replacement inside an ignored directory that keeps its modification time leaves the review pending", async () => {
     const { root, commit } = repository();
     writeFileSync(join(root, ".git/info/exclude"), "cache/\n");
     mkdirSync(join(root, "cache"));
@@ -266,7 +285,7 @@ describe("preservation hardening", () => {
     await refusedOrPending(root, review(root, commit, stub(body, ok(commit))), "changed");
   });
 
-  test("a same-size rewrite of a clean tracked file that restores its modification time leaves the review pending", async () => {
+  routed("a same-size rewrite of a clean tracked file that restores its modification time leaves the review pending", async () => {
     const { root, commit } = repository();
     // With ctime ignored, Git's stat cache sees an unchanged size and mtime and reports the file clean.
     git(root, "config", "core.trustctime", "false");
@@ -277,12 +296,12 @@ describe("preservation hardening", () => {
     await refusedOrPending(root, review(root, commit, stub(body, ok(commit))), "changed");
   });
 
-  test("a reviewer that detaches HEAD at the same commit leaves the review pending", async () => {
+  routed("a reviewer that detaches HEAD at the same commit leaves the review pending", async () => {
     const { root, commit } = repository();
     await refusedOrPending(root, review(root, commit, stub(`git -C "${root}" switch -q --detach HEAD`, ok(commit))), "changed");
   });
 
-  test("a chained committed symlink that escapes the export leaves the review pending", async () => {
+  routed("a chained committed symlink that escapes the export leaves the review pending", async () => {
     const { root, commit } = repository(dir => {
       mkdirSync(join(dir, "d"));
       symlinkSync("..", join(dir, "d", "back"));
@@ -293,7 +312,7 @@ describe("preservation hardening", () => {
 });
 
 describe("review policy comes from the reviewed commit", () => {
-  test("an uncommitted loop.yaml edit that drops a lens and an instruction file does not change the review", () => {
+  routed("an uncommitted loop.yaml edit that drops a lens and an instruction file does not change the review", () => {
     const stubDir = realpathSync(mkdtempSync(join(tmpdir(), "vh-review-policy-")));
     made.push(stubDir);
     const stubScript = join(stubDir, "reviewer.sh");
@@ -313,7 +332,7 @@ describe("review policy comes from the reviewed commit", () => {
 });
 
 describe("environment-clearing helpers", () => {
-  test("an implementation reviewer's detached helper that cleared its environment cannot write after the review", async () => {
+  routed("an implementation reviewer's detached helper that cleared its environment cannot write after the review", async () => {
     const { root, commit } = repository();
     const marker = join(root, "src/late.txt");
     const ready = join(realpathSync(mkdtempSync(join(tmpdir(), "vh-review-envclear-"))), "detached");
@@ -324,7 +343,7 @@ describe("environment-clearing helpers", () => {
     expect(existsSync(marker)).toBe(false);
   });
 
-  test("without a process boundary on the host the review stays pending", async () => {
+  routed("without a process boundary on the host the review stays pending", async () => {
     const { root, commit } = repository();
     const outcome = await runReviewRoute({ repo: root, commit, kind: "implementation", document: "docs/specs/feature.md",
       route: { model: "gpt-6.1-sol", argv: [stub("", ok(commit)), "{model}", "{prompt_file}"] }, prompt: "p", scratch: [], timeoutMs: 5_000, boundary: "unavailable" });
@@ -333,7 +352,7 @@ describe("environment-clearing helpers", () => {
 });
 
 describe("pathnames Git quotes", () => {
-  test("a reviewer rewriting an already modified file whose name Git quotes leaves the review pending", async () => {
+  routed("a reviewer rewriting an already modified file whose name Git quotes leaves the review pending", async () => {
     const { root, commit } = repository(dir => writeFileSync(join(dir, "a b.txt"), "one\n"));
     writeFileSync(join(root, "a b.txt"), "two\n");
     await refusedOrPending(root, review(root, commit, stub("echo three > 'a b.txt'", ok(commit))), "changed");
@@ -342,7 +361,7 @@ describe("pathnames Git quotes", () => {
 
 describe("private review clone", () => {
   for (const kind of ["implementation", "spec"] as const)
-    test(`another session's commit to a different branch during a ${kind} review does not leave it pending`, async () => {
+    routed(`another session's commit to a different branch during a ${kind} review does not leave it pending`, async () => {
       const { root, commit } = repository();
       const concurrent = setTimeout(() => { git(root, "branch", "other-session", commit); git(root, "tag", "other-tag", commit); }, 400);
       const outcome = await review(root, commit, stub("sleep 1.2", ok(commit)), { kind });
@@ -351,13 +370,13 @@ describe("private review clone", () => {
       expect(outcome.status).toBe("ready");
     });
 
-  test("an implementation reviewer runs in its private clone, not the owning worktree", async () => {
+  routed("an implementation reviewer runs in its private clone, not the owning worktree", async () => {
     const { root, commit } = repository();
     const script = stub(`[ "$(pwd)" != "${root}" ] || exit 6\n[ "$(git rev-parse HEAD)" = "${commit}" ] || exit 7`, ok(commit));
     expect((await review(root, commit, script)).status).toBe("ready");
   });
 
-  test("a reviewer that edits the owning worktree from its private clone leaves the review pending", async () => {
+  routed("a reviewer that edits the owning worktree from its private clone leaves the review pending", async () => {
     const { root, commit } = repository();
     await refusedOrPending(root, review(root, commit, stub(`echo changed > "${root}/src/app.txt"`, ok(commit))), "changed");
   });
@@ -373,14 +392,18 @@ describe("reply bytes", () => {
 
 // macOS has no PID namespace. The route keeps the same guarantee there by running every reviewer process
 // under a sandbox-exec profile that refuses writes to the paths the before-and-after check judges.
-const darwin = process.platform === "darwin" ? test : test.skip;
+const darwin = process.platform === "darwin" && ROUTE_BOUNDARY ? test : test.skip;
 
 /**
- * A late writer: forks a process that leaves the session, clears its environment, runs `command` after a
- * second and then writes `done`, so a test can wait for it to finish instead of guessing a delay.
+ * A late writer: forks a process that leaves the session and clears its environment. It waits for the test
+ * to create `release`, which the test does only after the route has returned, then runs `command` and
+ * writes `done`. It gives up after ten seconds without a release.
  */
-function lateWriter(command: string, done: string) {
-  return `perl -MPOSIX -e 'if (fork() == 0) { POSIX::setsid(); exec("/usr/bin/env", "-i", "/bin/sh", "-c", $ARGV[0]); }' ${JSON.stringify(`sleep 1; ${command}; echo done > ${done}`)}`;
+function lateWriter(command: string, release: string, done: string) {
+  const wait = `n=0; while [ ! -e ${release} ] && [ $n -lt 200 ]; do sleep 0.05; n=$((n+1)); done; [ -e ${release} ] || exit 0`;
+  // Double-quoted for the stub's bash, with `$`, `"`, `\` and backquotes escaped so only the writer's sh expands them.
+  const script = `${wait}; ${command}; echo done > ${done}`.replace(/["\\$`]/g, "\\$&");
+  return `perl -MPOSIX -e 'if (fork() == 0) { POSIX::setsid(); exec("/usr/bin/env", "-i", "/bin/sh", "-c", $ARGV[0]); }' "${script}"`;
 }
 /** Waits for a late writer's `done` record, up to a deadline. */
 async function finished(done: string, deadlineMs = 10_000) {
@@ -418,17 +441,19 @@ function recordFile() {
 describe("the macOS write boundary", () => {
   darwin("a detached writer that cleared its environment cannot write into the owning worktree after the review", async () => {
     const { wt, commit } = linkedWorktree();
-    const late = join(wt, "src/late.txt"), done = recordFile();
-    expect((await review(wt, commit, stub(lateWriter(`echo late > ${late}`, done), ok(commit)))).status).toBe("ready");
+    const late = join(wt, "src/late.txt"), done = recordFile(), release = recordFile();
+    expect((await review(wt, commit, stub(lateWriter(`echo late > ${late}`, release, done), ok(commit)))).status).toBe("ready");
+    writeFileSync(release, "go\n");
     await finished(done);
     expect(existsSync(late)).toBe(false);
   });
 
   darwin("a late writer cannot rename the worktree's grandparent and write through the new path", async () => {
     const { top, wt, commit } = linkedWorktree();
-    const rec = join(top, "rename-record"), late = join(wt, "src/late.txt"), done = join(top, "done");
-    const body = lateWriter(`if mv ${top}/a ${top}/ax 2>/dev/null; then echo renamed > ${rec}; echo late > ${top}/ax/b/wt/src/late.txt; mv ${top}/ax ${top}/a; else echo refused > ${rec}; fi`, done);
+    const rec = join(top, "rename-record"), late = join(wt, "src/late.txt"), done = join(top, "done"), release = join(top, "release");
+    const body = lateWriter(`if mv ${top}/a ${top}/ax 2>/dev/null; then echo renamed > ${rec}; echo late > ${top}/ax/b/wt/src/late.txt; mv ${top}/ax ${top}/a; else echo refused > ${rec}; fi`, release, done);
     expect((await review(wt, commit, stub(body, ok(commit)))).status).toBe("ready");
+    writeFileSync(release, "go\n");
     await finished(done);
     expect(readFileSync(rec, "utf8")).toBe("refused\n");
     expect(existsSync(late)).toBe(false);
@@ -436,9 +461,10 @@ describe("the macOS write boundary", () => {
 
   darwin("a late writer cannot rename the main checkout and change the linked worktree's index through it", async () => {
     const { top, main, gitDir, wt, commit } = linkedWorktree();
-    const rec = join(top, "rename-record"), index = join(gitDir, "index"), before = contentDigest(index), done = join(top, "done");
-    const body = lateWriter(`if mv ${main} ${main}x 2>/dev/null; then echo renamed > ${rec}; echo junk >> ${main}x/.git/worktrees/wt/index; mv ${main}x ${main}; else echo refused > ${rec}; fi`, done);
+    const rec = join(top, "rename-record"), index = join(gitDir, "index"), before = contentDigest(index), done = join(top, "done"), release = join(top, "release");
+    const body = lateWriter(`if mv ${main} ${main}x 2>/dev/null; then echo renamed > ${rec}; echo junk >> ${main}x/.git/worktrees/wt/index; mv ${main}x ${main}; else echo refused > ${rec}; fi`, release, done);
     expect((await review(wt, commit, stub(body, ok(commit)))).status).toBe("ready");
+    writeFileSync(release, "go\n");
     await finished(done);
     expect(readFileSync(rec, "utf8")).toBe("refused\n");
     expect(contentDigest(index)).toBe(before);
@@ -495,5 +521,69 @@ console.log(JSON.stringify(outcome));`;
     const run = Bun.spawnSync(["/usr/bin/sandbox-exec", "-p", "(version 1)(allow default)", process.execPath, "-e", script], { stdout: "pipe", stderr: "pipe" });
     const outcome = JSON.parse(run.stdout.toString().trim().split("\n").at(-1) || "{}") as ReviewOutcome;
     pending(outcome, "sandbox-exec");
+  });
+});
+
+describe("scratch directories that resolve onto protected paths", () => {
+  for (const [name, target] of [
+    ["the owning worktree's root", (root: string) => root],
+    ["the common Git directory", (root: string) => join(root, ".git/objects")],
+    ["a tracked directory of the worktree", (root: string) => join(root, "src")],
+  ] as const)
+    darwin(`a scratch symlink to ${name} leaves the review pending before the reviewer runs`, async () => {
+      const { root, commit } = repository();
+      const ran = recordFile();
+      symlinkSync(target(root), join(root, "alias"));
+      pending(await review(root, commit, stub(`echo ran > ${ran}`, ok(commit)), { scratch: ["alias"] }), "alias");
+      expect(existsSync(ran)).toBe(false);
+    });
+
+  darwin("a real scratch directory and a scratch symlink to a disjoint directory stay writable", async () => {
+    const { root, commit } = repository();
+    const outside = realpathSync(mkdtempSync(join(tmpdir(), "vh-review-shared-")));
+    made.push(outside);
+    symlinkSync(outside, join(root, "shared"));
+    const body = `echo out > "${root}/build/result.txt"; echo shared > "${root}/shared/result.txt"`;
+    expect((await review(root, commit, stub(body, ok(commit)), { scratch: ["build", "shared"] })).status).toBe("ready");
+    expect(readFileSync(join(root, "build/result.txt"), "utf8")).toBe("out\n");
+    expect(readFileSync(join(outside, "result.txt"), "utf8")).toBe("shared\n");
+  });
+});
+
+describe("the link check over the owning worktree", () => {
+  test("a file that disappears between the listing and its lstat gives a retryable result, not an error", async () => {
+    const { protectedLinkCheck } = await import("../../../plugins/vh-adlc/scripts/loop/review-route");
+    const { root } = repository();
+    const result = protectedLinkCheck(root, [], [], { afterList: dir => { if (dir === "src") rmSync(join(root, "src/app.txt")); } });
+    expect(result).toEqual({ changed: "src/app.txt" });
+  });
+
+  test("a file with a second hard link is reported by path", async () => {
+    const { protectedLinkCheck } = await import("../../../plugins/vh-adlc/scripts/loop/review-route");
+    const { root } = repository();
+    const outside = recordFile();
+    expect(Bun.spawnSync(["ln", join(root, "src/app.txt"), outside]).exitCode).toBe(0);
+    expect(protectedLinkCheck(root, [], [])).toEqual({ linked: "src/app.txt" });
+  });
+});
+
+describe("fixture Git calls", () => {
+  test("a hook's GIT_DIR and GIT_INDEX_FILE never redirect a fixture's writes", () => {
+    const outer = realpathSync(mkdtempSync(join(tmpdir(), "vh-review-outer-")));
+    made.push(outer);
+    git(outer, "init", "-q", "-b", "main");
+    writeFileSync(join(outer, "f.txt"), "outer\n");
+    git(outer, "add", "f.txt");
+    git(outer, "commit", "-q", "-m", "outer");
+    const head = git(outer, "rev-parse", "HEAD"), index = contentDigest(join(outer, ".git/index"));
+    const saved = { GIT_DIR: process.env.GIT_DIR, GIT_INDEX_FILE: process.env.GIT_INDEX_FILE };
+    process.env.GIT_DIR = join(outer, ".git");
+    process.env.GIT_INDEX_FILE = join(outer, ".git/index");
+    try { linkedWorktree(); } finally {
+      for (const [name, value] of Object.entries(saved)) if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
+    expect(git(outer, "rev-parse", "HEAD")).toBe(head);
+    expect(git(outer, "branch", "--list", "feature")).toBe("");
+    expect(contentDigest(join(outer, ".git/index"))).toBe(index);
   });
 });
