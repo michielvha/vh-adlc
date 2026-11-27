@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised for the host-route review R-12; a scoped host re-review is pending, then owner acceptance."
+status_description: "Spec review R-13 is clean; waiting for owner acceptance."
 issue: https://github.com/michielvha/vh-adlc/issues/187
 branch: feat/macos-review-boundary
 goal: "Spec and implementation reviews in this repository run on Codex from a Mac, with no owner step per review, and no reviewer process can change the owning worktree or the private clone once the review has been judged."
@@ -493,6 +493,11 @@ None.
 | 2026-11-27 | R-10 | spec | `7fd292bb` | claude-opus-5-5 | procedural | 1 blocking, 4 should-fix, 2 nits; host route, owner-directed gating pass on #187 because the convergence trigger fired twice (R-7, R-9) on Codex findings that re-raise owner decisions; Codex stays the route for every other review |
 | 2026-11-27 | R-11 | spec | `6af33856` | claude-opus-5-5 | procedural | clean: 0 blocking, 2 should-fix, 1 nit; host route, the owner-directed gating pass continued |
 | 2026-11-27 | R-12 | spec | `e531af54` | claude-opus-5-5 | procedural | 1 blocking, 1 should-fix; host route, the owner-directed gating pass continued |
+| 2026-11-27 | R-13 | spec | `8543fb32` | claude-opus-5-5 | procedural | NO FINDINGS; host route, the owner-directed gating pass |
+
+### R-13
+
+NO FINDINGS
 
 ### R-12
 
