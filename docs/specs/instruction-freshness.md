@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised for spec review R-3; waits for a new independent spec review."
+status_description: "Spec review R-4 left no blocking or should-fix finding; waits for owner acceptance."
 issue: https://github.com/michielvha/vh-adlc/issues/139
 goal: "SDD operations read the repository's listed instruction files and project procedure as they stand at the default branch tip, even from a checkout that is behind it."
 covers:
@@ -58,10 +58,11 @@ Proof is planned, not yet observed: a new test file builds a bare origin and clo
 then checks every state, the settings fallback, the offline paths and that no ref except the tracking
 ref moved. A text test checks the read rule in every skill and reference. The first spec review asked
 for five corrections and four smaller fixes, and the second for three corrections and five smaller
-fixes, mostly to make the planned tests exact. The third found that two extra pointers would have
-broken a pinned skill-body test; they are dropped, and the remaining test gaps are closed. All are
-applied here; a new review is pending. Acceptance
-authorizes implementation on a feature branch. Opening the code PR and merging need separate requests.
+fixes, mostly to make the planned tests exact. The third found that an extra pointer in the spec skill
+would have broken a pinned skill-body test. That pointer and a similar one in `references/loop.md` are
+dropped, because the read rule already decides which version operations hold, and the remaining test
+gaps are closed. The fourth found only two wording slips in this Context section, both fixed, and
+nothing in the normative sections. Acceptance authorizes implementation on a feature branch. Opening the code PR and merging need separate requests.
 
 ### Background
 
@@ -106,7 +107,8 @@ Current state:
   skills, and `tests/vh-adlc/proportional-review.test.ts:196` expects ``judged against the product
   profile and the files `bun scripts/loop/cli.ts context` lists`` in the spec skill.
   `direct-operation-compatibility.test.ts:17-27,101-108` also compares each of the seven SDD skills'
-  bodies with a pinned baseline, leaving out only `## Loop routes` and `## Issue labels`. Each of the
+  bodies with a pinned baseline, leaving out `## Loop routes` and a few other sections it checks
+  separately. Each of the
   seven skills' read-rule line sits under `## Loop routes`; the spec skill's line 164 sits under
   `## Under severity by consequence`, which is pinned. The orchestrate skill's line 24 sits under
   `## Start` and no body test pins it.
@@ -316,6 +318,7 @@ None.
 | 2026-11-27 | R-1 | spec | `5841585` | claude-opus-5-5 | procedural | 5 should-fix, 4 nits; revision follows |
 | 2026-11-27 | R-2 | spec | `5f5b05b` | claude-opus-5-5 | procedural | 3 should-fix, 5 nits; revision follows |
 | 2026-11-27 | R-3 | spec | `ed52406` | claude-opus-5-5 | procedural | 1 blocking, 1 should-fix, 1 nit; revision follows |
+| 2026-11-27 | R-4 | spec | `45cad2a` | claude-opus-5-5 | procedural | 2 nits, both in Context; applied outside the baseline |
 
 ### R-1
 
@@ -462,3 +465,19 @@ SEVERITY: nit
 WHERE: Test Plan row AC-05 (the unrelated-history case)
 EVIDENCE: The case is "a clone whose branch was reset to a root commit unrelated to origin's history". It does not say that this root commit carries `.vh-adlc/loop.yaml` and its listed files. A root commit made with `git checkout --orphan` and `git commit --allow-empty` has no settings, so `read` is `[]`. The assertion "every entry `unverified`" then holds vacuously, and the case proves only the reason and the exit code. The R-2 revision added this case.
 PROPOSAL: Say that the unrelated root commit contains the settings file and at least one listed file, so the case asserts a non-empty list of `unverified` entries.
+
+### R-4
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Background, Current state, the "Existing text tests pin the skills' wording" bullet)
+EVIDENCE: The bullet says `direct-operation-compatibility.test.ts:17-27,101-108` "compares each of the seven SDD skills' bodies with a pinned baseline, leaving out only `## Loop routes` and `## Issue labels`". The test also removes `## Documentation impact` for implement and ship (lines 60-68), `## Follow-up review after merge` for ship and resume (lines 70-78), and `## Article and promotion handoff` and `## After an authorized merge` for ship (lines 79-100). It also compares only the text from "The plugin directory is two levels" onward (line 22). The conclusion still holds: all seven read-rule lines are under `## Loop routes` (spec 29/39, tasks 18/25, implement 39/48, review 18/26, ship 42/50, investigate 40/44, resume 31/40), and spec line 164 is under the pinned `## Under severity by consequence` (line 155). The c2eff1d baseline has the same line 164. The R-3 revision added this bullet.
+PROPOSAL: Replace "leaving out only `## Loop routes` and `## Issue labels`" with "leaving out `## Loop routes` and a few other sections it checks separately".
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Owner summary, fifth paragraph, "The third found that two extra pointers would have broken a pinned skill-body test")
+EVIDENCE: R-3 F-01 named only the `skills/vh-adlc-spec/SKILL.md:164` pointer as breaking the pinned body test. The other dropped pointer, at `references/loop.md:42`, is in a file no body test pins. The tests that read loop.md (check.test.ts:312,382,388, proportional-review.test.ts:226, proportionality.test.ts:13, loop/glossary.test.ts:19) check for phrases, not a whole body. The R-3 revision added this sentence.
+PROPOSAL: Say that R-3 found the spec skill pointer would have broken a pinned skill-body test, and that both extra pointers are now dropped because the read rule already decides which version operations hold.
