@@ -518,6 +518,7 @@ readable, and that a scratch entry touching a store or its parent leaves the rev
       (`.ssh`, `.aws`, `.kube`, `.docker`, `.config/gh`, `.config/gcloud`, `.netrc`, `.git-credentials`),
       directly or by renaming a store or a directory above it, while other files there stay readable and
       Codex still runs and attests.
+      Residual: https://github.com/michielvha/vh-adlc/issues/201
 
 ## Test Plan
 
