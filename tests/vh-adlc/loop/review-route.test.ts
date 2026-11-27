@@ -549,6 +549,7 @@ describe("scratch directories that resolve onto protected paths", () => {
     ["the owning worktree's root", (root: string) => root],
     ["the common Git directory", (root: string) => join(root, ".git/objects")],
     ["a tracked directory of the worktree", (root: string) => join(root, "src")],
+    ["the filesystem root", () => "/"],
   ] as const)
     darwin(`a scratch symlink to ${name} leaves the review pending before the reviewer runs`, async () => {
       const { root, commit } = repository();
@@ -576,6 +577,25 @@ describe("the link check over the owning worktree", () => {
     const { root } = repository();
     const result = protectedLinkCheck(root, [], [], { afterList: dir => { if (dir === "src") rmSync(join(root, "src/app.txt")); } });
     expect(result).toEqual({ changed: "src/app.txt" });
+  });
+
+  test("an index that can't be read during the check gives a retryable result, not a pass", async () => {
+    const { protectedLinkCheck } = await import("../../../plugins/vh-adlc/scripts/loop/review-route");
+    const { root } = repository();
+    const locked = realpathSync(mkdtempSync(join(tmpdir(), "vh-review-locked-")));
+    made.push(locked);
+    mkdirSync(join(locked, "git"));
+    writeFileSync(join(locked, "git/index"), "index\n");
+    chmodSync(join(locked, "git"), 0o000);
+    try {
+      expect(protectedLinkCheck(root, [], [join(locked, "git/index")])).toEqual({ changed: join(locked, "git/index") });
+    } finally { chmodSync(join(locked, "git"), 0o700); }
+  });
+
+  test("a missing HEAD or index of a fresh repository is not a change", async () => {
+    const { protectedLinkCheck } = await import("../../../plugins/vh-adlc/scripts/loop/review-route");
+    const { root } = repository();
+    expect(protectedLinkCheck(root, [], [join(root, ".git/no-such-index")])).toEqual({});
   });
 
   test("a file with a second hard link is reported by path", async () => {
