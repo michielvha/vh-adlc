@@ -1,7 +1,8 @@
 ---
-status: draft
-status_description: "Draft after spec reviews R-1 to R-4; R-4 findings are recorded, not applied. On 2026-11-15 the owner moved this to its own session: apply what matters, ignore edge-case findings that only trigger re-review, keep v1 simple."
+status: in-progress
+status_description: "Implementation in progress on feat/session-retrospective; accepted at R-7 (f0f8dd4d)."
 issue: https://github.com/michielvha/vh-adlc/issues/101
+branch: feat/session-retrospective
 goal: "After an agent session, the owner gets a saved, ranked list of concrete changes to the agent's environment that would have prevented that session's mistakes and waste, each naming where it belongs and whether it has happened before."
 covers:
   - .agents/plugins/marketplace.json
@@ -19,153 +20,170 @@ covers:
   - docs/user-guides/workflows.md
   - tests/vh-adlc/retro/
   - tests/vh-adlc/check.test.ts
-  - tests/vh-adlc/maintenance/discovery.test.ts
   - tests/vh-adlc/triage/discovery.test.ts
 ---
 
 # Plan: Session retrospective
 
-A shared `vh-adlc-retro` skill reads an agent session and proposes changes to the agent's
-environment, ranked by severity, each with its evidence and the place it belongs, and keeps each
-report so later runs can see what keeps coming back.
+A shared `vh-adlc-retro` skill reviews the conversation it runs in and proposes changes to the agent's
+environment, ranked by severity, each with its evidence and the place it belongs. It saves each report
+so later runs can see what keeps coming back.
 
 ## Context
 
 ### Owner summary
 
 Lessons from agent sessions reach vh-adlc or a project only when someone remembers to write them
-down. Nothing reads a session afterwards and asks what in the environment made it go wrong or cost
-too much. The fixes are usually small: a pointer to the file the agent searched for, a lint rule for
-a mistake that reached a commit, a deleted instruction that only restates a default.
+down. The fixes are usually small: a pointer to the file the agent searched for, a lint rule for a
+mistake that reached a commit, or deleting an instruction that only restates a default.
 
-`vh-adlc-retro` reviews one session from the host it runs on, by default the current session up to
-the moment retro was asked for. Transcripts are often several megabytes and can exceed 200 MB, with
-subagent transcripts and large tool outputs in side files, so a deterministic script first reads the
-whole session and reduces it to a bounded digest. The same script removes known secret shapes from
-the transcript before the model sees it, as you chose. The model then reads the digest, the
-repository's instruction files, project procedure and check commands, and your user-level instruction
-and memory files on that host. Those files are read directly, so the report is redacted again before
-it is shown.
+You ask for a retrospective at the end of a session, and `vh-adlc-retro` reviews that same
+conversation, as you decided on 2026-11-27. It reads no transcript files. It also reads the
+repository's instruction files, project procedure and check configuration, and your user-level
+instruction and memory files. What compaction has already summarised, it sees only as the summary.
+If compaction also removed the name of a report an earlier retro run in the same conversation saved,
+that report counts as history, and its candidates can show as recurring, or as fixes that did not
+hold and rated high. Each names the report it matched. Reviewing saved or past
+sessions is #185.
 
 Candidates fall into six categories: navigation, missing deterministic checks, review standards,
-always-loaded instruction size and no-ops, tool economy, and information access. A mistake with a
-fixed, syntactic shape becomes a deterministic check, never another prose rule. A no-op is judged by
-what the instruction says, not by one session not needing it. Judgement-level standards go to the
-project procedure, and the report says plainly that this is weaker than intended, because the
-implementer reads that file too and the implementation reviewer has no standards input yet; that is
-a separate feature, as you chose.
+instruction size and no-ops, tool economy, and information access. A mistake with a fixed shape that
+a tool can detect becomes a deterministic check, even when a prose rule already forbids it. A no-op is
+judged by what the instruction says, not by one session not needing it. Judgement-level standards go
+to the project procedure. The report says this is weaker than intended, because the implementation
+reviewer reads no standards file; that is a separate feature, as you chose.
 
-Each candidate is high, medium or low. A problem seen in an earlier report from another session is
-recurring and moves up one level; a recurring problem that an existing rule already covers is a fix
-that did not hold and is always high. As you chose, this first version is kept simple: three
-severity levels instead of a longer tier list, recurrence matched by category and kind of home
-rather than exact file, and no reviewing of another host's transcripts.
+Each candidate is high, medium or low. A problem an earlier report raised moves up one level. If a
+rule already covers it, it is a fix that did not hold and is always high.
 
-Reports are saved, redacted, in a per-user folder outside every checkout, named after the repository's
-main folder so all its worktrees share it, as you asked: no remote parsing and no setting. If the
-session was in a different repository than the one retro runs in, retro asks. Its working files sit in
-a hidden folder beside the reports and are removed at the end; a killed run leaves them there, and the
-next report lists them for you to delete. The skill writes nothing else, creates no issue and makes no
-tracker or network call beyond the plugin's usual binary install and conventions fetch.
+Reports are saved, redacted, in a per-user folder outside every checkout that only you can read, one
+folder per repository, shared by all its worktrees. Moving or renaming the main checkout starts a new
+folder, so the history starts again. A small script redacts known secret shapes, checks the report's
+machine-readable block and writes the file. Nothing else is written, committed or sent, apart from
+the plugin's usual binary install and conventions fetch. On Codex the save needs write access to that
+folder. If Codex refuses it, you see the redacted report and nothing is saved.
 
-Proof is planned as script tests plus recorded runs on both hosts against fixture sessions in each
-host's format, with nine planted problems, a large session and seeded earlier reports, graded against
-a written checklist. Spec reviews R-1 and R-2 returned two blocking and twenty-eight should-fix
-findings between them, and R-3 one blocking and ten should-fix, all applied with your answers; a fresh
-review is next. Accepting authorizes
-implementation on a feature branch. Shipping needs your request.
+Proof is planned as script tests plus recorded runs on Claude Code and Codex. Each recorded run
+resumes a fixture conversation, written in that host's session format, with nine planted problems, and a subagent grades the report against a
+written checklist. These checks are planned, not run.
+
+Spec reviews R-1 to R-6 have run. The R-4 findings that only concerned transcript parsing no longer
+apply; the others, and those of R-5 and R-6, are applied. Review R-7 is next.
+Accepting authorizes implementation on a feature branch. Shipping needs your request.
 
 ### Background
 
-- vh-adlc has sixteen skills and none reads a past session to improve the environment
-  (`ls plugins/vh-adlc/skills` on `c676010`). `vh-adlc-investigate` investigates a named case and
-  `vh-adlc-audit` audits source; neither takes a transcript as input. Intake routes "Diagnosis or
-  findings" to investigate (`plugins/vh-adlc/references/lifecycle.md:55`).
-- Claude Code stores each session as `~/.claude/projects/<project>/<session-id>.jsonl`, with a sibling
-  `<session-id>/` directory holding `subagents/` (subagent transcripts) and `tool-results/` (offloaded
-  large tool outputs) (observed for `0443e578-6437-5521-b63e-27f043a5ac80`). Of 29 main transcripts in
-  one project, 2 exceed 13 MB and 2 are under 1 MB; local Codex rollouts reach 532,507,317 bytes (R-2
-  F-18, R-1 F-01). Codex CLI stores `~/.codex/sessions/YYYY/MM/DD/rollout-<timestamp>-<id>.jsonl`, and
-  the plugin already reads that log for model attestation
-  (`plugins/vh-adlc/scripts/loop/review-route.ts:164-167`).
-- Claude Code exposes `CLAUDE_CODE_SESSION_ID` and `CLAUDECODE` in a session's environment (observed
-  with `env`). Codex CLI 0.163.0 exposes `CODEX_SESSION_ID` and `CODEX_THREAD_ID`, both equal to the id
-  in the current rollout's file name (R-2 F-01, observed by the reviewer with `codex exec`). Both hosts
-  set these themselves, so a real session cannot start without them (R-3 F-11).
-- The plugin's recorded-run harness isolates hosts by relocating their configuration:
-  `CLAUDE_CONFIG_DIR` for Claude Code and `CODEX_HOME` for Codex
-  (`plugins/vh-adlc/scripts/triage/controller-clients.ts:17`, `:20`). Codex keeps user-level memory files
-  in `~/.codex/memories/` (`MEMORY.md`, `memory_summary.md`) and loads them into sessions (R-3 F-03).
-- Claude Code offloads large tool outputs to `tool-results/` and leaves a short preview in the
-  transcript, and its file reader stops at about 25,000 tokens per read (R-3 F-04, F-05).
+Harm. A lesson from a session reaches the environment only if the owner writes it down. That affects
+the owner and the few other people using vh-adlc, on most long sessions. The cost is the same waste
+or mistake repeated in later sessions. It is moderate, and it does not go away on its own. The
+simplest alternative without machinery is a prose-only skill: the owner asks for a retrospective and
+reads the answer in chat. That alternative cannot show recurrence, because nothing is kept, and it
+cannot keep secrets out of a saved file. This design adds only what those two need: a saved report
+history and a deterministic redact-and-save script. Reading transcript files, which needs a parser,
+size limits and session discovery, is left to #185.
+
+- vh-adlc has nineteen skills, and none reviews a session to improve the environment
+  (`ls plugins/vh-adlc/skills` at `3020122`). `vh-adlc-investigate` investigates a named case and
+  `vh-adlc-audit` audits source; neither takes a session as input. Intake routes "Diagnosis or
+  findings" to investigate (`plugins/vh-adlc/references/lifecycle.md:58`).
+- Claude Code and Codex CLI can resume a saved session non-interactively with a new prompt:
+  `claude --resume <session-id>` with `--print` (`claude --help`), and
+  `codex exec resume [SESSION_ID] [PROMPT]` (`codex exec resume --help`, codex-cli 0.172.0).
+  Claude Code keeps a session as `<config>/projects/<encoded path>/<id>.jsonl`, where the encoded path
+  is the real path of the working directory with every character other than an ASCII letter or digit
+  replaced by `-`. `ls ~/.claude/projects` shows
+  `-Users-michielvh-code-vh-adlc--claude-worktrees-session-retro` for this worktree and
+  `-private-var-folders-sm-8hfqw9-97pgfmhlfs2t7k66c0000gn-T-tmp-b4oI9g8ZQO-work` for a directory under
+  `$TMPDIR`, which is `/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/` and resolves to
+  `/private/var/...` (R-6 F-01). Codex CLI keeps
+  `<CODEX_HOME>/sessions/YYYY/MM/DD/rollout-<timestamp>-<id>.jsonl` (R-2 F-01).
+- The plugin writes its saved artifacts owner-only: `mode: 0o600` with exclusive creation at
+  `plugins/vh-adlc/scripts/triage/cli.ts:50`, and folders with `mode:0o700` at
+  `plugins/vh-adlc/scripts/triage/controller-recovery.ts:18`.
+- The plugin's recorded-run harness isolates hosts by relocating their configuration, `CODEX_HOME` for
+  Codex and `CLAUDE_CONFIG_DIR` for Claude Code, and passes the host only `PATH`, `HOME`, `LANG`, `TERM`
+  and `XDG_CACHE_HOME` (`plugins/vh-adlc/scripts/triage/controller-clients.ts:11`, `:18`, `:20`).
+  Codex keeps user-level memory files in `~/.codex/memories/`, among them `MEMORY.md` and
+  `memory_summary.md` (`ls ~/.codex/memories`), and loads them into sessions (R-3 F-03).
 - The loop settings declare a consumer's local rules: `project_procedure`, read by every SDD operation
   including the implementer; `instruction_files`; and `lenses`, applied only by spec reviews
   (`plugins/vh-adlc/references/loop-settings.md:40-42`). The implementation reviewer returns criterion
-  records and defects and reads no standards file (`plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md`,
-  "An implementation review"). `bun scripts/loop/cli.ts context --repo <dir>` prints the reading list
-  (`plugins/vh-adlc/references/loop-settings.md:111-112`).
-- Knowledge resolution fetches pinned pages and caches them under
-  `${XDG_CACHE_HOME:-$HOME/.cache}/vh-adlc/docs/`, and the installer fetches the locked binary
-  (`plugins/vh-adlc/references/loop.md`, "Get the binary" and "Resolve knowledge").
-- Triage saves each report under a configurable `report_dir`, leaves it uncommitted unless a commit is
-  requested, never overwrites existing output, and compares each run with its report history
-  (`plugins/vh-adlc/references/triage-settings.md:31`, `:56`; `plugins/vh-adlc/references/triage.md:136-154`).
-- `git rev-parse --path-format=absolute --git-common-dir` returns the main checkout's `.git` directory
-  from every worktree of a repository, so the folder that holds it names the repository the same way
-  from all of them.
-- The package checker has three skill classes: scheduled operations must name
-  `guides/humanize-prose.md` and contain `vh-adlc knowledge`; content operations need only valid
-  frontmatter; host operations skip knowledge (`tests/vh-adlc/check.test.ts:16-26`, `:241-246`,
-  `:249-266`, `:279-297`). Both discovery tests assert sixteen skills
-  (`tests/vh-adlc/triage/discovery.test.ts:13`, `tests/vh-adlc/maintenance/discovery.test.ts:12`), and
-  triage discovery counts eleven lifecycle skills after excluding others by name (`:22-23`).
-  `references/loop.md` names, per operation, how an unpinned repository is handled
-  (`plugins/vh-adlc/references/loop.md:63-65`). `docs/get-started/installation.md:107` says "fifteen
-  skills" and its list omits `vh-adlc-diagram` (R-3 F-12); `docs/reference/compatibility.md` lists host
-  support per operation.
+  records and defects and reads no standards file (`plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md:97`).
+  `bun scripts/loop/cli.ts context --repo <dir>` prints the reading list
+  (`plugins/vh-adlc/references/loop-settings.md:124`).
+- `git rev-parse --path-format=absolute --git-common-dir` prints the same directory from every worktree
+  of a repository. Outside the plain layout, the folder holding it does not name the repository: for a
+  worktree of a bare clone it is the bare clone's parent, and for a submodule it is `modules`. Distinct
+  repositories on one host also share base names, such as two `homebrew-tap` checkouts (R-4 F-01).
+- Codex CLI's default `workspace-write` sandbox refuses writes outside the workspace. On this Mac,
+  `codex sandbox -c sandbox_mode=workspace-write -- sh -c "mkdir '$HOME/Library/Application Support/<probe>'"`
+  failed with "Operation not permitted", and the same `mkdir` into a directory listed in
+  `-c sandbox_workspace_write.writable_roots=[...]` succeeded. R-4 F-05 observed the same refusal on
+  Linux for `~/.local/state`.
+- The package checker has four skill classes besides the entry: scheduled operations, which must name
+  `guides/humanize-prose.md` and contain `vh-adlc knowledge`; content operations, which need valid
+  frontmatter; host operations; and coordination operations (`tests/vh-adlc/check.test.ts:16-28`,
+  `:238-279`). Triage discovery asserts nineteen skills and counts eleven engineering skills after
+  excluding the content, host and coordination ones by name
+  (`tests/vh-adlc/triage/discovery.test.ts:13`, `:21-24`).
+  The same test asserts "nineteen skills" and "five content operations" in `docs/user-guides/workflows.md`
+  and "nineteen skills" in `docs/get-started/installation.md` (`tests/vh-adlc/triage/discovery.test.ts:51`,
+  `:53`), and those pages state the counts at `docs/user-guides/workflows.md:15-17` and
+  `docs/get-started/installation.md:118`. `references/loop.md` lists the operations that work unpinned
+  with the plugin pin (`plugins/vh-adlc/references/loop.md:114-115`).
 - The prior art is Matt Pocock's `retro` skill (Sources). Its categories and the mechanical-versus-
-  judgement rule are adopted; it checks steering files "in the repo OR the user's global scope" and
-  picks the cheapest guardrail for a check. Its `CODING_STANDARDS.md` home has no vh-adlc equivalent a
-  code reviewer reads, so that rule is weakened here, as the Owner summary states.
+  judgement rule are adopted; it checks steering files "in the repo OR the user's global scope". Its
+  `CODING_STANDARDS.md` home has no vh-adlc equivalent a code reviewer reads, so that rule is weakened
+  here, as the Owner summary states.
 
 ### Terminology
 
 | Term | Meaning |
 | --- | --- |
-| Session | A transcript from the host running the skill plus, on Claude Code, the side files its included turns reference, up to the turn that invoked the current retro run, without the turns of earlier retro runs (AC-08, AC-12). |
-| Digest | The bounded, redacted JSON Lines chunks the extraction script produces from a session; the only form of the transcript the model reads (AC-06, AC-08). |
+| Session | The conversation the skill runs in, as it stands in the agent's context when retro is asked for, without the turns of the current or any earlier retro run in that conversation. |
 | Candidate | One proposed environment change with key, category, severity, status, evidence, home and the exact change (AC-02). |
 | Home | Where a candidate belongs; its class is `vh-adlc` for generic process lessons, `repository` for the consumer repository, or `user` for the owner's user-level instruction or memory files (AC-03). |
 | Covering rule | Instruction text that forbids the mistake, or a check that runs automatically in a hook or CI. A configured check nothing runs is not a covering rule (AC-05). |
-| Mechanical violation | A mistake with a fixed shape a tool can detect, such as a banned API, an import form or a file location (AC-04). |
+| Mechanical violation | A mistake with a fixed shape a tool can detect, such as a banned API, an edit to a generated path or a commit-message format (AC-04). |
 | No-op instruction | An instruction that restates the host or model default, restates what a check that runs automatically already enforces, or duplicates another always-loaded instruction (AC-05). |
 | Repeated waste | Five or more tool calls toward one goal without progress: searches and reads before the target is found, or retries of the same failing command (AC-02). |
-| Recurring candidate | A candidate the skill judges to be the same problem as one in an earlier report from another session, in the same category and home class (AC-07). |
+| Recurring candidate | A candidate the skill judges to be the same problem as one in an earlier report, in the same category and home class, where that report was not saved earlier in this conversation (AC-07). |
 | Fix that did not hold | A recurring candidate that a covering rule already addresses (AC-07). |
 
 ## Scope
 
-- `plugins/vh-adlc/skills/vh-adlc-retro/SKILL.md`, a scheduled operation in the package checker's
-  phase-7 list, model-invoked so intake can route to it (owner decision).
-- `plugins/vh-adlc/scripts/retro/`, a Bun CLI with `locate`, `extract`, `history` and `save`
-  commands, and its tests.
+- `plugins/vh-adlc/skills/vh-adlc-retro/SKILL.md`, registered as a content operation, model-invoked so
+  intake can route to it (owner decision). It is a content operation because it writes a report and
+  changes no feature status, like the other content operations.
+- `plugins/vh-adlc/scripts/retro/`, a Bun CLI with `folder`, `history` and `save` commands, and its tests.
 - `plugins/vh-adlc/references/retro.md`: the report format, the history comparison and the exact
-  secret patterns, disclosed from the skill because only the extract, save and compare steps need them.
-- Intake routing in `references/lifecycle.md`, retro's unpinned behaviour in `references/loop.md`,
-  registration in the package checks and both discovery tests (seventeen skills; twelve lifecycle
-  skills in triage discovery), manifest version bumps, the skill count in
-  `docs/get-started/installation.md` (seventeen, naming `vh-adlc-diagram` and `vh-adlc-retro`), a retro row in `docs/reference/compatibility.md`, and entries in
-  `docs/reference/marketplace.md` and `docs/user-guides/workflows.md`.
-- Fixture sessions in Claude Code and Codex formats, a large-session generator for both, isolated host
-  profiles holding fixture user-level files, seeded earlier reports and a grader checklist under
-  `tests/vh-adlc/retro/`.
+  secret patterns, read from the skill when it reaches those steps.
+- Intake routing in `references/lifecycle.md` and retro in the unpinned list of `references/loop.md`.
+- Registration: `retro` in the checker's content operations and in triage discovery's exclusion list,
+  the triage discovery count at twenty skills, and the text assertions and pages moving to "twenty skills"
+  and "six content operations": `docs/user-guides/workflows.md` (count line and workflow table entry),
+  `docs/get-started/installation.md` (count and list), a retro row in `docs/reference/compatibility.md`
+  stating the Codex write-access requirement, and an entry in `docs/reference/marketplace.md`.
+  Manifest version bumps.
+- Under `tests/vh-adlc/retro/`: a fixture repository, fixture conversation templates for Claude Code
+  and for Codex with the script that installs them, isolated host profiles holding fixture user-level files, seeded earlier reports, and
+  the grader checklist.
 
-Out of scope, by name: reviewing a transcript from another host (owner decision for this version);
-applying any candidate, now or later (owner decision); creating issues; editing lessons, memory or
-instruction files; committing a report; sessions from other machines or cloud sessions; Copilot;
-reviewing several sessions in one run; scheduled runs; and a project-standards input for the
-implementation reviewer, which is a separate feature (owner decision); a report location setting;
-reading git remotes from transcripts; and cleaning up after other runs (owner decisions).
+Out of scope, by name: reviewing a saved transcript, a past session or another session, and anything
+compaction removed from the context (owner decision 2026-11-27, tracked as #185); applying any
+candidate, now or later (owner decision); creating issues; editing lessons, memory or instruction
+files; committing a report; Copilot; reviewing several sessions in one run; scheduled runs; a
+project-standards input for the implementation reviewer, which is a separate feature (owner
+decision); a report location setting; reading git remotes (owner decisions); and cleaning up after
+other runs.
+
+Not handled: a moved or renamed main checkout starts a new report folder, because the folder key is
+the checkout's common Git directory and no remote is read (R-4 F-01).
+
+Not handled: when compaction has removed the file name an earlier retro run in this conversation
+printed, that report counts as history from another session, so its candidates can show as recurring
+or as fixes that did not hold; each such candidate names the earlier report, so the owner can see
+where it came from (R-5 F-02).
 
 ## Design
 
@@ -173,7 +191,7 @@ reading git remotes from transcripts; and cleaning up after other runs (owner de
 
 The skill resolves `guides/humanize-prose.md` with `vh-adlc knowledge` through the verified binary and
 edits the report's prose with it. In a repository without a pin it works with the plugin pin, adds
-none and reports the missing pin; `references/loop.md` gains retro in the list with investigate.
+none and reports the missing pin; `references/loop.md` lists retro with investigate.
 
 Intake routes to retro a request for a retrospective, or for changes to the agent's instructions,
 checks or tools, after or about a session. It routes to investigate a request about a defect in the
@@ -182,67 +200,29 @@ as "what went wrong in this session?", makes the agent ask which is meant.
 
 ### Session and report folder
 
-The owner names a session by transcript path, or by session id. With neither, the skill reviews the
-current session: on Claude Code from `CLAUDE_CODE_SESSION_ID`, on Codex CLI from `CODEX_SESSION_ID` or
-`CODEX_THREAD_ID`. When none is set, it asks the owner to name the session and never picks the newest
-file. The variable it found also tells it the running host, which it passes to the script as
-`--host claude` or `--host codex`. A session id is looked up as `<config>/projects/*/<id>.jsonl` on
-Claude Code, where `<config>` is `CLAUDE_CONFIG_DIR` or `~/.claude`, and as
-`<CODEX_HOME>/sessions/*/*/*/rollout-*-<id>.jsonl` on Codex CLI, where `CODEX_HOME` defaults to
-`~/.codex`. A transcript in the other host's format ends the run with that reason and no report.
+The session is always the current conversation. The skill ignores the turns of the current retro run
+and of any earlier retro run in the conversation, and notes the file name each earlier run's `save`
+printed.
 
-The repository is the one the skill runs in. When the transcript's recorded working directory is not
-inside it, or no longer exists, the skill asks the owner whether to continue with this repository.
-Reports go to `${XDG_STATE_HOME:-$HOME/.local/state}/vh-adlc/retro/<name>/` on Linux and
-`$HOME/Library/Application Support/vh-adlc/retro/<name>/` on macOS, where `<name>` is the name of the
-folder holding the directory `git rev-parse --path-format=absolute --git-common-dir` prints: the main
-checkout's folder, the same from every worktree. `scripts/retro/cli.ts locate --transcript <file>`
-prints that folder, or the ask outcome when the working directory is outside the repository or gone.
-Every report names its folder. An absent folder is a first run.
-
-### Extraction and redaction
-
-`extract --transcript <file> --host <claude|codex> --output <dir>` streams the session line by line.
-
-Boundaries. A retro run starts at a Skill tool call naming `vh-adlc-retro` or a user message invoking
-`/vh-adlc-retro` on Claude Code, and at a command that reads `vh-adlc-retro/SKILL.md` on Codex CLI. It
-ends at its `save` command, or, when it has none because it was interrupted, at the next user message.
-The script stops at the start of the current run (the last start marker without an end) and skips
-every earlier run. On Claude Code it includes a file from `subagents/` or `tool-results/` only when an
-included turn references it.
-
-Redaction. For every string the script first redacts, then cuts. The exact patterns live in one place,
-`references/retro.md`, which both the redactor and the AC-06 check read. They cover PEM private key
-blocks; `Authorization`, `Proxy-Authorization`, `Cookie` and `Set-Cookie` header values; `Bearer`
-tokens; AWS access key IDs (`AKIA` or `ASIA` plus exactly 16 uppercase letters or digits); GitHub tokens
-(`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_` or `github_pat_` plus at least 20 token characters); Slack tokens
-(`xox[abposr]-` plus token characters); `sk-` keys of at least 20 token characters starting at a word
-boundary; JSON Web Tokens (three dot-separated base64url segments, the first starting `eyJ`); credentials
-in URLs (`scheme://user:pass@`); and the value assigned to any key whose name contains,
-case-insensitively, `password`, `passwd`, `secret`, `token`, `api_key`, `apikey`, `private_key` or
-`credential`, in `key=value`, `key: value` and JSON forms, such as `DB_PASSWORD=`, `GITHUB_TOKEN=` and
-`STACKWEAVER_HOSTED_SECRET=`. Each match becomes `<REDACTED>`.
-
-The digest is a set of numbered JSON Lines files in the output directory, each at most 20,000
-characters, which the skill reads in full and in order. It holds:
-
-- one entry per message and tool call, with source file and line, role, tool name, the tool input and
-  output each cut to 600 characters, the full output size in bytes and an error flag;
-- aggregates, each capped at 50 entries with a recorded overflow count: tool calls by name, the
-  largest outputs with their sizes, repeated failing commands, and the reads and searches before the
-  first edit of each file;
-- when the digest would exceed 500,000 characters in total, middle entries are dropped and replaced by a
-  count; the digest never exceeds that size and records what was dropped.
-
-A transcript the script cannot parse ends the run with that reason, no candidates and no report.
+The repository is the one the skill runs in. `scripts/retro/cli.ts folder --repo <dir>` prints the
+report folder: `<root>/vh-adlc/retro/<name>-<hash>/`, where `<root>` is `$XDG_STATE_HOME` when set,
+otherwise `$HOME/.local/state` on Linux and `$HOME/Library/Application Support` on macOS. `<hash>` is
+the first 12 hex characters of the SHA-256 of the absolute path that
+`git rev-parse --path-format=absolute --git-common-dir` prints, so every worktree of one repository
+gets the same folder and two repositories never share one. `<name>` is only for reading: the name of
+the folder holding that directory when the directory is named `.git`, otherwise the directory's own
+name without a trailing `.git`. Every report names its folder. An absent folder is a first run.
 
 ### Analysis
 
-The model reads the digest; the files `bun scripts/loop/cli.ts context --repo <dir>` lists, or the root
-instruction files without loop settings; the repository's build files, package scripts, pre-commit hooks
-and CI workflows; the lessons file the project procedure names, if any; and, read-only, the running
-host's user-level files: `<config>/CLAUDE.md` and the project's auto-memory index and the notes it links
-on Claude Code, and `<CODEX_HOME>/AGENTS.md` and the files in `<CODEX_HOME>/memories/` on Codex CLI.
+The model reviews the session in its context. It reads the files
+`bun scripts/loop/cli.ts context --repo <dir>` lists, or the root instruction files when there are no
+loop settings, and the always-loaded user-level instruction and memory index files in full. They are
+`<config>/CLAUDE.md` and the project's auto-memory index on Claude Code, and `<CODEX_HOME>/AGENTS.md`,
+`<CODEX_HOME>/memories/MEMORY.md` and `<CODEX_HOME>/memories/memory_summary.md` on Codex CLI. It searches the repository's build files, package scripts,
+hooks and CI workflows, the lessons file the project procedure names, and the other memory notes for
+each candidate's subject, rather than reading them whole. It reads every file it cites, to give the
+line.
 
 | Category | Trigger | Typical change |
 | --- | --- | --- |
@@ -253,60 +233,90 @@ on Claude Code, and `<CODEX_HOME>/AGENTS.md` and the files in `<CODEX_HOME>/memo
 | Tool economy | A tool call whose output or cost was far larger than its use | A narrower command, script or flag |
 | Information access | A fact the agent needed and could not reach | Access to a log, a read-only tool or a documented location |
 
-A mechanical violation is always proposed as a deterministic check, never as a prose or review rule:
-in the pre-commit hook when the mistake reached a commit, otherwise in the earliest guardrail that
-already exists, adding a pre-commit hook where none does. An instruction is never flagged only because
-the session did not exercise it. Before proposing a candidate, the skill searches every file it read
-for a covering rule; a covered candidate cites that rule's location, says why it did not hold, and
-proposes no duplicate.
+A mechanical violation is always proposed as a deterministic check in the repository where it
+happened, never as a prose or review rule, even when a prose rule already covers it; the report then
+cites that rule as the one that did not hold. The check goes in the pre-commit hook when the mistake
+reached a commit, a commit-message check in the commit-msg hook, and otherwise in the earliest
+guardrail that already exists, adding the hook where none does. An instruction is never flagged only
+because the session did not exercise it. Before proposing a candidate, the skill searches every file
+it read for a covering rule; a covered candidate cites that rule's location, says why it did not hold,
+and proposes no duplicate rule.
 
 ### Severity and order
 
 Base severity: high for a mistake that reached a commit, a review or the owner; medium for a mistake
 caught before commit, or repeated waste; low for any other waste, a no-op instruction or instruction
 size. A navigation or information-access candidate with no resulting mistake is medium when it is
-repeated waste and low otherwise. Then the status is set, in this order: a recurring candidate with a covering rule
-is `fix-not-held` and high; any other recurring candidate is `recurring` and moves up one level, high
-staying high; a covered candidate that is not recurring is `covered` and keeps its base severity;
-every other candidate is `new`.
+repeated waste and low otherwise. Then the status is set, in this order: a recurring candidate with a
+covering rule is `fix-not-held` and high; any other recurring candidate is `recurring` and moves up one
+level, high staying high; a covered candidate that is not recurring is `covered` and keeps its base
+severity; every other candidate is `new`.
 
 Candidates are ordered by severity, then by status (`fix-not-held`, `recurring`, `new`, `covered`),
-then by their first evidence line in the session; candidates whose evidence lies only in repository or
-user-level files follow those with session evidence in the same group, ordered by file path and line.
+then by where their first evidence occurs in the session. Candidates whose evidence lies only in
+repository or user-level files follow those with session evidence in the same group, ordered by file
+path and line.
 
 ### History
 
-`history --dir <dir> --session <id>` reads every earlier report: files ending in `.md` whose names do
-not start with `.`. Each report ends with a fenced `retro-report` YAML block: `format: 1`, repository
-folder name, host, session id, run id, time, and per candidate its key, category (`navigation`,
+`history --dir <dir> [--exclude <file name>]...` reads every earlier report: files ending in `.md`
+whose names do not start with `.`. Each report ends with a fenced `retro-report` YAML block:
+`format: 1` and a `candidates` list giving, per candidate, its key, category (`navigation`,
 `deterministic-checks`, `review-standards`, `instructions`, `tool-economy` or `information-access`),
-home, home class (`vh-adlc`, `repository` or `user`), severity,
-status (`new`, `recurring`, `fix-not-held` or `covered`), `recurs` (earlier keys, possibly empty) and a
-one-line summary. The key is `<category>:<home class>:<kebab-case slug>`. The skill compares a new
-candidate with earlier candidates of the same category and home class; when it judges one to be the
-same problem, it records that key under `recurs` and adopts its slug. Reports with the current session
-id are excluded and listed as previous runs of this session. A report whose `format` is newer than the
-version understands, or whose block does not parse, is skipped and listed by name.
+home, home class (`vh-adlc`, `repository` or `user`), severity (`high`, `medium` or `low`), status
+(`new`, `recurring`, `fix-not-held` or `covered`), `recurs` (the file names of the earlier reports it
+matched, possibly empty) and a one-line summary. The key is `<category>:<home class>:<kebab-case slug>`. The skill passes the file names of
+reports saved earlier in this conversation as `--exclude`; `history` lists them as earlier runs of
+this session and returns no candidates from them. It returns every other candidate with the file
+name of its report. A report whose `format` is newer than 1, or whose
+block does not parse, is skipped and listed by name.
+
+The skill compares each new candidate with the returned candidates of the same category and home
+class. When it judges one to be the same problem, it records that report's file name under `recurs`
+and adopts its slug.
 
 ### Report and save
 
-Per candidate the report gives severity, status, category, evidence (digest source lines with a short
-quote, or a file and line for file-only evidence), home, the exact change, its history, and for a
-review-standards candidate the weakness above. The skill passes the report to `save --dir <dir>
---report <file>`, which redacts it with the same rules, writes it to `.work/<run id>/report.tmp` in the
-report folder, links it to `<UTC time to the second>-<host>-<session id>-<6 random hex>.md` only if that
-name is free, and removes the temporary file. The skill then shows the saved file, not its own draft.
-Nothing is committed.
+Per candidate the report gives severity, status, category, evidence (a short quote with the tool call
+or message it came from, or a file and line for file-only evidence), home, the exact change, its
+history (the earlier report files under `recurs`), and for a review-standards candidate the weakness above. With no earlier report, the report
+says it is a first run.
+
+The skill pipes the report to `save --dir <dir>` on standard input. `save` redacts it, then parses
+its `retro-report` block and refuses with a reason, writing nothing, unless the block is a valid
+`format: 1` block with every field and only the tokens listed above; the skill then corrects its draft
+and saves again. Otherwise `save` creates any missing report folders with mode 0700, writes
+the report to `.<random>.tmp` in the folder, created exclusively with mode 0600, links that file to `<UTC time to the second>-<6 random hex>.md` only if the name
+is free (choosing new hex otherwise), removes the temporary file and prints the saved name and its
+redacted text. The skill shows that text, not its own draft. When `save` cannot write, it prints the
+reason and the redacted report, and the skill shows both and says the report was not saved.
+
+Redaction. The exact patterns live in one place, `references/retro.md`, which both `save` and the
+AC-06 check read. They cover PEM private key blocks; `Authorization`, `Proxy-Authorization`, `Cookie`
+and `Set-Cookie` header values; `Bearer` tokens; AWS access key IDs (`AKIA` or `ASIA` plus exactly 16
+uppercase letters or digits); GitHub tokens (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_` or `github_pat_`
+plus at least 20 token characters); Slack tokens (`xox[abposr]-` plus token characters); `sk-` keys of
+at least 20 token characters starting at a word boundary; JSON Web Tokens (three dot-separated
+base64url segments, the first starting `eyJ`); credentials in URLs (`scheme://user:pass@`); and the
+value assigned to any key whose name contains, case-insensitively, `password`, `passwd`, `secret`,
+`token`, `api_key`, `apikey`, `private_key` or `credential`, in `key=value`, `key: value` and JSON
+forms, such as `DB_PASSWORD=`, `GITHUB_TOKEN=` and `STACKWEAVER_HOSTED_SECRET=`. Each match becomes
+`<REDACTED>`. No pattern treats the marker `<REDACTED>` itself as a secret value, so redacting a
+redacted report changes nothing.
 
 ### Effects and failure
 
-Each run works in `.work/<run id>/` inside the report folder: the digest chunks and the temporary report
-live there, and the folder is removed when the run ends. A killed run leaves its work folder; nothing
-cleans up after other runs, `history` ignores dot-named entries, and each report lists any leftover work
-folders so the owner can delete them. Apart from the plugin's binary install and knowledge fetch, with
-their cache writes, there is no other file write, Git change, or tracker or network call by the skill
-or its script. The digest and the files the model reads go to the host's model provider. Concurrent runs
-use different run ids and report names, and each compares only reports that existed when it started.
+The only file the skill or its script writes is the report, through its temporary file in the report
+folder. A run killed during `save` can leave a dot-named temporary file, which `history` ignores and
+nothing removes. Apart from the plugin's binary install and knowledge fetch, with their cache writes,
+there is no other file write, Git change, or tracker or network call. Concurrent runs choose different
+names and never overwrite a report.
+
+On Codex CLI under the default `workspace-write` sandbox, `save` needs write access to the report
+folder: the owner approves the command when Codex asks, or adds the report root to
+`sandbox_workspace_write.writable_roots`. When the write is refused, the run ends with the redacted
+report shown and nothing saved, as above. The compatibility row states this.
+
 Rollback is reverting the plugin version; a rolled-back version skips reports in a newer format.
 
 ## Acceptance Criteria
@@ -314,81 +324,104 @@ Rollback is reverting the plugin version; a rolled-back version skips reports in
 - [ ] AC-01: `vh-adlc-retro` is discovered on Claude Code CLI and Codex CLI from the source-distributed
       plugin; a retrospective request without an operation name reaches it through intake, and "what
       went wrong in this session?" makes the agent ask whether a retrospective or an investigation is meant.
-- [ ] AC-02: On the small fixture session in the running host's format, the first report lists a
+- [ ] AC-02: Run on the small fixture conversation on the running host, the first report lists a
       candidate for each planted problem P1 to P5 and P7 to P9, each with key, category, severity,
       status, evidence, home and change, in the first-run order below; P6 is not listed, and other
       candidates may appear anywhere.
 - [ ] AC-03: Each planted problem's candidate names the home class the fixture table gives.
-- [ ] AC-04: P1 is proposed as the lint check wired into a new pre-commit hook, not as a prose or
-      review rule.
+- [ ] AC-04: P1 and P2 are each proposed as a check in a new pre-commit hook (P1 running the configured
+      lint rule), not as a prose or review rule.
 - [ ] AC-05: P2 is reported as covered with the forbidding `AGENTS.md` line, P9 as covered with the
-      forbidding line of the fixture user-level file, P5 as a no-op instruction, and P6 is not flagged.
-- [ ] AC-06: None of the planted secrets, and no string matching a pattern in `references/retro.md`,
-      appears in the digest or the saved and shown report, including a secret planted in a fixture
-      user-level memory file the running host reads; after the run the fixture repository and trackers
-      are unchanged, and the report folder differs only by the new report, with no work folder of that run.
-- [ ] AC-07: A second run on the small fixture with seeded earlier reports marks P2 `fix-not-held` and
-      P3 `recurring`, both high, citing the seeded report, in the second-run order below; P4 and P5, also
-      raised by a seeded report from the same session and by a `format: 2` report, stay low and `new`;
-      both of those reports are listed by name; with no earlier report the run states it is a first run.
-- [ ] AC-08: On the large fixture session in the running host's format (over 13 MB; on Claude Code with
-      `subagents/` and `tool-results/`), the run completes, the digest is at most 500,000 characters, and
-      the report includes P4, whose content lives only in `tool-results/` on Claude Code and in the
-      digest's last chunk.
-- [ ] AC-09: With no session named, a run reviews its own session even when a newer session of the same
-      project exists, on both hosts; with no session variable set, session selection asks the owner.
-- [ ] AC-10: An unparseable transcript and a transcript in the other host's format each end the run with
-      the reason, no candidates and no report.
-- [ ] AC-11: Two worktrees of one repository resolve to the same report folder, and a transcript whose
-      working directory is outside the repository, or gone, makes the skill ask before continuing.
-- [ ] AC-12: The digest contains no turn from the current retro run or from an earlier completed or
-      interrupted retro run, and no side file referenced only from those turns.
+      forbidding line of the fixture user-level instruction file, P5 as a no-op instruction, and P6 is
+      not flagged.
+- [ ] AC-06: None of the planted secrets, and no string matching a pattern in `references/retro.md`
+      other than the `<REDACTED>` marker, appears in the saved or shown report, including a secret
+      from the fixture user-level memory file that the planted conversation quotes. After the run the
+      fixture repository and trackers are unchanged, and the report folder differs only by the new
+      report, which, like the folders `save` created, only its owner can read.
+- [ ] AC-07: A second run with seeded earlier reports marks P2 `fix-not-held` and P3 `recurring`, both
+      high, citing the seeded report, in the second-run order below; P4 and P5, also raised by a report
+      saved earlier in the same conversation and by a `format: 2` report, stay low and `new`, and both
+      of those reports are listed by name; with no earlier report the run states it is a first run.
+- [ ] AC-08: `save` refuses, writing nothing, a report whose `retro-report` block `history` would skip
+      or that lacks a field or uses an unlisted token, and every report `save` writes is read back by
+      `history` with its candidates.
+- [ ] AC-09: Two worktrees of one repository resolve to the same report folder, and so does a worktree
+      of a bare clone with its other worktrees; two repositories whose main folders share a name
+      resolve to different folders.
 
 ### Fixture table
 
 The fixture repository has a lint configuration with the rule P1 breaks, a CI workflow that does not
-run the lint, no pre-commit hook, and a project procedure file. Each recorded run uses an isolated host
-profile (`CLAUDE_CONFIG_DIR` or `CODEX_HOME`) holding the fixture user-level instruction and memory files. Its session plants the problems in this
-order of first evidence: P3, P1, P8, P9, P2, P7, P4. P5 and P6 live only in `AGENTS.md`.
+run the lint, no pre-commit or commit-msg hook, a project procedure file, `AGENTS.md`, the settings
+file P3 searches for, the generated file P2's edit targets, and the helper P7 duplicates.
+
+Each fixture conversation is a JSON Lines template in its host's session format, started from a short
+real session recorded on that host and edited to plant the problems, with placeholders for the
+fixture repository path and the session id. Before each recorded run, the install script copies the
+fixture repository to a fresh directory and makes it a Git repository whose working tree and commits
+match the conversation: P1's banned call and P7's duplicate helper committed at the lines the
+conversation shows, and P2's generated file present and unedited. It fills the placeholders with the
+copy's real path and a new id, and writes the result where the host looks for it: under
+`<CLAUDE_CONFIG_DIR>/projects/<encoded path>/`, computed from that real path as Background states, or
+under `<CODEX_HOME>/sessions/YYYY/MM/DD/`. The run then resumes that id. Each recorded run
+uses an isolated host profile (`CLAUDE_CONFIG_DIR` or `CODEX_HOME`)
+holding the fixture user-level instruction and memory files, with a fresh, empty `XDG_STATE_HOME`
+seeded only with the stated reports for the second run. The conversation plants the problems in
+this order of first evidence: P3, P1, P8, P9, P2, P7, P4. P5 and P6 live only in `AGENTS.md`.
 
 | Problem | Planted as | First run | Second run | Home class |
 | --- | --- | --- | --- | --- |
 | P1 Mechanical violation | A banned API call the configured lint rule flags, committed | high, new | high, new | Consumer repository |
-| P2 Covered mistake | An edit to a generated file that `AGENTS.md` forbids, caught before commit | medium, covered | high, fix-not-held | Consumer repository |
+| P2 Covered mechanical violation | An edit to a generated file that `AGENTS.md` forbids, caught before commit | medium, covered | high, fix-not-held | Consumer repository |
 | P3 Navigation detour | Twenty searches and reads before finding the settings file (repeated waste) | medium, new | high, recurring | Consumer repository |
-| P4 Oversized output | A vh-adlc plugin script printing a multi-megabyte result that was barely used | low, new | low, new | vh-adlc |
+| P4 Oversized output | A vh-adlc plugin script printing a multi-megabyte result that was barely used, recorded exactly as the host records an oversized result, with its size visible and never the full output inline | low, new | low, new | vh-adlc |
 | P5 No-op instruction | "Save files as UTF-8" in `AGENTS.md`, which restates the host default | low, new | low, new | Consumer repository |
 | P6 Unexercised rule | "Never run migrations against production" in `AGENTS.md` | not listed | not listed | none |
 | P7 Review standard | A committed duplicate of an existing helper that the review step passed | high, new, with the weakness note | high, new | Consumer repository (project procedure) |
 | P8 Information access | One failed attempt to read the dev server log, after which the agent asked the owner | low, new | low, new | Consumer repository |
-| P9 Covered by user-level rule | A commit message with a character the fixture user-level instruction file forbids, caught before commit | medium, covered | medium, covered | User-level files |
+| P9 Covered by user-level rule | A drafted commit message claiming tests pass before they ran, which the fixture user-level instruction file forbids; the agent ran them before committing | medium, covered | medium, covered | User-level files |
 
 First-run order: P1, P7, P3, P9, P2, P8, P4, P5. Second-run order: P2, P3, P1, P7, P9, P8, P4, P5. The
-seeded reports are: one from another session raising P2 and P3; one from the current session id
-raising P4 and P5; one in `format: 2` raising P4 and P5. The fixture user-level memory file holds one
-planted secret. In the large fixture, P4's only evidence falls in the digest's last chunk.
+second run resumes a variant of the conversation that ends with an earlier, completed retro run whose
+`save` output names one seeded report. The seeded reports are: one from another session raising P2
+and P3; the one that earlier run saved, raising P4 and P5; and one in `format: 2` raising P4 and P5.
+The fixture user-level memory file holds one planted secret, which the conversation quotes.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | `bun test tests/vh-adlc` (scheduled-operation checks, discovery counts of seventeen skills and twelve lifecycle skills, loop.md and lifecycle.md entries). Recorded runs per host: invoking `vh-adlc-retro` by name, pass when the skill loads; "run a retrospective on this session", pass when intake selects `vh-adlc-retro`; "what went wrong in this session?", pass when the agent asks whether a retrospective or an investigation is meant and runs neither. |
-| AC-02, AC-03, AC-04, AC-05 | A recorded first run per host on the small fixture in that host's format under `tests/vh-adlc/retro/`. A fresh read-only subagent on the same host grades the saved report against `tests/vh-adlc/retro/checklist.md`, one item per fixture row and criterion (fields present, severity and status, relative order of planted candidates, home class, P1 as a new pre-commit hook running the lint, P2 and P9 covered with their lines, P5 flagged, P6 absent, P7 with the weakness note), and returns `ITEM <id>: PASS` or `ITEM <id>: FAIL <evidence>` per item; pass when every item passes. |
-| AC-06 | `bun test tests/vh-adlc/retro` runs redaction over a fixture holding one example of every listed shape and key form, including `DB_PASSWORD=`, `GITHUB_TOKEN=` and `STACKWEAVER_HOSTED_SECRET=` and a PEM block longer than 600 characters, which must all be redacted, and near-misses that must survive (the word `secretary` in prose, a lone `sk`, a 15-character `AKIA` string). Must also survive: `task-list`, `risk-free`, `disk-usage`. In the recorded runs: search the digest and the saved report with the patterns from `references/retro.md` and for each planted secret, the memory-file secret included (must find none); compare `git status --porcelain` and file hash lists of the fixture repository and the report folder before and after (must differ only by the one report, with no `.work/<run id>/` left); the run log shows no tracker or network command other than the binary install and knowledge fetch. Host-owned temporary files are outside the comparison. |
-| AC-07 | A recorded second run per host on the small fixture with the three seeded reports, graded by the checklist's second-run items (P2 and P3 status, severity and `recurs` citing the seeded key, order, P4 and P5 low and `new`, both skipped or excluded reports listed). `bun test tests/vh-adlc/retro` covers `history` exclusion of the current session, skipping of newer and malformed blocks, ignoring dot-named files, and the first-run statement. |
-| AC-08 | A recorded run per host on the large fixture in that host's format, built by the generator over 13 MB (on Claude Code with `subagents/` and `tool-results/`, P4's content only in `tool-results/`); pass when the run completes, the digest is at most 500,000 characters, the run log shows every chunk read, and the checklist's P4 item passes. `bun test tests/vh-adlc/retro` checks redaction before the 600-character cut, the 50-entry aggregate caps with overflow counts on a generated session with 5,000 edited files, the size limit, side-file inclusion and the Codex rollout parser. |
-| AC-09 | A recorded run per host with no session named while a second, newer session exists in the same fixture project; pass when the report's session id equals the run's `CLAUDE_CODE_SESSION_ID` or `CODEX_SESSION_ID`. `bun test tests/vh-adlc/retro` runs session selection with none of the variables set and checks that it returns the ask outcome. |
-| AC-10 | `bun test tests/vh-adlc/retro`: `extract` on a malformed file, and with `--host codex` on a Claude Code file and the reverse, reports the reason; none leaves a report. |
-| AC-11 | `bun test tests/vh-adlc/retro`: `locate` from two worktrees of a temporary repository returns one folder; a transcript whose working directory is outside the repository or removed returns the ask outcome. |
-| AC-12 | `bun test tests/vh-adlc/retro`: on a fixture per host holding one completed and one interrupted earlier retro run and a current run, the digest holds no entry from any of the three and no side file referenced only from them, and keeps the turns between them. |
+| AC-01 | `bun test tests/vh-adlc` (content-operation checks, discovery counts of twenty skills and eleven engineering skills, the count text in `workflows.md` and `installation.md`, loop.md and lifecycle.md entries). Recorded runs per host: invoking `vh-adlc-retro` by name, pass when the skill loads; "run a retrospective on this session", pass when intake selects `vh-adlc-retro`; "what went wrong in this session?", pass when the agent asks whether a retrospective or an investigation is meant and runs neither. |
+| AC-02, AC-03, AC-04, AC-05 | A recorded first run per host, resuming the small fixture conversation with the retro request (`claude --print --resume` or `codex exec resume`, Codex in the default `workspace-write` sandbox with the fixture `XDG_STATE_HOME` as a writable root). A fresh read-only subagent on the same host grades the saved report against `tests/vh-adlc/retro/checklist.md`, one item per fixture row and criterion (fields present, severity and status, relative order of planted candidates, home class, P1 and P2 as checks in a new pre-commit hook with P1 running the lint, P2 and P9 covered with their lines, P5 flagged, P6 absent, P7 with the weakness note), and returns `ITEM <id>: PASS` or `ITEM <id>: FAIL <evidence>` per item; pass when every item passes. |
+| AC-06 | `bun test tests/vh-adlc/retro` runs `save` over a report holding one example of every listed shape and key form, including `DB_PASSWORD=`, `GITHUB_TOKEN=`, `STACKWEAVER_HOSTED_SECRET=` and a multi-line PEM block, which must all be redacted, and near-misses that must survive: the word `secretary` in prose, a lone `sk`, a 15-character `AKIA` string, `task-list`, `risk-free`, `disk-usage`, `DB_PASSWORD=<REDACTED>` and `Bearer <REDACTED>`; saving the saved text again must leave it unchanged; with umask 022, the folders `save` creates have mode 0700 and the report mode 0600. In the recorded runs: search the saved report and the shown text with the patterns from `references/retro.md` and for each planted secret, the memory-file secret included (must find none other than the marker); compare `git status --porcelain` and file hash lists of the fixture repository and the report folder before and after (must differ only by the one report); the run log shows no tracker or network command other than the binary install and knowledge fetch. Host-owned files are outside the comparison. |
+| AC-07 | A recorded second run per host on the variant conversation with the three seeded reports, graded by the checklist's second-run items (P2 and P3 status, severity and `recurs` naming the seeded report's file, also named in the report text, order, P4 and P5 low and `new`, the excluded and the skipped report listed). `bun test tests/vh-adlc/retro` covers `history` with `--exclude`, skipping newer and malformed blocks, ignoring dot-named files, and an empty folder. |
+| AC-08 | `bun test tests/vh-adlc/retro`: `save` on reports with an unparseable block, a `format: 2` block, a missing field and an unlisted category token refuses with a reason and leaves the folder unchanged; a valid report saved by `save` is returned by `history` with every candidate. |
+| AC-09 | `bun test tests/vh-adlc/retro`: `folder` from two worktrees of a temporary repository returns one folder; from a worktree of a bare clone and a second worktree of it, one folder; from two temporary repositories whose main folders share a name, two different folders. |
 
 ## Tasks
 
-None yet; written once the document is planned.
+- [ ] T1 `tests/vh-adlc/retro/folder.test.ts` - `folder` from two worktrees, from a bare clone's two worktrees and from two same-named repositories; fails because `scripts/retro/cli.ts` does not exist (AC-09)
+- [ ] T2 `plugins/vh-adlc/scripts/retro/cli.ts`, `plugins/vh-adlc/scripts/retro/folder.ts` - the `folder` command with the state root, name and common-directory hash; T1 passes (AC-09)
+- [ ] T3 `tests/vh-adlc/retro/save.test.ts` - redaction of every listed shape and key form, the near-misses and the marker surviving, saving twice leaving the text unchanged, folder 0700 and report 0600 under umask 022, refusal of an unparseable, `format: 2`, missing-field or unlisted-token block with the folder unchanged; fails because `save` does not exist (AC-06, AC-08)
+- [ ] T4 `plugins/vh-adlc/references/retro.md`, `plugins/vh-adlc/scripts/retro/` - the report format and secret patterns, and `save` (redact, validate, exclusive temporary file, link to a free name, print the name and text, print the redacted report when it cannot write); T3 passes (AC-06, AC-08)
+- [ ] T5 `tests/vh-adlc/retro/history.test.ts` - `--exclude` listing and dropping same-conversation reports, skipping newer and malformed blocks by name, ignoring dot-named files, an empty or absent folder, each candidate returned with its report's file name, and a report written by `save` read back with every candidate; fails because `history` does not exist (AC-07, AC-08)
+- [ ] T6 `plugins/vh-adlc/scripts/retro/` - the `history` command; T5 passes (AC-07, AC-08)
+- [ ] T7 `tests/vh-adlc/check.test.ts`, `tests/vh-adlc/triage/discovery.test.ts` - `retro` as a content operation, in triage discovery's exclusion list, twenty skills, and "twenty skills" and "six content operations" in the guides; fails because the skill and the page changes do not exist (AC-01)
+- [ ] T8 `plugins/vh-adlc/skills/vh-adlc-retro/SKILL.md`, `plugins/vh-adlc/references/lifecycle.md`, `plugins/vh-adlc/references/loop.md`, `docs/get-started/installation.md`, `docs/user-guides/workflows.md`, `docs/reference/compatibility.md`, `docs/reference/marketplace.md`, `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json`, `.agents/plugins/marketplace.json`, `.claude-plugin/marketplace.json` - the skill, intake row, unpinned entry, pages, Codex write-access row and version bumps; T7 and `bun test tests/vh-adlc` pass (AC-01)
+- [ ] T9 `tests/vh-adlc/retro/install.test.ts` - installing each host's fixture makes a Git repository whose commits and files match the conversation, and writes the filled session where that host looks for it, the Claude Code folder encoded from the copy's real path; fails because the fixtures and install script do not exist (AC-02, AC-07)
+- [ ] T10 `tests/vh-adlc/retro/` - the fixture repository, first-run and second-run conversation templates for both hosts started from real recorded sessions, isolated profiles with the user-level files and planted secret, seeded reports, the install script and `checklist.md`; T9 passes (AC-02, AC-03, AC-04, AC-05, AC-06, AC-07)
+- [ ] T11 `tests/vh-adlc/retro/runs/` - recorded runs on Claude Code and Codex: the three intake prompts, the first run and the second run, each graded by a fresh read-only subagent against `checklist.md`, with the AC-06 searches and before-and-after comparisons; every item passes on both hosts (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07)
 
 ## Open Questions
 
 None.
+
+## Deferred
+
+- D-01: Reviewing saved transcripts, past sessions and other sessions, tracked as #185. From: owner cut on 2026-11-27. Verdict: pending.
+- D-02: Keeping report history when the main checkout moves or is renamed. From: R-4 F-01, stated limit. Verdict: pending.
+- D-03: Excluding an earlier same-conversation report whose file name compaction removed. From: R-5 F-02, stated limit. Verdict: pending.
 
 ## Review Log
 
@@ -398,6 +431,10 @@ None.
 | 2026-11-15 | R-2 | spec | `b34ba95382ee1ceb78d0c6c2ac5d751dc65b0ff3` | claude-opus-5-5 | procedural | One blocking, sixteen should-fix and three nit findings |
 | 2026-11-15 | R-3 | spec | `09de0c3e2a106f48ae3f72e8859362a9193cc308` | claude-opus-5-5 | procedural | One blocking, ten should-fix and three nit findings |
 | 2026-11-15 | R-4 | spec | `fc1b66539fc6b13d92d6473230911e8fbaf31691` | claude-opus-5-5 | procedural | Eleven should-fix and three nit findings |
+| 2026-11-27 | R-5 | spec | `4f465f0348baea0bba3fbea1c5c6752f6510686a` | claude-opus-5-5 | procedural | Three should-fix and four nit findings |
+| 2026-11-27 | R-6 | spec | `f2fc74e65fddcfb902229042385ba973d2c8d2a8` | claude-opus-5-5 | procedural | One blocking, two should-fix and one nit finding |
+| 2026-11-27 | R-7 | spec | `f0f8dd4ddd76a13f2dc0ea9b071a20a86d38fcf5` | claude-opus-5-5 | procedural | No findings |
+| 2026-11-27 | R-7 | spec | `f0f8dd4ddd76a13f2dc0ea9b071a20a86d38fcf5` | n/a | n/a | accepted by owner |
 
 ### R-1
 
@@ -847,6 +884,91 @@ SEVERITY: nit
 WHERE: Design, Extraction and redaction ("it includes a file from `subagents/` or `tool-results/` only when an included turn references it"); Terminology (Session)
 EVIDENCE: The main transcript `0443e578-6437-5521-b63e-27f043a5ac80.jsonl` refers to its subagents only as `agentId: a6d6fbd72502c1fd7`, never by the file name `subagents/agent-a6d6fbd72502c1fd7.jsonl`. Tool-results files are named by path. "References" is not defined for subagents.
 PROPOSAL: Say that an `agentId` in an included turn references `subagents/agent-<id>.jsonl`.
+
+### R-5
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Session and report folder ("An absent folder is a first run"); Design, Report and save ("`save` creates the folder if needed, writes the report to `.<random>.tmp` in it, links that file"); Design, Effects and failure; Owner summary ("Reports are saved, redacted, in a per-user folder"); AC-06; Test Plan row AC-06
+EVIDENCE: Redaction is pattern-based, so a secret of a shape the list does not name stays in the saved report. Examples are a Google `AIza...` key, an `npm_...` token or a bare hex API key that has no key name. The document gives no mode for the folder or the report files. With a 022 umask, a folder `save` creates under `$HOME/.local/state/vh-adlc/retro/` and its reports are readable by other local accounts wherever the home directory is traversable. The product profile puts the user's credentials at stake. The plugin's own scripts already use owner-only modes for saved artifacts: `writeFileSync(..., { flag: "wx", mode: 0o600 })` at `plugins/vh-adlc/scripts/triage/cli.ts:50` and `mkdirSync(output,{recursive:true,mode:0o700})` at `plugins/vh-adlc/scripts/triage/controller-recovery.ts:18`. AC-06 checks only the patterns and the planted secrets, so it passes a world-readable report.
+PROPOSAL: Have `save` create the report folders with mode 0700 and write the temporary file with mode 0600, created exclusively, before linking it. Add the modes to the AC-06 `bun test` row.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Session and report folder ("notes the file name each earlier run's `save` printed"); Design, History ("The skill passes the file names of reports saved earlier in this conversation as `--exclude`"); Terminology (Recurring candidate, "where that report was not saved earlier in this conversation"); Scope, Out of scope ("anything compaction removed from the context"); AC-07
+EVIDENCE: The only thing that ties an earlier same-conversation report to this session is the file name `save` printed, and the design relies on it staying in the model's context. Here is a plausible sequence in the long sessions the Background names as the harm: retro runs and saves, work goes on, compaction summarises the earlier turns, and retro runs again. Now the file name may be gone while the summary still describes the same mistakes. The earlier report is then not excluded, so every candidate it raised becomes `recurring` and moves up a level, or becomes `fix-not-held` and high, even though nothing recurred. The Out of scope line excludes reviewing what compaction removed. It does not state this consequence, which inflates severities, and the Owner summary does not mention it. The AC-07 variant keeps the earlier run's `save` output intact, so it cannot show the case.
+PROPOSAL: Either add a Scope line `Not handled: an earlier retro report from this conversation whose file name compaction removed counts as history, ...` and mention it in the Owner summary, or have the skill ask the owner which reports to exclude when its context shows a compaction summary that mentions an earlier retro run but no saved file name.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Scope (last bullet, "fixture conversations resumable on Claude Code and on Codex"); Fixture table paragraphs ("Each recorded run resumes a fixture conversation in an isolated host profile"); Fixture table row P4 ("printing a multi-megabyte result"); Test Plan rows AC-02, AC-03, AC-04, AC-05 and AC-07
+EVIDENCE: The document never says how the fixture conversations are produced. They could be hand-written transcripts in each host's format, or recorded once by scripted live sessions and then copied into the isolated profile. It also does not say how a resume finds them. Claude Code files sessions under `<config>/projects/<encoded working directory>/` (for example this host's `~/.claude/projects/-Users-michielvh-code-vh-adlc/`), and Codex keeps rollouts under `CODEX_HOME/sessions/`. The harness creates a fresh profile (`plugins/vh-adlc/scripts/triage/controller-clients.ts:5-6`, `:18`, `:20`), and the fixture repository's path changes on every run, so each transcript has to be placed and rewritten for that path. P4 plants a multi-megabyte tool result. The hosts truncate large tool output before it reaches the model's context, so a fixture that stores the full output either cannot be resumed or gets compacted. A fixture that stores the truncated form has to show the size in the way the host would. Two careful implementers would build fixtures that behave differently, and only one would let the AC-02 and AC-07 runs execute as the document intends.
+PROPOSAL: Say how each host's fixture conversation is made and installed: its source format, where it goes in the isolated profile, and how the fixture repository path is substituted. State that P4's output appears in the fixture exactly as the host records an oversized result, with its size visible.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Background (package checker bullet, "Both discovery tests assert nineteen skills"); Scope (Registration, "both discovery tests at twenty skills")
+EVIDENCE: Only `tests/vh-adlc/triage/discovery.test.ts:13` asserts a count (`toHaveLength(19)`). `tests/vh-adlc/maintenance/discovery.test.ts:12` asserts only `toContain("vh-adlc-maintenance")`, and `grep -n '19\|nineteen' tests/vh-adlc/maintenance/discovery.test.ts` finds no count. The claim was carried over from earlier revisions (R-1 F-09 cited a `toHaveLength(16)` there).
+PROPOSAL: Say that the triage discovery test asserts the skill count, and drop the maintenance test from the count change, or keep it in covers only for a reason that is stated.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary ("Four of its findings were about transcript parsing and no longer apply now that parsing is out")
+EVIDENCE: At least five R-4 findings concern transcript reading and no longer apply: F-02 (session variables), F-03 (run boundaries in transcript records), F-04 (transcript cwd values), F-08 (digest budget) and F-14 (subagent references). F-06 and F-12 were about the `.work/` folder, which this revision also removed.
+PROPOSAL: Correct the count, or list which R-4 findings were dropped and which were applied.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Analysis ("the always-loaded user-level instruction and memory index files in full. They are ... `<CODEX_HOME>/AGENTS.md` and `<CODEX_HOME>/memories/` on Codex CLI")
+EVIDENCE: `<CODEX_HOME>/memories/` is a directory, not an index file. On this host, `ls ~/.codex/memories` shows `MEMORY.md`, `memory_summary.md` and `extensions`. "Read in full" does not say whether that means one index file, every file in the directory, or the directory tree.
+PROPOSAL: Name the Codex memory file or files that are read in full, and treat the rest like Claude Code's linked memory notes, which are searched by subject.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: Context, Owner summary (report folder paragraph); Scope ("Not handled: a moved or renamed main checkout starts a new report folder")
+EVIDENCE: The Owner summary describes the folder as "one folder per repository, shared by all its worktrees". It does not say that moving or renaming the main checkout starts a fresh folder, which loses the recurrence history the Background gives as one of the two reasons for the machinery.
+PROPOSAL: Add one sentence to the Owner summary stating the moved-checkout limit.
+
+### R-6
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Context, Background (resume bullet, "Claude Code keeps a session as `<config>/projects/<working directory with / and . as ->/<id>.jsonl`"); Acceptance Criteria, Fixture table paragraph ("writes the result where the host looks for it: under `<CLAUDE_CONFIG_DIR>/projects/<encoded path>/`"); Test Plan rows AC-02, AC-03, AC-04, AC-05 and AC-07 (recorded runs on Claude Code)
+EVIDENCE: This revision added the encoding rule, and it is false for the directory the install script will most likely copy the fixture into. On this Mac, `echo $TMPDIR` prints `/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/` and `realpath $TMPDIR` prints `/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T`. `ls ~/.claude/projects` shows sessions started there filed as `-private-var-folders-sm-8hfqw9-97pgfmhlfs2t7k66c0000gn-T-tmp-b4oI9g8ZQO-work`. Claude Code encodes the resolved real path, so `/var` becomes `/private/var`, and it turns the underscore into `-` as well, not only `/` and `.`. An install script that follows the stated rule writes the template to `-var-folders-sm-8hfqw9_97pgfmhlfs2t7k66c0000gn-T-...`. `claude --print --resume <id>` then cannot find the session, so the Claude Code recorded runs that prove AC-02 to AC-05 and AC-07 cannot run as written.
+PROPOSAL: State the encoding as observed: take the real path of the working directory and replace every character that is not an ASCII letter or digit with `-`. Have the install script compute the folder from the real path of the fresh fixture copy, and cite the `ls ~/.claude/projects` output.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Scope ("Not handled: when compaction has removed the file name ... each such candidate names the earlier report, so the owner can see where it came from (R-5 F-02)"); Design, History (`recurs` holds "earlier keys, possibly empty"; "it records that key under `recurs` and adopts its slug"); Design, Report and save ("Per candidate the report gives ... its history"); AC-07 ("citing the seeded report"); Test Plan row AC-07 ("`recurs` citing the seeded key"); Context, Owner summary (compaction sentence)
+EVIDENCE: This revision added the stated limit, and its mitigation rests on each recurring candidate naming the earlier report. Nothing in the Design makes that happen. `recurs` holds keys of the form `<category>:<home class>:<slug>`, and because the new candidate adopts the earlier slug, the key is identical in every report that raised the problem, so it identifies no report. The Design does not say whether `history` returns the source file name with each candidate, and the report's "its history" is not defined. The AC-07 checklist item checks only "`recurs` citing the seeded key". An implementation that shows only the key passes every proof, and then the owner has no way to spot a false recurrence that compaction caused, which is the safeguard the limit promises.
+PROPOSAL: Have `history` return each candidate with the file name of its report, and have the report name that file for every `recurring` or `fix-not-held` candidate. Add "names the seeded report's file" to the AC-07 checklist item.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, Fixture table paragraphs ("The fixture repository has a lint configuration ... and a project procedure file"; "the install script copies the fixture repository to a fresh directory"); Fixture table rows P1, P2 and P7; Scope (last bullet, "a fixture repository ... with the script that installs them"); Test Plan row AC-06 ("compare `git status --porcelain` ... of the fixture repository")
+EVIDENCE: A fixture repository kept under `tests/vh-adlc/retro/` cannot carry its own committed `.git`, and a plain copy is not a Git repository. Yet `folder --repo` runs `git rev-parse --git-common-dir` (Design, Session and report folder), the AC-06 check runs `git status --porcelain`, and the skill "reads every file it cites, to give the line" (Design, Analysis). The document never says that the install script makes the copy a Git repository, or that its files and history match what the conversation claims. That means the committed banned call (P1), the committed duplicate helper (P7) and the generated file P2 edits, left unedited because the edit was caught. One implementer gives the copy a single commit holding none of that, and another reproduces the conversation's commits. The skill then cites lines that do not exist, or sees a history that contradicts the transcript, and the AC-02 and AC-05 grading can differ between the two.
+PROPOSAL: State that the install script initialises the copy as a Git repository whose working tree and commits match the planted conversation: P1's call and P7's duplicate committed at known lines, P2's generated file present and unedited. Add the fixture repository's expected files to the fixture paragraph.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Context, Owner summary ("that report counts as history, and its candidates can show as recurring"); Scope (second Not handled line, "can show as recurring or as fixes that did not hold")
+EVIDENCE: The summary sentence was added in this revision for R-5 F-02. It leaves out what the Scope line states: such candidates can also become fixes that did not hold, which Design, Severity and order always rates high.
+PROPOSAL: Change the summary to "can show as recurring, or as fixes that did not hold and rated high".
+
+### R-7
+
+NO FINDINGS
 
 ## Sources
 
