@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Being written; not yet reviewed."
+status: planned
+status_description: "Accepted by the owner at R-6 (089a0707); tasks next, then the replay on a copy of the enterprise case."
 issue: https://github.com/michielvha/vh-adlc/issues/172
 goal: "A spec reviewer that finds a secondary defect while writing up a wider finding reports it, either inside that finding or as a finding of its own, so the enterprise replay labels L-08 and L-10 pass retention again without more blocking findings per pass."
 covers:
@@ -255,6 +255,7 @@ None.
 | 2026-11-27 | R-4 | spec | `b4ff8acf` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 0 nit |
 | 2026-11-27 | R-5 | spec | `8f22161e` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 0 nit |
 | 2026-11-27 | R-6 | spec | `089a0707` | claude-opus-5-5 | procedural | clean: 0 blocking, 0 should-fix, 1 nit |
+| 2026-11-27 | R-6 | spec | `089a0707` | n/a | n/a | accepted by owner |
 
 ### R-1
 
