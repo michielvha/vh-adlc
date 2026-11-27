@@ -218,6 +218,44 @@ None.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-27 | R-1 | spec | `41080f61` | claude-opus-5-5 | procedural | 1 blocking, 3 should-fix, 1 nit |
+
+### R-1
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, Required sentences (S-36, S-56, S-57 and the paragraph on S-45 and `orchestrate.md:170-172`); Design, Glossary ("Taken over"); Context, Owner summary ("Taken over means another session carries the feature on"); frontmatter goal
+EVIDENCE: S-45 stays unchanged and says "archive each paused session as soon as its report is in the workstream ledger, before its replacement starts" (`docs/specs/workstream-orchestration.md:429`). The glossary defines Taken over as "Another session carries a sub-session's feature on", and S-56 only applies "when another session takes a sub-session's feature over". Before its replacement starts, no other session carries the feature, so a paused session archived under S-45 is not taken over by this document's own definition. New S-36 also drops the old "Apart from paused sessions" exception (`orchestrate.md:200`). The design then deletes the only text that protects paused sessions without that condition, `orchestrate.md:170-172` ("Archive a paused session only in a way that keeps its worktree, branch and uncommitted changes for its replacement ... Where the host's archive action would remove the worktree, ask the owner before archiving it"). That is the case issue #166 exists for: "Under Q28 a paused session may be archived before its replacement starts. If the host's archive action removes the session's worktree, the replacement loses the claimed feature's uncommitted changes." S-56 also asks for a "handoff, naming its worktree", while paused sessions only send a state "report" (S-30, S-44, S-45). Read literally, S-56 and S-57 do not cover the S-45 archive, so the worktree safeguard no longer applies to the case where uncommitted changes can be lost. The Design sentence "S-56 and S-57 add the conditions every taken-over session meets" does not close this gap, because the paused session is not yet taken over.
+PROPOSAL: Make the Taken over term and S-56/S-57 cover a session whose replacement is approved or recorded in the ledger but not yet started (for example "is being or has been replaced"), and accept the paused session's ledger report as its handoff. Or keep a required sentence under Plugin upgrades that applies the worktree, branch and uncommitted-changes safeguard and the ask-first rule to every paused session S-45 archives. Then say in S-36 how the S-45 archive fits the two ways a session ends.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Required sentences (S-55, S-59); Design, How the rules read together ("Cleanup listing"); Context, Owner summary (cleanup paragraph); frontmatter goal
+EVIDENCE: S-59: "When the owner asks to clean up sessions in general, list every candidate with its work state (PR merged, PR open, waiting on the owner, or nothing to merge) and archive only the ones the owner picks." S-55 allows archiving a finished sub-session "only once the forge CLI shows its work item merged, or ... its issue closed, or the owner has said the work is abandoned". The design does not say which rule wins when the owner picks a workstream sub-session listed as "PR open" in a general cleanup. One implementer will archive it on the pick. Another will treat the pick as not enough under S-55 and refuse, or treat the pick as abandonment. The 2026-11-27 incident in #180 started with exactly this kind of request ("the owner said to archive sessions that were no longer used"). The goal decides the answer: a sub-session is archived only when its work is finished or it has been taken over.
+PROPOSAL: Add to S-59, or to a new sentence, that S-55 and S-56 still govern the workstream's own sub-sessions in a cleanup listing, so an owner pick of an open one is not an archive approval unless the owner says the work is abandoned. Change the Cleanup listing bullet and the Owner summary to match.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Required sentences (S-36, S-55); Scope, Out of scope (the incident table bullet)
+EVIDENCE: Incident 13 in the reference reads "A session was archived while still cleaning up, and handoff files in `/tmp` were swept away. | S-36, S-37" (`plugins/vh-adlc/references/orchestrate.md:242`). The earlier feature built that table so that "a later change that drops a rule shows which incident returns" (`docs/specs/workstream-orchestration.md:485-487`). This document replaces S-36 with "A sub-session ends in one of two ways, and each has its own archive rule: work finished, or taken over." and moves "only after it has confirmed its cleanup finished" into S-55. Incident 13 would then cite a sentence that no longer holds the rule that stops it. The test only checks that the cited IDs exist (`tests/vh-adlc/check.test.ts:615-623`), so it stays green. Scope rules out a new incident row but says nothing about rewriting row 13's rule IDs.
+PROPOSAL: Add to Scope and Design that incident 13's Rules cell changes to name S-55 (with S-36 if wanted) and S-37, and add that to AC-01 or its Test Plan row, for example by asserting row 13 names S-55.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-04); Test Plan (AC-04 row)
+EVIDENCE: AC-04 requires "one minor version above the version on the default branch when the feature branch is cut". The named proof, "a package change comes with a version change", only asserts `expect(now.version).not.toBe(JSON.parse(base.out).version)` (`tests/vh-adlc/check.test.ts:226-233`). The manifest test asserts the two manifests are equal (`tests/vh-adlc/check.test.ts:169-180`). A patch bump to 0.33.1 or a jump to 1.0.0 passes both, so the proof can pass on a wrong implementation.
+PROPOSAL: Add a check, a test or a written procedure, that compares the version with the one on `origin/main` and asserts the minor is one higher and the patch is 0. Or loosen AC-04 to what the existing test proves.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Required sentences (S-36, S-58); Design, How the rules read together ("Pending and failed sessions")
+EVIDENCE: S-36 says "A sub-session ends in one of two ways", but S-58 adds a third: "A pending or failed session that the owner approves ending is archived under that approval." The old S-36 stated that exception inside the same sentence ("Apart from ... pending or failed sessions the owner approves ending"). The new S-36 leaves it out, so a reader of S-36 alone sees exactly two cases.
+PROPOSAL: Word S-36 so that it names the owner-approved ending of a pending or failed session as an exception, for example "Apart from pending or failed sessions the owner approves ending, a sub-session ends in one of two ways ...".
 
 ## Sources
 
