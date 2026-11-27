@@ -334,6 +334,30 @@ None.
 | 2026-11-27 | R-3 | spec | `b6f3156b` | claude-opus-5-5 | procedural | clean: 0 blocking, 0 should-fix, 1 nit (unapplied under the nit rule); host route |
 | 2026-11-27 | R-3 | spec | `b6f3156b` | n/a | n/a | accepted by owner |
 | 2026-11-27 | R-4 | spec | `b765e737` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 2 nits; full pass after the gpt-6.2-sol rename; host route |
+| 2026-11-27 | R-5 | spec | `58342e95` | claude-opus-5-5 | procedural | clean: 0 blocking, 1 should-fix and 2 nits, all outside the normative baseline (Tasks, Context); host route |
+
+### R-5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan row AC-02 (the new sentences "Each late writer sleeps one second, tries its write, and then records that it finished in a file under the temporary directory. The test waits for that record, up to a 10-second deadline, before asserting"), Tasks T3 and T5 (ticked), and the unchecked tail T8 and T9
+EVIDENCE: This revision applied R-4 F-02 by changing the AC-02 row, which is part of the normative baseline. It did not add a task to bring the tests in line. At X, `tests/vh-adlc/loop/review-route.test.ts:379-381` (`lateWriter`) still runs `sleep 1; <command>` and writes no completion record. Test (1) at `:410-415` still does `await Bun.sleep(2_000); expect(existsSync(late)).toBe(false);`, and the rename tests at `:418-436` still do `await Bun.sleep(2_000)` and then `readFileSync(rec, ...)`, with no wait for a record and no deadline. T3 and T5 stay ticked against the old row, and the only unchecked tasks are T8 (`.vh-adlc/loop.yaml`) and T9 (AC-06 evidence). The convention says "Re-planning keeps checked tasks and changes only the unchecked tail; new requirements get new task IDs." An implementer who finishes T8 and T9 leaves the tests with the fixed sleeps R-4 F-02 identified as flaky, so the AC-02 proof named in the row does not exist and the implementation review finds a mismatch. The gap comes from this revision's change to the AC-02 row.
+PROPOSAL: Add a new unchecked task before T8, for example T10 on `tests/vh-adlc/loop/review-route.test.ts`: every late writer records that it finished, and each late-writer test waits for that record, up to a 10-second deadline, before asserting. Its done condition is that the boundary tests pass on this Mac and `mutants.py` still shows each one failing against its part (AC-02).
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (validation paragraph: "Two smoke runs of real Codex `gpt-6.2-sol` through the route came back ready with the model attested, and Codex's write probe was refused inside the profile.")
+EVIDENCE: Nothing in the document, the Tasks evidence or `tests/vh-adlc/evidence/macos-review-boundary/` records these runs. That directory holds only `mutants.py` and `mutants.out`, and `git grep -i smoke 58342e95 -- docs/specs/macos-review-boundary.md tests/vh-adlc/evidence` finds only this sentence and unrelated Antigravity files. The convention says "Context and Design cite their claims: a `file:line`, or a command and its output", and the summary must "distinguish planned checks from observed proof". This revision added the sentence.
+PROPOSAL: Cite the command and the observed outcome of the smoke runs (date, commit, the `ready` status and the attested model, and the refused write) in Background, or drop the sentence and leave AC-06 as the planned real-Codex proof.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary ("so this revision renames it, and the second plugin manifest joins `covers`. Nothing else in the scope changed.")
+EVIDENCE: The same revision also changed the normative AC-02 Test Plan row since the R-3 acceptance. The late-writer tests now wait for a completion record up to a 10-second deadline, and the main-checkout rename test now checks the linked worktree's index instead of `src/late.txt`. The convention asks the summary to "Explain material changes since the last accepted scope". The sentence is narrowly true of the Scope section, but it leaves the owner thinking the model and `covers` are the only baseline changes being accepted again.
+PROPOSAL: Add half a sentence saying that the AC-02 proof now waits for each late writer to finish, and that the main-checkout rename case checks the index.
 
 ### R-4
 
