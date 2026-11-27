@@ -32,7 +32,7 @@ const agentsPin = () => pinIn(agentsText(), /vhco-pro\/docs\/blob\/([0-9a-f]{40}
 function resolvedConvention(): string {
   const override = process.env.VH_ADLC_CONVENTION_DOCS;
   if (override) return readFileSync(join(override, "conventions/feature-documents.md"), "utf8");
-  const setup = Bun.spawnSync(["bash", join(plugin, "scripts/ensure-vh-adlc.sh"), "--offline"], { stdout: "pipe", stderr: "pipe" });
+  const setup = Bun.spawnSync(["bash", join(plugin, "scripts/ensure-vh-adlc.sh")], { stdout: "pipe", stderr: "pipe" });
   if (setup.exitCode !== 0) throw new Error("verified cached binary required for proportional review checks");
   const binary = setup.stdout.toString().trim();
   const page = "conventions/feature-documents.md";

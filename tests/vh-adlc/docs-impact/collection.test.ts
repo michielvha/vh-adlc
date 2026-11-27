@@ -71,7 +71,7 @@ test("ordinary feature coverage and the actual pinned freshness matcher agree on
   const root = fixture({ "docs/specs/feature.md": feature, "src/deep/a.ts": "old\n", "src/q1.ts": "old\n", "src/a.ts": "old\n", "area/sub/app.ts": "old\n" }, declaration + 'Feature documents: docs/specs/\n');
   for (const name of ["src/deep/a.ts", "src/q1.ts", "src/a.ts", "area/sub/app.ts"]) put(root, name, "changed\n");
   const plugin = join(import.meta.dir, '../../../plugins/vh-adlc');
-  const ensured = Bun.spawnSync(['bash', join(plugin, 'scripts/ensure-vh-adlc.sh'), '--offline'], { stdout: 'pipe', stderr: 'pipe' }); expect(ensured.exitCode).toBe(0);
+  const ensured = Bun.spawnSync(['bash', join(plugin, 'scripts/ensure-vh-adlc.sh')], { stdout: 'pipe', stderr: 'pipe' }); expect(ensured.exitCode).toBe(0);
   const pin = readFileSync(join(plugin, 'knowledge.md'), 'utf8').match(/\b[a-f0-9]{40}\b/u)?.[0]; if (!pin) throw Error('missing plugin pin');
   const args = [ensured.stdout.toString().trim(), 'fresh', 'docs/specs/feature.md', '--repo', root, '--plugin-pin', pin];
   const before = Bun.spawnSync(args, { stdout: 'pipe', stderr: 'pipe' });
@@ -93,7 +93,7 @@ test('an ordinary covered doc repair still makes the actual feature review stale
   const reviewed = git(root, 'rev-parse', 'HEAD');
   const row = `| 2026-11-05 | R-1 | implementation | \`${reviewed}\` | fixture | procedural | Fixture review. |\n`;
   put(root, 'docs/specs/feature.md', feature + row + '\n### R-1\n\nCRITERION: AC-01 The first end state, wrapped onto a second line.\nVERDICT: met\nEVIDENCE: fixture\n\nCRITERION: AC-02 The second end state.\nVERDICT: met\nEVIDENCE: fixture\n'); commit(root);
-  const plugin = join(import.meta.dir, '../../../plugins/vh-adlc'), ensured = Bun.spawnSync(['bash', join(plugin, 'scripts/ensure-vh-adlc.sh'), '--offline'], { stdout: 'pipe', stderr: 'pipe' }); expect(ensured.exitCode).toBe(0);
+  const plugin = join(import.meta.dir, '../../../plugins/vh-adlc'), ensured = Bun.spawnSync(['bash', join(plugin, 'scripts/ensure-vh-adlc.sh')], { stdout: 'pipe', stderr: 'pipe' }); expect(ensured.exitCode).toBe(0);
   const pin = readFileSync(join(plugin, 'knowledge.md'), 'utf8').match(/\b[a-f0-9]{40}\b/u)?.[0]; if (!pin) throw Error('missing pin');
   const fresh = () => { const run = Bun.spawnSync([ensured.stdout.toString().trim(), 'fresh', 'docs/specs/feature.md', '--repo', root, '--plugin-pin', pin], { stdout: 'pipe', stderr: 'pipe' }); return JSON.parse(run.stdout.toString()); };
   expect(fresh().data.implementation_review.stale).toBe(false);

@@ -55,7 +55,7 @@ describe("an offline reader session", () => {
     writeFileSync(join(bin, "bash"), '#!/bin/bash\nprintf "resolve\\n" >> "$VH_DOCS_READER_COUNTER"\nexec /bin/bash "$@"\n');
     chmodSync(join(bin, "bash"), 0o700);
     // A private cache holding a copy of the verified binary, so the test can replace it.
-    const real = Bun.spawnSync(["bash", resolve(dirname(LOADER), "ensure-vh-adlc.sh"), "--offline"], { stdout: "pipe", stderr: "pipe" });
+    const real = Bun.spawnSync(["bash", resolve(dirname(LOADER), "ensure-vh-adlc.sh")], { stdout: "pipe", stderr: "pipe" });
     expect(real.exitCode).toBe(0);
     const version = JSON.parse(readFileSync(resolve(dirname(LOADER), "../vh-adlc.lock.json"), "utf8")).version;
     const platform = `${process.platform}_${process.arch === "x64" ? "amd64" : process.arch}`;
