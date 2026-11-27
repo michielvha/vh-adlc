@@ -67,6 +67,17 @@ function pending(outcome: ReviewOutcome, reason: string) {
   expect(outcome.status).toBe("pending");
   if (outcome.status === "pending") expect(outcome.reason).toContain(reason);
 }
+/**
+ * A reviewer that tries to change a protected path. Under the PID namespace the change happens and the
+ * before-and-after check leaves the review pending. Under the macOS write boundary the change is refused,
+ * so the review may be ready, but only with the owning worktree unchanged.
+ */
+async function refusedOrPending(root: string, outcome: Promise<ReviewOutcome>, reason: string) {
+  const before = snapshot(root, ["build"], "owning");
+  const result = await outcome;
+  if (process.platform === "darwin" && result.status === "ready") expect(snapshot(root, ["build"], "owning")).toEqual(before);
+  else pending(result, reason);
+}
 
 describe("replies", () => {
   test("a matching reply is ready to store, with the records after both header lines", async () => {
@@ -119,7 +130,7 @@ describe("the owning worktree is preserved", () => {
     test(`${name} leaves the review pending`, async () => {
       const { root, commit } = repository();
       before(root);
-      pending(await review(root, commit, stub(body, ok(commit))), "changed");
+      await refusedOrPending(root, review(root, commit, stub(body, ok(commit))), "changed");
     });
 
   test("writes inside a declared scratch directory are allowed", async () => {
@@ -345,7 +356,7 @@ describe("private review clone", () => {
 
   test("a reviewer that edits the owning worktree from its private clone leaves the review pending", async () => {
     const { root, commit } = repository();
-    pending(await review(root, commit, stub(`echo changed > "${root}/src/app.txt"`, ok(commit))), "changed");
+    await refusedOrPending(root, review(root, commit, stub(`echo changed > "${root}/src/app.txt"`, ok(commit))), "changed");
   });
 });
 
@@ -354,5 +365,123 @@ describe("reply bytes", () => {
     const { parseReply } = await import("../../../plugins/vh-adlc/scripts/loop/review-route");
     expect(parseReply("MODEL: m\nTARGET: abcdef1\n\nNO FINDINGS   \n")).toEqual({ model: "m", target: "abcdef1", records: "NO FINDINGS   \n" });
     expect(parseReply("MODEL: m\r\nTARGET: abcdef1\r\n\r\nFINDING: F-01\r\nKIND: factual\r\n")).toEqual({ model: "m", target: "abcdef1", records: "FINDING: F-01\r\nKIND: factual\r\n" });
+  });
+});
+
+// macOS has no PID namespace. The route keeps the same guarantee there by running every reviewer process
+// under a sandbox-exec profile that refuses writes to the paths the before-and-after check judges.
+const darwin = process.platform === "darwin" ? test : test.skip;
+
+/** A late writer: forks a process that leaves the session, clears its environment and runs `command` after a second. */
+function lateWriter(command: string) {
+  return `perl -MPOSIX -e 'if (fork() == 0) { POSIX::setsid(); exec("/usr/bin/env", "-i", "/bin/sh", "-c", $ARGV[0]); }' ${JSON.stringify(`sleep 1; ${command}`)}`;
+}
+
+/**
+ * A main checkout two levels below a fresh directory, with a linked worktree beside it that is the owning
+ * worktree, so its Git directory and common Git directory lie outside it and no test renames the shared
+ * temporary directory.
+ */
+function linkedWorktree() {
+  const top = realpathSync(mkdtempSync(join(tmpdir(), "vh-review-linked-")));
+  made.push(top);
+  const main = join(top, "a/b/main"), wt = join(top, "a/b/wt");
+  mkdirSync(join(main, "src"), { recursive: true });
+  mkdirSync(join(main, "docs/specs"), { recursive: true });
+  writeFileSync(join(main, "src/app.txt"), "app\n");
+  writeFileSync(join(main, "docs/specs/feature.md"), "# Feature\n");
+  git(main, "init", "-q", "-b", "main");
+  git(main, "add", "-A");
+  git(main, "commit", "-q", "-m", "fixture");
+  git(main, "worktree", "add", "-q", "-b", "feature", wt);
+  return { top, main, wt, gitDir: join(main, ".git/worktrees/wt"), commit: git(wt, "rev-parse", "HEAD") };
+}
+const contentDigest = (path: string) => existsSync(path) ? Bun.hash(readFileSync(path)).toString() : "absent";
+function recordFile() {
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "vh-review-record-")));
+  made.push(dir);
+  return join(dir, "record");
+}
+
+describe("the macOS write boundary", () => {
+  darwin("a detached writer that cleared its environment cannot write into the owning worktree after the review", async () => {
+    const { wt, commit } = linkedWorktree();
+    const late = join(wt, "src/late.txt");
+    expect((await review(wt, commit, stub(lateWriter(`echo late > ${late}`), ok(commit)))).status).toBe("ready");
+    await Bun.sleep(2_000);
+    expect(existsSync(late)).toBe(false);
+  });
+
+  darwin("a late writer cannot rename the worktree's grandparent and write through the new path", async () => {
+    const { top, wt, commit } = linkedWorktree();
+    const rec = join(top, "rename-record"), late = join(wt, "src/late.txt");
+    const body = lateWriter(`if mv ${top}/a ${top}/ax 2>/dev/null; then echo renamed > ${rec}; echo late > ${top}/ax/b/wt/src/late.txt; mv ${top}/ax ${top}/a; else echo refused > ${rec}; fi`);
+    expect((await review(wt, commit, stub(body, ok(commit)))).status).toBe("ready");
+    await Bun.sleep(2_000);
+    expect(readFileSync(rec, "utf8")).toBe("refused\n");
+    expect(existsSync(late)).toBe(false);
+  });
+
+  darwin("a late writer cannot rename the main checkout and change the linked worktree's index through it", async () => {
+    const { top, main, gitDir, wt, commit } = linkedWorktree();
+    const rec = join(top, "rename-record"), index = join(gitDir, "index"), before = contentDigest(index);
+    const body = lateWriter(`if mv ${main} ${main}x 2>/dev/null; then echo renamed > ${rec}; echo junk >> ${main}x/.git/worktrees/wt/index; mv ${main}x ${main}; else echo refused > ${rec}; fi`);
+    expect((await review(wt, commit, stub(body, ok(commit)))).status).toBe("ready");
+    await Bun.sleep(2_000);
+    expect(readFileSync(rec, "utf8")).toBe("refused\n");
+    expect(contentDigest(index)).toBe(before);
+  });
+
+  darwin("an implementation reviewer cannot write into its private clone during the review", async () => {
+    const { wt, commit } = linkedWorktree();
+    const rec = recordFile();
+    const body = `if echo x > during.txt 2>/dev/null; then echo written > ${rec}; else echo refused > ${rec}; fi`;
+    expect((await review(wt, commit, stub(body, ok(commit)))).status).toBe("ready");
+    expect(readFileSync(rec, "utf8")).toBe("refused\n");
+  });
+
+  darwin("a spec reviewer cannot make the export writable and write into it during the review", async () => {
+    const { wt, commit } = linkedWorktree();
+    const rec = recordFile();
+    const body = `chmod u+w "$3" 2>/dev/null; if echo x > "$3/during.txt" 2>/dev/null; then echo written > ${rec}; else echo refused > ${rec}; fi`;
+    expect((await review(wt, commit, stub(body, ok(commit)), { kind: "spec" })).status).toBe("ready");
+    expect(readFileSync(rec, "utf8")).toBe("refused\n");
+  });
+
+  darwin("writes into a declared scratch directory and the temporary directory still land", async () => {
+    const { wt, commit } = linkedWorktree();
+    const rec = recordFile();
+    const body = `mkdir -p build && echo out > build/result.txt && echo scratch >> ${rec}; echo tmp >> ${rec}`;
+    expect((await review(wt, commit, stub(body, ok(commit)), { scratch: ["build"] })).status).toBe("ready");
+    expect(readFileSync(rec, "utf8")).toBe("scratch\ntmp\n");
+  });
+
+  darwin("refs and the linked worktree's index stay unchanged", async () => {
+    const { main, gitDir, wt, commit } = linkedWorktree();
+    const index = join(gitDir, "index"), before = contentDigest(index), refs = git(main, "for-each-ref");
+    const body = `git -C ${wt} branch sneaky 2>/dev/null; git -C ${wt} tag -f t 2>/dev/null; echo junk >> ${index} 2>/dev/null; true`;
+    expect((await review(wt, commit, stub(body, ok(commit)))).status).toBe("ready");
+    expect(git(main, "for-each-ref")).toBe(refs);
+    expect(contentDigest(index)).toBe(before);
+  });
+
+  darwin("a protected file that already has a second hard link leaves the review pending before the reviewer runs", async () => {
+    const { root, commit } = repository();
+    const outside = recordFile(), ran = recordFile();
+    expect(Bun.spawnSync(["ln", join(root, "src/app.txt"), outside]).exitCode).toBe(0);
+    pending(await review(root, commit, stub(`echo ran > ${ran}`, ok(commit))), "src/app.txt");
+    expect(existsSync(ran)).toBe(false);
+  });
+
+  darwin("a route started inside another Seatbelt sandbox stays pending and names the missing boundary", () => {
+    const { root, commit } = repository();
+    const module = resolve(import.meta.dir, "../../../plugins/vh-adlc/scripts/loop/review-route.ts");
+    const script = `const { runReviewRoute } = await import(${JSON.stringify(module)});
+const outcome = await runReviewRoute({ repo: ${JSON.stringify(root)}, commit: ${JSON.stringify(commit)}, kind: "implementation", document: "docs/specs/feature.md",
+  route: { model: "gpt-6.1-sol", argv: [${JSON.stringify(stub("", ok(commit)))}, "{prompt_file}"] }, prompt: "p", scratch: [], timeoutMs: 10000 });
+console.log(JSON.stringify(outcome));`;
+    const run = Bun.spawnSync(["/usr/bin/sandbox-exec", "-p", "(version 1)(allow default)", process.execPath, "-e", script], { stdout: "pipe", stderr: "pipe" });
+    const outcome = JSON.parse(run.stdout.toString().trim().split("\n").at(-1) || "{}") as ReviewOutcome;
+    pending(outcome, "sandbox-exec");
   });
 });
