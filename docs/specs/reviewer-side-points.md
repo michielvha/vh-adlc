@@ -254,6 +254,7 @@ None.
 | 2026-11-27 | R-3 | spec | `eef99624` | claude-opus-5-5 | procedural | 0 blocking, 1 should-fix, 0 nit |
 | 2026-11-27 | R-4 | spec | `b4ff8acf` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 0 nit |
 | 2026-11-27 | R-5 | spec | `8f22161e` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 0 nit |
+| 2026-11-27 | R-6 | spec | `089a0707` | claude-opus-5-5 | procedural | clean: 0 blocking, 0 should-fix, 1 nit |
 
 ### R-1
 
@@ -369,6 +370,15 @@ SEVERITY: should-fix
 WHERE: Acceptance Criteria AC-02 ("each in at least 2 of 6 counted first passes, or 3 of 12 when the harness extended the set"); Test Plan AC-02, AC-03 row ("at least 2 of 6 or 3 of 12 new runs"); Context (Owner summary, first pass condition "in at least 2 of 6 passes, or 3 of 12"); Design (The replay: the AC-02 bullet "AC-02 asks for 2 hits in 6 or 3 in 12")
 EVIDENCE: The diff rewrote AC-02's last clause, so this is in scope. The harness extends a route to 12 when any label fails retention after 6 (tests/vh-adlc/replay/run.ts:578). That can be an unrelated label: on the host route it happens about 59% of the time from other labels alone (R-3 F-01). Then L-08 can have 2 hits in counted passes 1 to 6 and none in 7 to 12. One reader takes "at least 2 of 6 counted first passes" as met by the first 6 and passes the route. Another reads "or 3 of 12 when the harness extended the set" as the only test once the set is extended, and fails it at 2 of 12. At 1 in 3 per pass, P(2 of first 6) is about 0.33 and P(0 of next 6) about 0.088, so roughly 3% of host runs, times the chance of extension, land on this split. The Test Plan row also leaves it open. Design forbids a rerun, so a different reading flips whether the sentence ships.
 PROPOSAL: Say which count decides once the set is extended. For example: "2 of the first 6 counted first passes, or, when the harness extended the set, 3 of all 12". Or say that an extended route passes on either count. Use the same wording in the Owner summary, Design and the Test Plan row.
+
+### R-6
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Design (The replay: the AC-02 bullet "AC-02 asks for 2 hits in the first 6 counted passes or, when the set was extended, 3 in all 12, and an extended route passes on either count ... At a leftover rate of 5% per pass, a single hit in 12 passes would happen about 46% of the time, while 3 in 12 would happen about 2% of the time"); Context (Owner summary, first pass condition "A single hit could be chance"); Acceptance Criteria AC-02; Test Plan AC-02, AC-03 row
+EVIDENCE: This comes from the change made in answer to R-5 F-02, which added "an extended route passes on either count". The bullet still gives only the 3-in-12 figure as the noise rate the threshold allows. I recomputed it under the rule as it now reads, with a 5% leftover rate per pass. P(at least 2 of the first 6) is 0.033, so a route that stops at 6 passes on noise about 3.3% of the time. For an extended route the pass chance is P(at least 2 of the first 6) + P(1 of the first 6) x P(at least 2 of the next 6) + P(0 of the first 6) x P(at least 3 of the next 6), which is 0.0328 + 0.0076 + 0.0016, about 4.2%. P(at least 3 of 12) alone is 0.0196, which matches the document's "about 2%". So the sentence is still literally true, but it no longer gives the false-pass rate of the criterion it justifies. The threshold, AC-02 and the Test Plan row agree with each other in all four places, so nothing an implementer builds or a proof checks changes. `vh-adlc lint` passes on the document at 089a0707. The R-5 F-01 source now checks out: issue comment 7226459817 records the decision, and ledger #179 line 101 lists it.
+PROPOSAL: Give the false-pass rate the rule actually allows at a 5% leftover rate: about 3% for a route that stops at 6 passes and about 4% for an extended route, compared with about 46% for a single hit in 12.
 
 ## Sources
 
