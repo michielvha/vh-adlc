@@ -1,0 +1,130 @@
+// The loop context reports, for every file it lists, whether the local copy matches origin's default
+// branch tip and which version an operation reads (docs/specs/instruction-freshness.md).
+import { afterAll, describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+
+const CLI = resolve(import.meta.dir, "../../../plugins/vh-adlc/scripts/loop/cli.ts");
+const made: string[] = [];
+afterAll(() => { for (const dir of made) rmSync(dir, { recursive: true, force: true }); });
+
+const ENV = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid" };
+function git(root: string, ...args: string[]) {
+  const run = Bun.spawnSync(["git", ...args], { cwd: root, stdout: "pipe", stderr: "pipe", env: { ...process.env, ...ENV } });
+  if (run.exitCode !== 0) throw Error(`git ${args.join(" ")}: ${run.stderr.toString()}`);
+  return run.stdout.toString().trim();
+}
+function scratch(prefix: string) { const dir = realpathSync(mkdtempSync(join(tmpdir(), prefix))); made.push(dir); return dir; }
+function write(root: string, files: Record<string, string | null>) {
+  for (const [path, text] of Object.entries(files)) {
+    if (text === null) { rmSync(join(root, path), { force: true }); continue; }
+    mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), text);
+  }
+}
+function commit(root: string, files: Record<string, string | null>, message = "change") {
+  write(root, files); git(root, "add", "-A"); git(root, "commit", "-q", "-m", message); return git(root, "rev-parse", "HEAD");
+}
+const settings = (files: string[], procedure?: string, lenses: string[] = []) =>
+  `schema_version: 1\ninstruction_files:\n${files.map(file => `  - ${file}\n`).join("")}` +
+  (procedure ? `project_procedure: ${procedure}\n` : "") +
+  (lenses.length ? `lenses:\n${lenses.map(name => `  - name: ${name}\n    check: Check ${name}.\n    severity: nit\n`).join("")}` : "");
+
+/** A seed repository that publishes to a bare origin, and a clone of it. Advance origin by committing in the seed and pushing. */
+function fixture(files: Record<string, string>) {
+  const seed = scratch("vh-fresh-seed-"), origin = scratch("vh-fresh-origin-"), parent = scratch("vh-fresh-clone-");
+  git(seed, "init", "-q", "-b", "main"); commit(seed, files, "first");
+  git(origin, "init", "-q", "--bare", "-b", "main");
+  git(seed, "remote", "add", "origin", origin); git(seed, "push", "-q", "origin", "main");
+  git(parent, "clone", "-q", origin, "clone");
+  const clone = join(parent, "clone");
+  git(clone, "config", "user.name", "t"); git(clone, "config", "user.email", "t@example.invalid");
+  const advance = (change: Record<string, string | null>) => { const sha = commit(seed, change, "advance"); git(seed, "push", "-q", "origin", "main"); return sha; };
+  return { seed, origin, clone, advance };
+}
+
+type Entry = { path: string; state: string; read: string | null };
+type Freshness = { default_branch: string; tip: string | null; reason?: string; settings: Entry & { error?: string }; files: Entry[] };
+function context(repo: string, ...extra: string[]) {
+  const run = Bun.spawnSync([process.execPath, CLI, "context", "--repo", repo, ...extra], { stdout: "pipe", stderr: "pipe",
+    env: { ...process.env, XDG_CONFIG_HOME: join(tmpdir(), "vh-fresh-no-override"), GIT_TERMINAL_PROMPT: "0" }, timeout: 90_000 });
+  const out = run.stdout.toString();
+  return { code: run.exitCode, stderr: run.stderr.toString(), json: JSON.parse(out || "{}") as { read: string[]; lenses: unknown[]; lensText: string; plugin: unknown; freshness: Freshness } };
+}
+const byPath = (freshness: Freshness) => Object.fromEntries(freshness.files.map(entry => [entry.path, entry]));
+
+describe("per-file states against the default branch tip", () => {
+  test("stale, current and edited files each report their state and the version to read (AC-01, AC-02)", () => {
+    const { clone, advance } = fixture({
+      ".vh-adlc/loop.yaml": settings(["AGENTS.md", "a.md", "b.md", "c.md"], "agents/procedure.md"),
+      "AGENTS.md": "rules v1\n", "agents/procedure.md": "procedure v1\n", "a.md": "same\n", "b.md": "b v1\n", "c.md": "c v1\n",
+    });
+    const tip = advance({ "AGENTS.md": "rules v2\n", "agents/procedure.md": "procedure v2\n", "b.md": "b v2 at tip\n", "c.md": "c v2 at tip\n" });
+    commit(clone, { "b.md": "b edited on this branch\n" });
+    write(clone, { "c.md": "c edited, not committed\n" });
+
+    const { code, json } = context(clone, "--default-branch", "main");
+    expect(code).toBe(0);
+    expect(json.freshness.tip).toBe(tip);
+    expect(json.freshness.default_branch).toBe("main");
+    expect(json.read).toEqual(["AGENTS.md", "a.md", "b.md", "c.md", "agents/procedure.md"]);
+    const files = byPath(json.freshness);
+    expect(files["AGENTS.md"]).toEqual({ path: "AGENTS.md", state: "stale", read: `${tip}:AGENTS.md` });
+    expect(files["agents/procedure.md"]).toEqual({ path: "agents/procedure.md", state: "stale", read: `${tip}:agents/procedure.md` });
+    expect(files["a.md"]).toEqual({ path: "a.md", state: "current", read: "a.md" });
+    expect(files["b.md"]).toEqual({ path: "b.md", state: "edited", read: "b.md" });
+    expect(files["c.md"]).toEqual({ path: "c.md", state: "edited", read: "c.md" });
+    expect(json.freshness.files.map(entry => entry.path)).toEqual(json.read);
+    expect(git(clone, "show", files["AGENTS.md"].read!)).toBe("rules v2");
+    expect(git(clone, "show", files["agents/procedure.md"].read!)).toBe("procedure v2");
+  });
+
+  test("a listed file the tip deleted reads as removed while this branch keeps its own settings (AC-04)", () => {
+    const { clone, advance } = fixture({
+      ".vh-adlc/loop.yaml": settings(["AGENTS.md", "d.md"]), "AGENTS.md": "rules\n", "d.md": "d\n",
+    });
+    advance({ "d.md": null, ".vh-adlc/loop.yaml": settings(["AGENTS.md"]) });
+    commit(clone, { ".vh-adlc/loop.yaml": settings(["AGENTS.md", "d.md"], undefined, ["local-lens"]) });
+
+    const { code, json } = context(clone, "--default-branch", "main");
+    expect(code).toBe(0);
+    expect(json.freshness.settings.state).toBe("edited");
+    expect(byPath(json.freshness)["d.md"]).toEqual({ path: "d.md", state: "removed", read: null });
+    expect(byPath(json.freshness)["AGENTS.md"].state).toBe("current");
+  });
+});
+
+describe("the checkout stays as it was", () => {
+  test("only origin's tracking ref for the default branch moves, even when origin has a new tag (AC-06)", () => {
+    const { seed, clone, advance } = fixture({ ".vh-adlc/loop.yaml": settings(["AGENTS.md"]), "AGENTS.md": "v1\n" });
+    const tip = advance({ "AGENTS.md": "v2\n" });
+    git(seed, "tag", "v9.9.9", tip); git(seed, "push", "-q", "origin", "v9.9.9");
+    write(clone, { "scratch.txt": "untracked\n" });
+    const snapshot = () => ({
+      head: git(clone, "rev-parse", "HEAD"), branch: git(clone, "symbolic-ref", "HEAD"),
+      status: git(clone, "status", "--porcelain=v2"), tree: git(clone, "write-tree"),
+      refs: git(clone, "for-each-ref", "--format=%(refname) %(objectname)").split("\n").filter(line => !line.startsWith("refs/remotes/origin/main ")),
+    });
+    const before = snapshot();
+    const { code } = context(clone, "--default-branch", "main");
+    expect(code).toBe(0);
+    expect(snapshot()).toEqual(before);
+    expect(git(clone, "rev-parse", "refs/remotes/origin/main")).toBe(tip);
+    expect(git(clone, "tag", "--list")).toBe("");
+  });
+});
+
+describe("resolving the default branch", () => {
+  test("a clone without origin/HEAD still verifies, with and without the flag (AC-08)", () => {
+    const { clone, advance } = fixture({ ".vh-adlc/loop.yaml": settings(["AGENTS.md"]), "AGENTS.md": "v1\n" });
+    const tip = advance({ "AGENTS.md": "v2\n" });
+    git(clone, "update-ref", "-d", "refs/remotes/origin/HEAD");
+    for (const extra of [["--default-branch", "main"], []]) {
+      const { code, json } = context(clone, ...extra);
+      expect(code).toBe(0);
+      expect(json.freshness.tip).toBe(tip);
+      expect(json.freshness.files.some(entry => entry.state === "unverified")).toBe(false);
+      expect(json.freshness.settings.state).not.toBe("unverified");
+    }
+  });
+});

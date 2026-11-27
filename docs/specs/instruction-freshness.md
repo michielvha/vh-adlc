@@ -306,7 +306,8 @@ the plugin removes the field and the rule together, because they ship in one ver
 
 ## Tasks
 
-- [ ] T1 `tests/vh-adlc/loop/context-freshness.test.ts` - the failing tests for the per-file states, the tip-pinned `read`, the untouched checkout and a clone without `origin/HEAD`; they fail because `context` prints no `freshness` (AC-01, AC-02, AC-04, AC-06, AC-08)
+- [x] T1 `tests/vh-adlc/loop/context-freshness.test.ts` - the failing tests for the per-file states, the tip-pinned `read`, the untouched checkout and a clone without `origin/HEAD`; they fail because `context` prints no `freshness` (AC-01, AC-02, AC-04, AC-06, AC-08)
+      Evidence: `bun test tests/vh-adlc/loop/context-freshness.test.ts --timeout 60000` on 2f12dfa plus this test: 0 pass, 4 fail. AC-01/02, AC-04 and AC-08 fail on `json.freshness` being undefined; AC-06 fails because `refs/remotes/origin/main` stayed at the clone's old commit (no fetch).
 - [ ] T2 `plugins/vh-adlc/scripts/loop/freshness.ts`, `plugins/vh-adlc/scripts/loop/cli.ts` - default-branch resolution, the guarded `--no-tags` fetch and the state classification; T1 passes (AC-01, AC-02, AC-04, AC-06, AC-08)
 - [ ] T3 `tests/vh-adlc/loop/context-freshness.test.ts` - the failing tests for the stale-settings fallback and every `unverified` cause; they fail because `context` still reads only the local settings and has no fallback reasons (AC-03, AC-05)
 - [ ] T4 `plugins/vh-adlc/scripts/loop/freshness.ts` - the tip-settings fallback, its load error, the null `read` for an absent settings file and the `unverified` reasons; T3 and T1 pass, and `tests/vh-adlc/loop/plugin-version.test.ts` still passes (AC-03, AC-05)
