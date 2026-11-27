@@ -1,5 +1,5 @@
 /** Complete synthetic original roles and real owned native Git refs for closure-controller tests. */
-import { readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, lstatSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect } from "bun:test";
 import { collectClosureWorkerInputs, collectClosureReviewTarget } from "../../../plugins/vh-adlc/scripts/docs-drift/closure-worker";
@@ -35,4 +35,54 @@ export async function originalClosureFixture(roots: string[], publisher?: Parame
   const authority = retainSyntheticArtifact(f.artifacts, "closure-authority.json", canonicalJSON({ schema_version: 1, kind: "docs-drift-publication-authority", manifest_sha256: target.manifest_sha256,
     origin: { kind: "owner-request", artifact: request }, effects: target.manifest!.effects.map(effect => ({ id: effect.id, sha256: effectDigest([effect]) })) }));
   return { ...f, origin, service, worker, reviewer, target, publication: { ...options, worker_capture: worker, reviewer_capture: reviewer, authority } };
+}
+
+type ClosureFixture = Awaited<ReturnType<typeof originalClosureFixture>>;
+const shared = new WeakMap<string[], { fixture: ClosureFixture; trees: [live: string, pristine: string][] }>();
+
+/**
+ * The default closure fixture, built once per roots list. The first call returns the freshly built
+ * fixture; every later call first restores each fixture root to its pristine copy, so each test still
+ * starts from unchanged state. Directories are restored in place because the run directory's identity
+ * includes its inode.
+ */
+export async function sharedOriginalClosureFixture(roots: string[]): Promise<ClosureFixture> {
+  const existing = shared.get(roots);
+  if (existing) {
+    for (const [live, pristine] of existing.trees) restoreTree(pristine, live);
+    return existing.fixture;
+  }
+  const start = roots.length, fixture = await originalClosureFixture(roots), live = roots.slice(start);
+  const used = [fixture.repo, fixture.origin, fixture.artifacts, fixture.adopted.root, fixture.adopted.retained.directory,
+    fixture.service.statePath, fixture.service.calls, fixture.options.cache_directory];
+  for (const path of used) {
+    const real = realpathSync(path);
+    if (!live.some(root => real === realpathSync(root) || real.startsWith(realpathSync(root) + "/")))
+      throw Error("Shared closure fixture path outside its owned roots: " + path);
+  }
+  const trees = live.map(root => {
+    const pristine = root + ".pristine";
+    cpSync(root, pristine, { recursive: true, verbatimSymlinks: true, preserveTimestamps: true });
+    roots.push(pristine);
+    return [root, pristine] as [string, string];
+  });
+  shared.set(roots, { fixture, trees });
+  return fixture;
+}
+
+function restoreTree(source: string, target: string): void {
+  const wanted = new Set(readdirSync(source));
+  for (const name of readdirSync(target)) if (!wanted.has(name)) rmSync(join(target, name), { recursive: true, force: true });
+  for (const name of wanted) {
+    const from = join(source, name), to = join(target, name), kind = lstatSync(from);
+    const current = existsSync(to) || isSymlink(to) ? lstatSync(to) : null;
+    if (kind.isDirectory() && current?.isDirectory()) { restoreTree(from, to); continue; }
+    if (current) rmSync(to, { recursive: true, force: true });
+    cpSync(from, to, { recursive: true, verbatimSymlinks: true, preserveTimestamps: true });
+  }
+  chmodSync(target, lstatSync(source).mode & 0o7777);
+}
+
+function isSymlink(path: string): boolean {
+  try { return lstatSync(path).isSymbolicLink(); } catch { return false; }
 }

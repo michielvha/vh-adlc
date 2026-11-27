@@ -4,7 +4,7 @@ import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { checkClosurePublication, publishClosure } from "../../../plugins/vh-adlc/scripts/docs-drift/closure-controller";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
-import { originalClosureFixture } from "./original-closure-fixture";
+import { originalClosureFixture, sharedOriginalClosureFixture } from "./original-closure-fixture";
 import { git, put } from "./repository-fixture";
 
 const roots: string[] = [];
@@ -15,7 +15,7 @@ afterAll(() => {
 });
 
 test("normal closure authority check seals the reviewed exact batch without sending any writes", async () => {
-  const f = await originalClosureFixture(roots), before = captureRepositoryState(f.repo);
+  const f = await sharedOriginalClosureFixture(roots), before = captureRepositoryState(f.repo);
   const result = await checkClosurePublication(f.publication);
   expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true);
   expect(result.authority).toBe("none");
@@ -31,7 +31,7 @@ test("normal closure authority check seals the reviewed exact batch without send
 
 test("retained original closure controller publishes only its exact approved explanations and closes", async () => {
   try {
-    const f = await originalClosureFixture(roots);
+    const f = await sharedOriginalClosureFixture(roots);
     put(f.repo, "docs/guide.md", "Preserve another documentation draft\n");
     const before = captureRepositoryState(f.repo);
     const controller: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/closure-controller") = await import(join(f.adopted.retained.directory, "scripts/docs-drift/closure-controller.ts"));
@@ -57,7 +57,7 @@ test.each(["local", "hosted"])("retained closure resumes an applied close after 
   try {
     const { spyOn } = await import("bun:test");
     const identities = Object.fromEntries(["hosted", "copilot", "claude", "interactive"].map(name => [name, { actor: "fixture-bot", actor_id: 20 }]));
-    const f = await originalClosureFixture(roots, entry === "hosted" ? { entry: "hosted", identities } : undefined);
+    const f = entry === "hosted" ? await originalClosureFixture(roots, { entry: "hosted", identities }) : await sharedOriginalClosureFixture(roots);
     const before = captureRepositoryState(f.repo);
     if (entry === "hosted") {
       const state = JSON.parse(readFileSync(f.service.statePath, "utf8"));
@@ -102,7 +102,7 @@ test("edited delivered explanations invalidate original closure recovery even af
   try {
     const { spyOn } = await import("bun:test");
     const { writeFileSync } = await import("node:fs");
-    const f = await originalClosureFixture(roots), before = captureRepositoryState(f.repo);
+    const f = await sharedOriginalClosureFixture(roots), before = captureRepositoryState(f.repo);
     const controller: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/closure-controller") = await import(join(f.adopted.retained.directory, "scripts/docs-drift/closure-controller.ts"));
     const journal = await import(join(f.adopted.retained.directory, "scripts/docs-drift/journal.ts"));
     const append = journal.appendOutcome;
@@ -139,7 +139,7 @@ test("edited delivered explanations invalidate original closure recovery even af
 test("closure execution refuses incomplete permission and sends no native effects without its original run", async () => {
   const { retainSyntheticArtifact } = await import("./original-publication-fixture");
   const { canonicalJSON } = await import("../../../plugins/vh-adlc/scripts/docs-drift/protocol");
-  const f = await originalClosureFixture(roots), before = captureRepositoryState(f.repo);
+  const f = await sharedOriginalClosureFixture(roots), before = captureRepositoryState(f.repo);
   const packet = JSON.parse(readFileSync(join(f.artifacts, f.publication.authority.path), "utf8"));
   packet.effects = [];
   const missing = retainSyntheticArtifact(f.artifacts, "missing-closure-effect-permission.json", canonicalJSON(packet));
@@ -158,7 +158,7 @@ test("closure execution refuses incomplete permission and sends no native effect
 test("a mistaken closure resume selection leaves its pending journal unchanged and correct resume can finish", async () => {
   try {
     const { spyOn } = await import("bun:test"), { canonicalDigest } = await import("../../../plugins/vh-adlc/scripts/docs-drift/protocol");
-    const f = await originalClosureFixture(roots), before = captureRepositoryState(f.repo);
+    const f = await sharedOriginalClosureFixture(roots), before = captureRepositoryState(f.repo);
     const controller: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/closure-controller") = await import(join(f.adopted.retained.directory, "scripts/docs-drift/closure-controller.ts"));
     const journal = await import(join(f.adopted.retained.directory, "scripts/docs-drift/journal.ts")), original = journal.appendOutcome;
     let interrupted = false;
@@ -185,7 +185,7 @@ test("a mistaken closure resume selection leaves its pending journal unchanged a
 test.each(["authority", "origin"])("changed closure %s bytes persistently invalidate the batch before another effect", async kind => {
   try {
     const { spyOn } = await import("bun:test"), { writeFileSync } = await import("node:fs");
-    const f = await originalClosureFixture(roots), before = captureRepositoryState(f.repo);
+    const f = await sharedOriginalClosureFixture(roots), before = captureRepositoryState(f.repo);
     const controller: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/closure-controller") = await import(join(f.adopted.retained.directory, "scripts/docs-drift/closure-controller.ts"));
     const journal = await import(join(f.adopted.retained.directory, "scripts/docs-drift/journal.ts")), original = journal.appendOutcome;
     const authority = JSON.parse(readFileSync(join(f.artifacts, f.publication.authority.path), "utf8"));
