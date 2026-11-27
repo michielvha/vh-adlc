@@ -253,3 +253,69 @@ consumers rely on.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-27 | R-1 | spec | `5841585` | claude-opus-5-5 | procedural | 5 should-fix, 4 nits; revision follows |
+
+### R-1
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Read rule, States); Scope (Out of scope, first bullet); Context (Owner summary, second paragraph)
+EVIDENCE: The design sends operations to `origin/<branch>:AGENTS.md` whenever the local copy is `stale`. In consumers like this one, AGENTS.md also holds the conventions pin (AGENTS.md:3-4 links vhco-pro/docs at e79eaa6). The binary takes the pin from the working tree: `vh-adlc lint docs/specs/instruction-freshness.md --repo . --plugin-pin e79eaa6...` printed `"source":"repository","pin_files":["AGENTS.md"]`. So when a branch is behind a pin bump, the operation reads the tip's AGENTS.md and follows conventions at the new revision, while `gate`, `fresh` and the review dispatch keep deciding at the checkout's older pin. The document never says which revision governs conventions once instruction files come from the tip.
+PROPOSAL: In the Read rule, say that the conventions revision the operation follows and passes to the binary and reviewers is always the one the binary resolves from the checkout (`knowledge.revision`), never a pin line in a tip copy. Add that case to the AC-07 text test or to a criterion.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (States, Settings file); Acceptance Criteria AC-04; Test Plan row AC-01, AC-02, AC-04
+EVIDENCE: Every path in valid settings must exist (settings.ts:85-90, `file()` fails with "must reference a file"). If origin deletes a listed file, it must also drop the file from its settings, or its settings stop loading. When it drops the file, the local settings become `stale`, and the design then "takes the reading list and lenses from" the tip's settings, so the deleted file is no longer listed and is never reported `removed`. `removed` can only appear when the local settings are `edited`/`current` against an inconsistent tip, or when the tip's settings fail to load. The Test Plan fixture only says "origin advances, deletes one file", so it leaves this undecided, and two implementers will build different fixtures, one of which cannot produce AC-04. The States table also leaves the case where `T` has no `p` and the working tree differs from `B:p` undefined: `edited` requires "differs from `T:p`", which is unclear when `T:p` does not exist.
+PROPOSAL: State the conditions under which `removed` occurs (the local settings are kept because they are edited, or because the tip's settings fail to load), and build the AC-04 fixture on one of them explicitly. Add a States row or clause for a path the tip deleted that this branch changed.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Default branch and fetch, Concurrency, failure, upgrade); Acceptance Criteria AC-06; Test Plan row AC-06; Context (Owner summary, "The fetch moves only remote-tracking refs")
+EVIDENCE: The design says `git fetch -q origin <branch>` "moves only `refs/remotes/origin/<branch>`", and AC-06 says "only `refs/remotes/origin/<branch>` moved". `git help -m fetch` says: "By default, any tag that points into the histories being fetched is also fetched ... changed by using the --tags or --no-tags options". So a fetch without `--no-tags` can create local `refs/tags/*`, which are not remote-tracking refs. The AC-06 proof compares only HEAD, symbolic-ref, status and write-tree, so it would pass while the criterion's "only" is false.
+PROPOSAL: Fetch with `git fetch -q --no-tags origin <branch>`, and have the AC-06 test compare `git for-each-ref` before and after, expecting only `refs/remotes/origin/<branch>` to differ.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Default branch and fetch, Read rule); Scope (the `--default-branch` bullet); Acceptance Criteria AC-05
+EVIDENCE: Without the flag, `context` resolves the branch only from `refs/remotes/origin/HEAD`, and otherwise reports every entry `unverified`. The Read rule does not say whether operations pass `--default-branch`, and the eight skills call `context` with no flag (for example skills/vh-adlc-spec/SKILL.md:39). A repository created with `git init` and later pushed usually has no `origin/HEAD`. There, every run comes back `unverified` and the stale-rules harm stays, even though operations already know the default branch (skills/vh-adlc-implement/SKILL.md:51,80 use `<default branch>`).
+PROPOSAL: Have the Read rule make operations pass `--default-branch <default branch>`, or fall back to `git ls-remote --symref origin HEAD` before giving up. Add a Test Plan case for a clone without `origin/HEAD` that still gets a verified result.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan row AC-05; Acceptance Criteria AC-05
+EVIDENCE: The row asserts `read`, `lenses` and `plugin` are "equal to a run on the same settings before the change". A test in the new suite cannot run the code from before the change, so this baseline cannot be observed as written. The design promises that the reason for an unresolvable default branch "names `--default-branch`", but the row asserts only a non-empty `reason`, so a wrong reason passes. The design also lists a timed-out fetch and a held ref lock as causes, and neither has a case.
+PROPOSAL: Compare against the `loopContext` output for the clone's working-tree settings. For the no-`origin/HEAD` case, assert that the reason names `--default-branch`.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Owner summary); Scope; Design (Read rule); Acceptance Criteria AC-07; Test Plan row AC-07
+EVIDENCE: The Owner summary says each file gets "the local path, or a `origin/<branch>:<path>` revision". It leaves out the null `read` of `removed`, and "a `origin" should read "an". The document calls orchestrate one of "the eight SDD skills", but references/loop.md:141 lists the SDD operations as seven (spec, tasks, implement, review, ship, investigate and resume), and references/orchestrate.md:11-22 classes orchestrate as a coordination operation.
+PROPOSAL: Mention the null `read` for `removed` in the summary, fix the article, and say "the seven SDD skills and the orchestrate skill" or equivalent wherever "eight SDD skills" appears.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Read rule); Context (Background, Current state)
+EVIDENCE: The design updates references/loop.md:143 and the eight skills' context lines. Other places also refer to "the files `bun scripts/loop/cli.ts context` lists" or re-run context: references/loop.md:42 (nit triage), skills/vh-adlc-spec/SKILL.md:164 and references/orchestrate.md:108. The last is outside `covers`.
+PROPOSAL: List these locations in the Read rule as also following the reported version, or say why they need no change.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (States, Output, Concurrency, failure, upgrade)
+EVIDENCE: `read` is `origin/<branch>:p`, a moving ref. A concurrent session's fetch between `context` and the `git show` makes the operation read a later tip than the one classified. The name can also be ambiguous with a local branch named `origin/<branch>`. The output already carries `tip: "<sha>"`.
+PROPOSAL: Emit `read` as `<tip sha>:p`, or state why the moving ref is preferred.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: nit
+WHERE: Design (States); Scope (Not handled line)
+EVIDENCE: The States table depends on `B`, the merge base of `HEAD` and `T`, and no outcome is defined for when none exists (a shallow clone, or unrelated histories). The Scope line "Not handled: a file that both the current branch and the tip changed ..." does not follow the convention's `Not handled: <the case>, <why> (R-<n> F-<nn>).` form (feature-documents.md:255-256).
+PROPOSAL: Report `unverified` with a reason when no merge base exists. Either restate the limit as a Design decision with its reason, or keep it in Scope until a finding gives it an ID.
