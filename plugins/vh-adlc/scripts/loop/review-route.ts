@@ -360,9 +360,16 @@ export function protectedLinkCheck(root: string, scratch: string[], extra: strin
  * of one, into a Git directory, or, through a symlink, to anywhere inside a denied path. The snapshot skips
  * a scratch entry by its declared path, not by what it points at.
  */
-function scratchOverlap(allows: { entry: string; declared: string; resolved: string }[], deny: string[], gitDirs: string[]): { entry: string; resolved: string } | undefined {
+function scratchOverlap(allows: { entry: string; declared: string; resolved: string }[], deny: string[], gitDirs: string[],
+  stores: string[] = []): { entry: string; resolved: string } | undefined {
   const inside = (path: string, dir: string) => path === dir || dir === "/" || path.startsWith(`${dir}/`);
+  const storeParents = new Set(stores.flatMap(store => {
+    const out: string[] = [];
+    for (let at = dirname(store); ; at = dirname(at)) { if (existsSync(at)) out.push(at); if (dirname(at) === at) return out; }
+  }));
   for (const { entry, declared, resolved } of allows) {
+    // A scratch allow comes from the candidate commit: it must never reach a credential store.
+    if (stores.some(store => inside(resolved, store) || inside(store, resolved)) || storeParents.has(resolved)) return { entry, resolved };
     if (deny.some(dir => inside(dir, resolved)) || gitDirs.some(dir => inside(resolved, dir))
       || resolved !== declared && deny.some(dir => inside(resolved, dir))) return { entry, resolved };
   }
@@ -373,6 +380,9 @@ function scratchOverlap(allows: { entry: string; declared: string; resolved: str
  * The environment a reviewer CLI gets: an allowlist from the controller's, then `request.env`. The reviewer
  * runs the candidate's tests, often with network access, so it never inherits the controller's credentials.
  */
+/** Credential stores under the reviewer's home that the macOS profile refuses to read (owner's choice B, #187). */
+const CREDENTIAL_DIRECTORIES = [".ssh", ".aws", ".kube", ".docker", ".config/gh", ".config/gcloud"];
+const CREDENTIAL_FILES = [".netrc", ".git-credentials"];
 const REVIEWER_ENVIRONMENT = ["PATH", "HOME", "TMPDIR", "USER", "LOGNAME", "SHELL", "LANG", "TERM", "CODEX_HOME",
   "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_RUNTIME_DIR"];
 function reviewerEnvironment(extra: Record<string, string> | undefined): Record<string, string> {
@@ -411,12 +421,18 @@ export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutc
     // Under the macOS boundary no reviewer process may write what the before-and-after check judges. The
     // profile is built from these resolved paths, after no scratch allow is shown to open a protected one.
     const deny = [repo, gitDir, commonDir, ...(cloneDir ? [cloneDir] : []), ...(exportDir ? [exportDir] : [])].map(resolvedPath);
+    // The fixed credential stores under the home the reviewer gets.
+    const reviewerHome = request.env?.HOME ?? process.env.HOME;
+    const credentials = reviewerHome
+      ? { directories: CREDENTIAL_DIRECTORIES.map(path => resolvedPath(join(reviewerHome, path))),
+          files: CREDENTIAL_FILES.map(path => resolvedPath(join(reviewerHome, path))) }
+      : { directories: [], files: [] };
     // Each allow is resolved once: the overlap check and the profile see the same path.
     const allows = [...scratch.map(entry => ({ entry, declared: join(repo, entry) })),
       ...(cloneDir ? scratch.map(entry => ({ entry, declared: join(cloneDir!, entry) })) : [])]
       .map(allow => ({ ...allow, resolved: resolvedPath(allow.declared) }));
     if (seatbelt) {
-      const overlap = scratchOverlap(allows, deny, [resolvedPath(gitDir), resolvedPath(commonDir)]);
+      const overlap = scratchOverlap(allows, deny, [resolvedPath(gitDir), resolvedPath(commonDir)], [...credentials.directories, ...credentials.files]);
       if (overlap) return { status: "pending", reason: `the review_scratch entry ${overlap.entry} resolves onto a protected path (${overlap.resolved}), so allowing writes there would open it` };
     }
     const promptFile = join(work, "prompt.md");
@@ -429,7 +445,7 @@ export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutc
     const env = reviewerEnvironment(request.env);
     let result;
     try {
-      const writeDeny = { deny, allow: allows.map(allow => allow.resolved), resolved: true };
+      const writeDeny = { deny, allow: allows.map(allow => allow.resolved), resolved: true, credentials };
       result = await runOwnedClient(argv, { cwd: exportDir ?? cloneDir ?? repo, env, stdout, stderr, pidNamespace: namespace, writeDeny },
         { timeout_ms: request.timeoutMs ?? 15 * 60_000, grace_ms: 500, reap_ms: 2_000 });
     } catch (error) { return { status: "pending", reason: `the reviewer command could not start: ${(error as Error).message}` }; }

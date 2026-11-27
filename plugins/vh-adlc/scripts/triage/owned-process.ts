@@ -23,7 +23,12 @@ export type OwnedResult = {
   boundary: "pid-namespace" | "seatbelt" | "marker";
 };
 /** Paths no client process may write (with each of their parent directories), and paths inside them it still may. */
-export type WriteDeny = { deny: string[]; allow: string[]; /** The caller already resolved and validated every path. */ resolved?: boolean };
+export type WriteDeny = {
+  deny: string[]; allow: string[];
+  /** The caller already resolved and validated every path. */ resolved?: boolean;
+  /** Credential stores no process may read, write or rename; their rules come after the allows so none can override them. */
+  credentials?: { directories: string[]; files: string[] };
+};
 
 export const SANDBOX_EXEC = "/usr/bin/sandbox-exec";
 let seatbeltProbe: boolean | undefined;
@@ -76,6 +81,16 @@ export function seatbeltPrefix(writeDeny: WriteDeny): string[] {
   let profile = "(version 1)(allow default)";
   if (deny.length) profile += `(deny file-write* ${rules("D", "subpath", deny)})(deny file-write* ${rules("P", "literal", parents)})`;
   if (allow.length) profile += `(allow file-write* ${rules("A", "subpath", allow)})`;
+  // Credential stores: refuse reads, and refuse writes on each store and on every existing parent, so a
+  // rename can't expose a store under a new path. A missing parent gets no rule: there is nothing to rename.
+  const directories = [...new Set((writeDeny.credentials?.directories ?? []).map(resolve))];
+  const files = [...new Set((writeDeny.credentials?.files ?? []).map(resolve))];
+  if (directories.length || files.length) {
+    const stores = [rules("C", "subpath", directories), rules("F", "literal", files)].filter(Boolean).join(" ");
+    const storeParents = [...new Set([...directories, ...files].flatMap(parentsOf))].filter(path => existsSync(path));
+    profile += `(deny file-read* ${stores})(deny file-write* ${stores})`;
+    if (storeParents.length) profile += `(deny file-write* ${rules("Q", "literal", storeParents)})`;
+  }
   return [SANDBOX_EXEC, ...parameters, "-p", profile];
 }
 

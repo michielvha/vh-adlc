@@ -8,7 +8,7 @@ import os, re, subprocess, sys
 W = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
 RR = f"{W}/plugins/vh-adlc/scripts/loop/review-route.ts"
 OP = f"{W}/plugins/vh-adlc/scripts/triage/owned-process.ts"
-TESTS = "macOS write boundary|scratch directories that resolve|the link check over"
+TESTS = "macOS write boundary|scratch directories that resolve|the link check over|credential stores under|reviewer's environment"
 MUTANTS = {
     "no denied paths": (RR, "const writeDeny = { deny, allow:", "const writeDeny = { deny: [] as string[], allow:"),
     "no parent literal denies": (OP, '(deny file-write* ${rules("P", "literal", parents)})', ""),
@@ -21,6 +21,12 @@ MUTANTS = {
     "no scratch overlap check": (RR, "if (overlap) return", "if (overlap && false) return"),
     "no filesystem-root containment": (RR, 'path === dir || dir === "/" || path.startsWith', "path === dir || path.startsWith"),
     "no Git metadata error guard": (RR, "      return { changed: path };\n", "      continue;\n"),
+    "no credential read denies": (OP, "profile += `(deny file-read* ${stores})(deny file-write* ${stores})`;", "profile += `(deny file-write* ${stores})`;"),
+    "no credential store write denies": (OP, "profile += `(deny file-read* ${stores})(deny file-write* ${stores})`;", "profile += `(deny file-read* ${stores})`;"),
+    "no credential parent denies": (OP, 'if (storeParents.length) profile += `(deny file-write* ${rules("Q", "literal", storeParents)})`;', ""),
+    "allows placed after the credential rules": (OP, '  return [SANDBOX_EXEC, ...parameters, "-p", profile];', '  if (allow.length) profile += `(allow file-write* ${rules("A", "subpath", allow)})`;\n  return [SANDBOX_EXEC, ...parameters, "-p", profile];'),
+    "no store overlap check": (RR, "    if (stores.some(store => inside(resolved, store) || inside(store, resolved)) || storeParents.has(resolved)) return { entry, resolved };\n", ""),
+    "no environment allowlist": (RR, "    const env = reviewerEnvironment(request.env);", "    const env = { ...(process.env as Record<string, string>), ...request.env };"),
     "no boundary precheck": (RR, 'if (!namespace && !seatbelt) return { status: "pending", reason: NO_BOUNDARY };', ""),
 }
 env = dict(os.environ, PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:" + os.environ["PATH"])

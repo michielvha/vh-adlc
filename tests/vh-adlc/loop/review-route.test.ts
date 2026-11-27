@@ -570,7 +570,8 @@ describe("scratch directories that resolve onto protected paths", () => {
       const { root, commit } = repository();
       const ran = recordFile();
       symlinkSync(target(root), join(root, "alias"));
-      pending(await review(root, commit, stub(`echo ran > ${ran}`, ok(commit)), { scratch: ["alias"] }), "alias");
+      // An empty reviewer HOME means no credential stores, so only the protected-path containment can refuse this.
+      pending(await reviewWithHome(root, commit, "", `echo ran > ${ran}`, ["alias"]), "alias");
       expect(existsSync(ran)).toBe(false);
     });
 
