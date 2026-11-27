@@ -21,8 +21,11 @@ let namespaceProbe: boolean | undefined;
 /** Whether this host can run a client in an unprivileged PID namespace (Linux with user namespaces). */
 export function pidNamespaceAvailable(): boolean {
   if (namespaceProbe === undefined) {
-    const probe = Bun.spawnSync(["unshare", "--user", "--map-current-user", "--pid", "--fork", "--kill-child", "true"], { stdout: "ignore", stderr: "ignore" });
-    namespaceProbe = probe.exitCode === 0;
+    // A host without unshare at all, such as macOS, makes the spawn itself throw.
+    try {
+      const probe = Bun.spawnSync(["unshare", "--user", "--map-current-user", "--pid", "--fork", "--kill-child", "true"], { stdout: "ignore", stderr: "ignore" });
+      namespaceProbe = probe.exitCode === 0;
+    } catch { namespaceProbe = false; }
   }
   return namespaceProbe;
 }

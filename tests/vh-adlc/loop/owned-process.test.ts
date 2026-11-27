@@ -1,6 +1,6 @@
 // The owned-process runner stops everything a client left behind, including helpers that left its group.
 import { afterAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { markedProcesses, pidNamespaceAvailable, runOwnedClient } from "../../../plugins/vh-adlc/scripts/triage/owned-process";
@@ -81,8 +81,11 @@ describe("the PID namespace boundary", () => {
 
   // A fresh subprocess, because the probe caches its answer per process and this file may have probed already.
   test("a host without unshare runs the client with the marker boundary instead of throwing", () => {
-    const dir = scratch(), empty = join(dir, "empty-path");
+    // PATH keeps ps, which the macOS marker scan runs, and leaves out unshare.
+    const dir = scratch(), empty = join(dir, "no-unshare-path");
     mkdirSync(empty);
+    const ps = Bun.which("ps");
+    if (ps) symlinkSync(ps, join(empty, "ps"));
     const module = join(import.meta.dir, "../../../plugins/vh-adlc/scripts/triage/owned-process.ts");
     const script = `const { runOwnedClient } = await import(${JSON.stringify(module)});
 const r = await runOwnedClient(["/bin/sh", "-c", "exit 0"], { cwd: ${JSON.stringify(dir)}, env: { PATH: ${JSON.stringify(empty)} },
