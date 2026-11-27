@@ -133,9 +133,23 @@ PATH entry.
 Only `spec_reviewer` and `implementation_reviewer` accept a `command` route; settings that give one to
 `author` or `implementer` are refused, naming the role. Agent and skill files never name a model.
 
-A command route runs its CLI in its own PID namespace (`unshare --user --pid`), so every process it
-started, even one that left its group and cleared its environment, stops when the CLI exits. On a host
-without that boundary, a command-route review stays pending.
+A command route keeps every process its CLI starts, even one that left its group and cleared its
+environment, from changing the owning worktree or the private clone after the review has been judged.
+On Linux it runs the CLI in its own PID namespace (`unshare --user --pid`), so all of them stop when the
+CLI exits. On macOS it runs the CLI under a `sandbox-exec` profile that denies every process it starts
+writes to the owning worktree, its Git directory and common Git directory, the private clone or export,
+and each of their parent directories, outside `review_scratch`. Everything else stays writable, such as
+the temporary directory, `~/.codex` and build caches, and a process that outlives the review is not
+stopped there. A review whose protected files already have a second hard link stays pending. On a host
+with neither boundary, including a process already inside another Seatbelt sandbox, a command-route
+review stays pending.
+
+Seatbelt profiles do not nest, which has two consequences on macOS. A Codex route passes
+`-s danger-full-access`, because Codex's own sandbox cannot start inside the route's profile; its tool
+commands can then write outside the protected paths and reach the network. And a reviewer inside the
+profile cannot run tests that start their own `sandbox-exec`, so a change to the route's boundary code
+(`scripts/loop/review-route.ts`, `scripts/triage/owned-process.ts`) gets its implementation review on the
+host route or on a Linux host.
 
 Feature reservations use the adopted remote's committed `.vh-adlc/work-ownership.yaml`,
 independent of local loop overrides or a stale feature checkout. See
