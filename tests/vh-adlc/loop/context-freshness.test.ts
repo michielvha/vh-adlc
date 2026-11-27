@@ -1,7 +1,7 @@
 // The loop context reports, for every file it lists, whether the local copy matches origin's default
 // branch tip and which version an operation reads (docs/specs/instruction-freshness.md).
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { loopContext } from "../../../plugins/vh-adlc/scripts/loop/procedure";
@@ -130,6 +130,45 @@ describe("resolving the default branch", () => {
       expect(json.freshness.files.some(entry => entry.state === "unverified")).toBe(false);
       expect(json.freshness.settings.state).not.toBe("unverified");
     }
+  });
+});
+
+describe("the read rule in the skills and references (AC-07)", () => {
+  const PLUGIN = resolve(import.meta.dir, "../../../plugins/vh-adlc");
+  const COMMAND = "`bun scripts/loop/cli.ts context --default-branch <default branch>`";
+  const POINTER = "`references/loop-settings.md` (Instruction freshness)";
+  const CONVENTIONS = "The conventions revision is always the one `vh-adlc knowledge` resolves from the checkout.";
+  const sentences = (text: string) => text.replace(/\s+/g, " ").split(/(?<=[.!?])\s+(?=[A-Z`])/);
+  const points = (text: string) => sentences(text).some(sentence => sentence.includes(COMMAND) && sentence.includes(POINTER));
+  function section(text: string, heading: string): string {
+    const match = new RegExp(`^(#+) ${heading}\\s*$`, "m").exec(text);
+    if (!match) return "";
+    const rest = text.slice(match.index + match[0].length);
+    const next = new RegExp(`^#{1,${match[1].length}} `, "m").exec(rest);
+    return next ? rest.slice(0, next.index) : rest;
+  }
+  const ruleOk = (text: string) => ["`--default-branch <default branch>`", "`git show <read>`", CONVENTIONS].every(phrase => section(text, "Instruction freshness").includes(phrase));
+
+  test("the pointer pattern accepts the planned sentence and rejects the two wrong ones", () => {
+    expect(points("Before acting, run `bun scripts/loop/cli.ts context --default-branch <default branch>` and read every file it lists at the version `references/loop-settings.md` (Instruction freshness) names.")).toBe(true);
+    expect(points("Before acting, read every file `bun scripts/loop/cli.ts context` lists.")).toBe(false);
+    expect(points("Run `bun scripts/loop/cli.ts context --default-branch <default branch>`. Read `references/loop-settings.md` (Instruction freshness).")).toBe(false);
+  });
+
+  test("the rule pattern accepts the three rule bullets and rejects the conventions sentence alone or replaced", () => {
+    const bullets = "## Instruction freshness\n\n- Run `context` with `--default-branch <default branch>`.\n- Read each entry of `freshness.files` at its `read` value, a revision with `git show <read>`.\n- " + CONVENTIONS + "\n\n## Next\n";
+    expect(ruleOk(bullets)).toBe(true);
+    expect(ruleOk("## Instruction freshness\n\n" + CONVENTIONS + "\n")).toBe(false);
+    expect(ruleOk(bullets.replace(CONVENTIONS, "The conventions revision is the one the tip's `AGENTS.md` pins."))).toBe(false);
+  });
+
+  const pointed = [...["spec", "tasks", "implement", "review", "ship", "investigate", "resume", "orchestrate"].map(name => `skills/vh-adlc-${name}/SKILL.md`), "references/loop.md"];
+  test.each(pointed)("%s points to the read rule with the default-branch command", path => {
+    expect(points(readFileSync(join(PLUGIN, path), "utf8"))).toBe(true);
+  });
+
+  test("references/loop-settings.md states the read rule and keeps the conventions revision from the checkout", () => {
+    expect(ruleOk(readFileSync(join(PLUGIN, "references", "loop-settings.md"), "utf8"))).toBe(true);
   });
 });
 

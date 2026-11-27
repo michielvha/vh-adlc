@@ -14,6 +14,7 @@ const TERMS: Record<string, string[]> = {
   "Primary worktree": ["root checkout", "main worktree"],
   "No publication path": ["nothing to publish", "no-publish"],
   "Delivered": ["fully shipped", "published and done"],
+  "Instruction freshness": ["instruction staleness", "rule freshness"],
 };
 const files = () => [
   ...["loop-settings.md", "review-protocol.md", "loop.md", "authority.md"].map(name => join(PLUGIN, "references", name)),
