@@ -201,6 +201,58 @@ None.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-27 | R-1 | spec | `f201f8d2` | claude-opus-5-5 | procedural | 1 blocking, 2 should-fix, 4 nit |
+
+### R-1
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design (The replay: the AC-03 bullet "The analysis puts that chance at under 1% per label. Of the 79 label and route pairs the new brief retained, it raised 46 at their minimum in 9 or more of 12 passes"); Acceptance Criteria AC-03; Test Plan AC-02, AC-03 row; Owner summary (pass condition "No label the new brief retained is lost")
+EVIDENCE: The analysis does not put this chance anywhere. Its 0.009 figure (docs/internal/analysis/proportional-review-label-losses.md:100-104) is the chance that a label with no brief effect shows 2 of 3 old and 0 of 12 new. That is a different event. The retention table at tests/vh-adlc/evidence/proportional-review/results.md:63-164 has 75 enterprise pass rows, not 79. 46 of them have new at minimum 9/12 or more. The harness fails a label when old at minimum is 2 or more and no new pass raises it at minimum (tests/vh-adlc/replay/run.ts:268-270). It extends the set to 12 passes when any label fails (run.ts:578). Taking the stored new brief's rates as the per-pass rate of a sentence with no effect, P(0 of 12) is about 11% for host L-41 (old 2/3, new 2/12, results.md:155) and about 3.2% for host L-35 (old 2/3, new 3/12, results.md:149). It is about 0.8% for each of command L-15, host L-18 and host L-24, and about 0.16% for each of command L-18, host L-15 and host L-32. Together that is roughly a 16% chance that AC-03 fails for a harmless sentence. Design says such a failure "is not rerun", and a failed replay means the sentence does not ship. The false figure is the stated reason AC-03 uses the harness rule as it stands, so it changes what the proof checks.
+PROPOSAL: Correct the count and remove the misattributed chance. Then either limit AC-03 to pairs the replayed new brief raised at minimum often enough that 0 of 12 is unlikely, for example 6 or more of 12, and list the low-rate pairs as reported only, or state the roughly 16% false-failure risk in the Owner summary for the owner to accept.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-04; Test Plan AC-04 row; Owner summary (third pass condition); Design (The replay, the counting of 6 passes and 6 more)
+EVIDENCE: AC-04 compares a mean over 6 counted passes, or 12 if a label fails, with a 12-pass baseline, using a fixed margin of one. Blocking findings per pass cannot be counted from public files. As a proxy I counted ":blocking" labels per counted new-brief pass in results.md:18-59. Host: mean 5.83, SD 1.53 over 12 passes. Command: mean 24.67, SD 2.61. If the sentence has no effect, the standard error of the difference is about 0.76 on host and 1.3 on command. A rise of more than 1 then happens by chance about 10% of the time on host and about 22% on command. That is roughly a 30% chance that AC-04 fails a sentence that changes nothing, before any real increase. A sentence that asks for separate findings is also likely to add a few findings, some of them blocking, without undoing what proportional review gained. Two careful implementers would read a near-miss differently, but Design forbids a rerun.
+PROPOSAL: Base AC-04 on the measured spread. Either always count 12 passes per route for the mean, or set the margin from the baseline's standard deviation, for example the baseline mean plus two standard errors, and give the SD in the Background table next to the means.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-02; Test Plan AC-02, AC-03 row; Owner summary (first pass condition); frontmatter goal
+EVIDENCE: Under the harness rule, L-08 on host and L-10 on command pass once a single counted pass raises them at minimum (run.ts:268-270). The old brief raised each in 2 of 3 passes, and the replayed new brief in 0 of 12 (results.md:74,122). The analysis says chance "remains possible for both" and the old rate behind them is uncertain (analysis:152-153). The new brief already covers L-10's case in 2 of 13 Codex passes, but the matcher does not count it (analysis:132-136). One matched pass in 6 or 12 is also likely with a small residual rate, for example about 46% in 12 passes at a 5% rate. So AC-02 can pass for a sentence that does not restore the labels. The goal says the labels "pass retention again", but nothing checks the rate the old brief showed.
+PROPOSAL: Make AC-02 require a rate that tells the sentence apart from noise, for example at minimum in at least 2 of 6, or 3 of 12 after confirmation passes, on each label's route. Alternatively, record in the Owner summary that a single hit counts as restored.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design (The brief under test: "The shipped change is the same sentence on the default branch, where the paragraph around it has since been reworded (`57b33e73`)"); Owner summary ("the result measures the sentence alone")
+EVIDENCE: The paragraph that holds the sentence on line 82 ("Return every finding ...") is identical at ef685da1 and at f201f8d2. `57b33e73` rewords the two paragraphs before it. `git log ef685da1..HEAD -- plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` also lists `ee8e6c82` and `ea11072b`, which change the Rules section's page-cache instruction (lines 31-34 now). The shipped brief also runs under docs pin e79eaa6a, not 0fa68d68. So the shipped combination differs from the tested one in more than the stated rewording, and no replay covers it.
+PROPOSAL: Name all three commits and the docs pin difference. Say that the replay measures the sentence on the ef685da1 brief and that the shipped context is not replayed.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Scope (Out of scope: "The owner set the replay budget at about 6 Claude and 6 to 12 Codex passes"); Owner summary ("about 6 Claude passes and 6 Codex passes, plus 6 more of either"); Design (The replay, the 6 plus 6 bullet)
+EVIDENCE: The harness extends a route to 12 counted passes when any label fails after 6 (run.ts:578). On host that happens whenever L-08 is still missing after 6 passes, or when L-41 (2/12, P(0 of 6) about 33%) or L-35 misses. So 12 Claude passes is a likely outcome, and Scope gives the owner's budget as about 6. Failed executions add more (run.ts:227, up to three runs per needed pass).
+PROPOSAL: State one budget in all three places: up to 12 counted passes per route, plus failed executions.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Design (The replay: "its existing rule (`run.ts:48`, `run.ts:258-275`)" and "It refuses a run whose route or model differs from the settings")
+EVIDENCE: run.ts:258-275 is the retention rule. The 6 more passes are triggered at run.ts:578. A run that reports another route or model is not refused. It is stored as "not counted" and the set goes on (run.ts:234-236), and the harness stops only when runs reach the limit (run.ts:227-230). results.md:26 shows such a run.
+PROPOSAL: Cite run.ts:578 for the extension, and say that a run reporting another route or model is recorded as not counted and replaced, up to the harness limit.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Owner summary: "Reading the stored review records showed why ... The new reviewer still writes the wider finding, but frames it around one consequence and drops the clause"); Context (Background, the bullet "The analysis rules out two other explanations")
+EVIDENCE: The analysis presents the side-point pattern as what the records show, says no rule change is confirmed, and keeps chance open: "Chance remains possible for both" (docs/internal/analysis/proportional-review-label-losses.md:144-153). For L-10 on Codex it reports 9 of 13 passes that do not raise the defect and 2 that fold it into a blocking finding (analysis:132-142). So "drops the clause" describes only part of the passes. Background lists the two explanations that are ruled out but leaves out chance, which is not.
+PROPOSAL: Say the records point to dropped side points as the likely cause, that chance is not excluded, and that the replay tests the cause.
 
 ## Sources
 
