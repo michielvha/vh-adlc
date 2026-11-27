@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Written; waiting for the owner's answer to Q1, then a spec review."
+status_description: "Written with the owner's answers folded in; waiting for the first spec review."
 issue: https://github.com/michielvha/vh-adlc/issues/180
 goal: "An orchestrator archives a sub-session only when the forge shows its work finished, or when another session has taken its feature over and its worktree is kept, and archives nothing outside its workstream that the owner has not picked."
 covers:
@@ -29,8 +29,9 @@ entries for open work. The reference allowed it, because it lets the orchestrato
 "once each is done", and "done" is the session's own word.
 
 After this change, a sub-session ends in one of two ways, and the reference names both side by side.
-**Work finished** means the forge CLI shows the work item merged, or the owner has said the work is
-abandoned. Only then is the session archived. **Taken over** means another session carries the
+**Work finished** means the forge CLI shows the work item merged, or, for work with nothing to merge,
+its issue closed, or the owner has said the work is abandoned. Only then is the session archived. The
+owner accepted that a mistakenly closed issue lets the orchestrator archive such a session. **Taken over** means another session carries the
 feature on, as a paused or stale session's replacement or a resumed copy. The old session may be
 archived before the merge, but only once its handoff, naming its worktree, is in the workstream ledger,
 and only in a way that keeps its worktree, branch and uncommitted changes. If the host would delete the
@@ -44,8 +45,7 @@ The change is rule text in `references/orchestrate.md` and the orchestration row
 tool runs; the forge check is the `gh` read the status pass already does. The plugin's minor version
 goes up, as with every plugin feature.
 
-Open decision: Q1 asks when work with nothing to merge counts as finished. No review has run yet, and
-nothing in this document has been executed. Acceptance authorizes building the rule and test changes
+No decisions are open. No review has run yet, and nothing in this document has been executed. Acceptance authorizes building the rule and test changes
 on a feature branch. Merging and releasing still need the owner.
 
 ### Background
@@ -111,7 +111,7 @@ Out of scope:
 
 | Term | Meaning |
 | --- | --- |
-| Work finished | A sub-session's work item is merged, or the owner has said the work is abandoned, as the forge CLI or a recorded owner answer shows. |
+| Work finished | A sub-session's work item is merged, or for work with nothing to merge its issue is closed, or the owner has said the work is abandoned, as the forge CLI or a recorded owner answer shows. |
 | Taken over | Another session carries a sub-session's feature on: the replacement of a paused or stale session, or a resumed copy. The old session's work stays open until its work item is merged. |
 
 The reference's `## Glossary` table gains both rows exactly as written here.
@@ -130,7 +130,7 @@ exactly in the reference, under the section its heading names.
 **Close-out** (`## Close-out`):
 
 - S-36: A sub-session ends in one of two ways, and each has its own archive rule: work finished, or taken over.
-- S-55: Work finished: archive a sub-session only once the forge CLI shows its work item merged, or the owner has said the work is abandoned, never on the session's own report of done, and only after it has confirmed its cleanup finished; archive finished sub-sessions promptly.
+- S-55: Work finished: archive a sub-session only once the forge CLI shows its work item merged, or for work with nothing to merge its issue closed, or the owner has said the work is abandoned, never on the session's own report of done, and only after it has confirmed its cleanup finished; archive finished sub-sessions promptly.
 - S-56: Taken over: when another session takes a sub-session's feature over, the old session may be archived before the merge, but only once its handoff, naming its worktree, is in the workstream ledger, and only in a way that keeps its worktree, branch and uncommitted changes for the session taking over.
 - S-57: Where the host's archive action would remove a taken-over session's worktree, ask the owner before archiving it.
 - S-58: A pending or failed session that the owner approves ending is archived under that approval.
@@ -144,7 +144,9 @@ removed, leaving one statement of the rule.
 ### How the rules read together
 
 - **Forge read.** For work finished, the orchestrator reads the state of the PR the ledger records for
-  the work item with the forge CLI. The status pass rule already makes a failed read unknown, never
+  the work item with the forge CLI. Work with nothing to merge, such as an investigation, a triage or an
+  issue closed by a decision, is finished once the forge CLI shows the work item's issue closed; the
+  owner chose this and accepted that a mistakenly closed issue lets such a session be archived. The status pass rule already makes a failed read unknown, never
   merged or done, so a failed read leaves the session running and the read repeats on the next pass. No
   new sentence restates it.
 - **Owner abandonment.** "The owner has said the work is abandoned" means a dated owner answer
@@ -210,21 +212,7 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-### Q1: When does work with nothing to merge count as finished?
-
-Some sub-sessions end with no PR: an investigation, a triage, an issue closed by a decision. Under the
-work-finished rule as written, such a session is archived only when the owner says the work is
-abandoned, which is the wrong word for a completed investigation.
-
-**Recommendation:** A. It keeps the rule forge-checked and needs no extra owner step for routine work.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Closed work-item issue counts** | Work with nothing to merge is finished once the forge CLI shows its work-item issue closed. S-55 and the glossary row say "merged, or for work with nothing to merge its issue closed". | A session whose issue someone closes by mistake can be archived; the closed state is still on the forge to check. |
-| **B. Owner says it is finished** | Nothing is archived without a merge unless the owner says so. S-55 and the glossary row say "or the owner has said the work is finished or abandoned". | One more owner answer per session with nothing to merge, batched with the other questions. |
-
-**Why this is yours:** both meet the goal; they differ in how much the orchestrator may decide alone,
-which is the decision boundary you set.
+None.
 
 ## Review Log
 
@@ -237,3 +225,4 @@ which is the decision boundary you set.
 - [Issue #180](https://github.com/michielvha/vh-adlc/issues/180): the incident on 2026-11-27, the two gaps and the harm statement.
 - [Issue #166](https://github.com/michielvha/vh-adlc/issues/166): the paused-session worktree safeguard to make required.
 - [Owner answers on #180](https://github.com/michielvha/vh-adlc/issues/180#issuecomment-7213799472): a new document, #166 included, and the two ways a session ends named side by side.
+- [Owner answer to Q1 on #180](https://github.com/michielvha/vh-adlc/issues/180#issuecomment-7213902293): work with nothing to merge is finished once its issue is closed.
