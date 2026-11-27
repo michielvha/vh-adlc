@@ -247,6 +247,7 @@ None.
 | 2026-11-27 | R-2 | spec | `42990be2` | claude-opus-5-5 | procedural | 0 blocking, 1 should-fix, 2 nit |
 | 2026-11-27 | R-3 | spec | `eef99624` | claude-opus-5-5 | procedural | 0 blocking, 1 should-fix, 0 nit |
 | 2026-11-27 | R-4 | spec | `b4ff8acf` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 0 nit |
+| 2026-11-27 | R-5 | spec | `8f22161e` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 0 nit |
 
 ### R-1
 
@@ -346,6 +347,22 @@ SEVERITY: should-fix
 WHERE: Design (The replay: the second-set bullet "Any later pass it stored is listed in the results as not counted"; the paragraph "The harness's `--results` file goes to scratch first ... Only counts and run identities are copied"); Acceptance Criteria AC-05; Test Plan AC-05 row
 EVIDENCE: This also traces to the R-3 F-01 change. The harness writes its `--results` file only after every route has finished (tests/vh-adlc/replay/run.ts:630-633). A second-set invocation that is stopped after pass 6 therefore writes no results file, so Design's "the harness's `--results` file goes to scratch first" has nothing to copy for that set. The only harness path that writes results from stored runs is `assemble` (run.ts:399-415, 708-716). It reads every stored pass through `storedPasses`, which marks any pass with a `.verdicts.json` as counted and adds its hits to retention (run.ts:351-372). So a pass 7 stored before the stop would show up as counted in the assembled retention verdicts and in the run list, which is the opposite of "listed in the results as not counted". The document does not say how the second set's run identities, statuses and retention verdicts reach `results.md` for AC-05. Two implementers would produce different files: one would run `assemble` and count pass 7, another would edit the file by hand.
 PROPOSAL: State how the second set's results are produced. For example, run `assemble` on the second copy after moving any pass beyond the sixth counted one aside, then mark that pass by hand as not counted. Or state that the second set's rows in `results.md` are written by hand from the stored files, with retention recounted over the 12 judged passes.
+
+### R-5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (The replay: the bullet "Such a route fails AC-02. No second set runs: the orchestrator decided this on 2026-11-27 under the owner's delegation (ledger [#179](https://github.com/michielvha/vh-adlc/issues/179))"); Context (Owner summary, first pass condition "The orchestrator accepted that risk under the owner's delegation"); Open Questions ("None.")
+EVIDENCE: This traces to the change since b4ff8acf. Commit 250d79b2 raised the choice as Q1 and said "Why this is yours: it trades the risk of rejecting a sentence that works against an extra manual procedure and its passes. The goal and the recorded rules do not decide that." Commit 8f22161e removed Q1 and folded in answer A as a decision by the orchestrator. conventions/feature-documents.md (Open questions) says "Only the owner answers them" and "An answered question is folded into the document and removed". The cited ledger does not record this decision. I read the body of issue #179 (`gh issue view 179 --json body`): the Owner decisions list has no entry on a second set or on accepting the 11% and 23% false-failure risk. The only entry on this feature is "2026-11-27 (orchestrator, delegated by the owner): file D-02, D-07, D-11 and D-13, decline D-09, and try the one-sentence brief fix for D-17 and D-18." That entry delegates trying the fix, not answering a question the document itself said was the owner's. So the document's claim that the risk was accepted under delegation, and its "None." under Open Questions, rest on a source that does not support them. I recomputed the figures and they hold: P(exactly 1 of 6 at 1 in 3) = 0.263, times 0.41 and 0.857 gives about 11% and 23%. At 2 in 3: 0.0165 times 0.857 gives about 1.4%, under 1.5%.
+PROPOSAL: Restore Q1 for the owner to answer, or record the owner's answer, or a delegation that explicitly covers this choice, in the ledger and cite that entry. Say in the Owner summary who decided it.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-02 ("each in at least 2 of 6 counted first passes, or 3 of 12 when the harness extended the set"); Test Plan AC-02, AC-03 row ("at least 2 of 6 or 3 of 12 new runs"); Context (Owner summary, first pass condition "in at least 2 of 6 passes, or 3 of 12"); Design (The replay: the AC-02 bullet "AC-02 asks for 2 hits in 6 or 3 in 12")
+EVIDENCE: The diff rewrote AC-02's last clause, so this is in scope. The harness extends a route to 12 when any label fails retention after 6 (tests/vh-adlc/replay/run.ts:578). That can be an unrelated label: on the host route it happens about 59% of the time from other labels alone (R-3 F-01). Then L-08 can have 2 hits in counted passes 1 to 6 and none in 7 to 12. One reader takes "at least 2 of 6 counted first passes" as met by the first 6 and passes the route. Another reads "or 3 of 12 when the harness extended the set" as the only test once the set is extended, and fails it at 2 of 12. At 1 in 3 per pass, P(2 of first 6) is about 0.33 and P(0 of next 6) about 0.088, so roughly 3% of host runs, times the chance of extension, land on this split. The Test Plan row also leaves it open. Design forbids a rerun, so a different reading flips whether the sentence ships.
+PROPOSAL: Say which count decides once the set is extended. For example: "2 of the first 6 counted first passes, or, when the harness extended the set, 3 of all 12". Or say that an extended route passes on either count. Use the same wording in the Owner summary, Design and the Test Plan row.
 
 ## Sources
 
