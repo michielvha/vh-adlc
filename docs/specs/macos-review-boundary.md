@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Accepted at R-23; re-entering implementation."
+status: in-progress
+status_description: "Being implemented on feat/macos-review-boundary; T28 to T33 and T30 remain."
 issue: https://github.com/michielvha/vh-adlc/issues/187
 branch: feat/macos-review-boundary
 goal: "Spec and implementation reviews in this repository run on Codex from a Mac, with no owner step per review, and no reviewer process can change the owning worktree or the private clone once the review has been judged."
