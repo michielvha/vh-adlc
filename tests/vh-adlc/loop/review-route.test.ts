@@ -523,6 +523,21 @@ describe("the macOS write boundary", () => {
     expect(contentDigest(index)).toBe(before);
   });
 
+  darwin("a separate Git directory whose name ends in a space stays protected", async () => {
+    const top = realpathSync(mkdtempSync(join(tmpdir(), "vh-review-sepgit-")));
+    made.push(top);
+    const root = join(top, "work"), meta = join(top, "meta ");
+    mkdirSync(join(root, "docs/specs"), { recursive: true });
+    writeFileSync(join(root, "docs/specs/feature.md"), "# Feature\n");
+    git(top, "init", "-q", "-b", "main", `--separate-git-dir=${meta}`, root);
+    git(root, "add", "-A");
+    git(root, "commit", "-q", "-m", "fixture");
+    const commit = git(root, "rev-parse", "HEAD"), index = join(meta, "index"), before = contentDigest(index);
+    const body = `echo junk >> "${index}" 2>/dev/null; true`;
+    expect((await review(root, commit, stub(body, ok(commit)))).status).toBe("ready");
+    expect(contentDigest(index)).toBe(before);
+  });
+
   darwin("a protected file that already has a second hard link leaves the review pending before the reviewer runs", async () => {
     const { root, commit } = repository();
     const outside = recordFile(), ran = recordFile();
