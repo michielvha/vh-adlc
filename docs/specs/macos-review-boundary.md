@@ -295,7 +295,15 @@ applies. The Instruction freshness section and `parseReply` are left alone.
 
 ## Tasks
 
-None yet; written once the document is planned.
+- [ ] T1 `tests/vh-adlc/loop/owned-process.test.ts` - a subprocess with no `unshare` on `PATH` calls `runOwnedClient(..., { pidNamespace: true })` and expects `boundary: "marker"`; fails because the probe throws `Executable not found` (AC-04)
+- [ ] T2 `plugins/vh-adlc/scripts/triage/owned-process.ts` - `pidNamespaceAvailable()` returns false on a spawn error; T1 passes and the existing `owned-process.test.ts` and `tests/vh-adlc/triage/owned-process.test.ts` still pass (AC-04)
+- [ ] T3 `tests/vh-adlc/loop/review-route.test.ts` - darwin-only tests on the nested linked-worktree fixture for AC-02 (1) to (5), the nested-sandbox case for AC-03 and the pre-existing hard link for AC-08, plus macOS expectations for the existing preserved-worktree tests; the new tests fail on this Mac at T2 (AC-01, AC-02, AC-03, AC-08)
+- [ ] T4 `plugins/vh-adlc/scripts/triage/owned-process.ts` - the `writeDeny` option, `seatbeltAvailable()` and the profile with subpath, parent `literal` and allow rules passed as `-D` parameters; `ownedClientCompleted` unchanged; `owned-process.test.ts` and the triage owned-process tests pass (AC-02, AC-03)
+- [ ] T5 `plugins/vh-adlc/scripts/loop/review-route.ts` - pass `writeDeny` with the worktree, both Git directories, clone or export and scratch allows, accept `seatbelt`, add the link-count check and the new pending reason; `review-route.test.ts` passes on this Mac, and each AC-02, AC-03 and AC-08 test fails again with its part of the profile or check removed (AC-01, AC-02, AC-03, AC-08)
+- [ ] T6 `plugins/vh-adlc/references/loop-settings.md`, `plugins/vh-adlc/references/review-protocol.md` - the command-route paragraph and the Routes sentence state the four AC-07 points; `tests/vh-adlc/direct-operation-compatibility.test.ts` passes (AC-07)
+- [ ] T7 `plugins/vh-adlc/.claude-plugin/plugin.json` - minor version bump; `tests/vh-adlc/loop/plugin-version.test.ts` passes (Design)
+- [ ] T8 `.vh-adlc/loop.yaml` - both reviewer roles routed to Codex with the accepted model and `model_attestation: codex-session`; the AC-05 `cli.ts route` commands print the expected JSON, where both printed `"route":"host"` before (AC-05)
+- [ ] T9 `tests/vh-adlc/evidence/macos-review-boundary/` - one real Codex spec review and one real Codex implementation review through `cli.ts review` on this Mac, each JSON outcome, `git status --porcelain` before and after, and `vh-adlc review check` on the stored records (AC-06)
 
 ## Open Questions
 
