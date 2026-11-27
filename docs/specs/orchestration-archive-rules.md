@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Spec review R-4 is clean; waiting for the owner's acceptance."
+status: planned
+status_description: "Accepted by the owner at R-4 (0ae4eab6); ready for tasks and implementation."
 issue: https://github.com/michielvha/vh-adlc/issues/180
 goal: "An orchestrator archives a sub-session only when the forge shows its work finished, or when another session takes its feature over, or the owner has approved its replacement, and its worktree is kept, and archives nothing outside its workstream that the owner has not picked."
 covers:
@@ -248,6 +248,7 @@ None.
 | 2026-11-27 | R-2 | spec | `b3f58301` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 1 nit |
 | 2026-11-27 | R-3 | spec | `53c00e17` | claude-opus-5-5 | procedural | 0 blocking, 1 should-fix, 1 nit |
 | 2026-11-27 | R-4 | spec | `0ae4eab6` | claude-opus-5-5 | procedural | clean: 0 blocking, 0 should-fix, 1 nit left unapplied under the nit rule |
+| 2026-11-27 | R-4 | spec | `0ae4eab6` | n/a | n/a | accepted by owner |
 
 ### R-1
 
