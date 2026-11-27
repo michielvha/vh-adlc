@@ -442,3 +442,38 @@ describe("visual reading handoff checks", async () => {
     expect(visual.namesGap("The ledger cutover needs a pull quote.", "The ledger cutover")).toBe(true);
   });
 });
+
+describe("visual reading reads through variables", async () => {
+  const visual = await import("./blog/visual.ts");
+  const { mkdtempSync, mkdirSync: mkdir, writeFileSync: write, realpathSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  test("shell variables and JS string constants resolve before paths are read", () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), "bvr-vars-")));
+    mkdir(join(dir, "pkg/agents"), { recursive: true });
+    write(join(dir, "pkg/agents/vh-adlc-blog-editor.agent.md"), "x");
+    const shell = visual.shellReads(`p=${dir}/pkg; cat $p/agents/vh-adlc-blog-editor.agent.md \${p}/agents`, "/");
+    expect(shell.paths).toEqual([join(dir, "pkg/agents/vh-adlc-blog-editor.agent.md"), join(dir, "pkg/agents")]);
+    const js = `const a="${dir}/pkg"; text(await Promise.allSettled([tools.exec_command({cmd:\`cat '\${a}/agents/vh-adlc-blog-editor.agent.md'\`})]));`;
+    const literals = visual.literalArguments(js, ["tools.exec_command"]).map((l) => l.literal);
+    expect(literals).toEqual([`cat '${dir}/pkg/agents/vh-adlc-blog-editor.agent.md'`]);
+  });
+});
+
+describe("visual reading GitHub connector fetches", async () => {
+  const visual = await import("./blog/visual.ts");
+  const { mkdtempSync, writeFileSync: write } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  test("only the docs repository at the pin is allowed through the connector", () => {
+    const dir = mkdtempSync(join(tmpdir(), "bvr-mcp-"));
+    const call = (input: string) => JSON.stringify({ type: "response_item", payload: { type: "custom_tool_call", name: "exec", call_id: "x", input, internal_chat_message_metadata_passthrough: { turn_id: "t" } } });
+    write(join(dir, "p.jsonl"), [
+      JSON.stringify({ type: "session_meta", payload: { id: "P", cwd: dir, source: "exec" } }),
+      JSON.stringify({ type: "event_msg", payload: { type: "task_started", turn_id: "t", root_turn_id: "t" } }),
+      call(`await tools.mcp__codex_apps__github_fetch_file({repository_full_name:"vhco-pro/docs",path:"AGENTS.md",ref:"abc"})`),
+      call(`await tools.mcp__codex_apps__github_fetch_file({repository_full_name:"other/repo",path:"x",ref:"abc"})`),
+    ].join("\n"));
+    const { parent } = visual.linkedRollouts(visual.loadRollouts(dir), "P");
+    const fetches = visual.analyze([parent!], { png: join(dir, "none.png"), allowedUrl: visual.docsUrl("abc") }).fetches;
+    expect(fetches.map((f) => f.what.includes("other/repo"))).toEqual([true]);
+  });
+});

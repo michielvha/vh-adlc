@@ -425,12 +425,16 @@ const expand = (word: string) => word === "~" ? homedir() : word.startsWith("~/"
 export function shellReads(command: string, cwd: string): { paths: string[]; names: string[] } {
   const paths: string[] = [];
   const names: string[] = [];
+  const vars = new Map<string, string>();
+  const substitute = (word: string) => word.replace(/\$\{(\w+)\}|\$(\w+)/g, (all, a, b) => vars.get(a ?? b) ?? all);
   for (const words of simpleCommands(command)) {
     const { name, args } = commandWords(words);
+    // A command made only of assignments sets shell variables that later words in this command text may use.
+    if (!name) for (const w of words) { const m = w.match(/^([A-Za-z_]\w*)=(.*)$/); if (m) vars.set(m[1], substitute(m[2])); }
     if (name) names.push(name);
     for (const word of args) {
       if (!word) continue;
-      const path = resolve(cwd, expand(word));
+      const path = resolve(cwd, expand(substitute(word)));
       if (existsSync(path)) paths.push(real(path));
     }
   }
@@ -443,6 +447,9 @@ const READ_CALLS = ["readFileSync", "readFile", "readdirSync", "readdir", "open"
 /** String literals passed to each named call in code-mode `exec` input. */
 export function literalArguments(input: string, names: string[]): { name: string; literal: string }[] {
   const found: { name: string; literal: string }[] = [];
+  // String constants the script declares, so template literals that use them can be read.
+  const consts = new Map<string, string>();
+  for (const m of input.matchAll(/\b(?:const|let|var)\s+(\w+)\s*=\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|`((?:[^`\\$]|\\.)*)`)/g)) consts.set(m[1], m[2] ?? m[3] ?? m[4] ?? "");
   const pattern = new RegExp(`(?<![\\w.])(${names.map(escape).join("|")})\\s*\\(`, "g");
   for (const match of input.matchAll(pattern)) {
     let depth = 0;
@@ -455,8 +462,8 @@ export function literalArguments(input: string, names: string[]): { name: string
       if (c === ")" && --depth === 0) break;
     }
     const body = input.slice(start, i + 1);
-    for (const lit of body.matchAll(/"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|`((?:[^`\\$]|\\.)*)`/g)) {
-      const rawText = lit[1] ?? lit[2] ?? lit[3] ?? "";
+    for (const lit of body.matchAll(/"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|`((?:[^`\\]|\\.)*)`/g)) {
+      const rawText = lit[3] !== undefined ? lit[3].replace(/\$\{(\w+)\}/g, (all, n) => consts.get(n) ?? all) : lit[1] ?? lit[2] ?? "";
       let value = rawText;
       try { value = JSON.parse(`"${rawText.replace(/"/g, '\\"').replace(/\\'/g, "'")}"`); } catch { /* keep the raw literal */ }
       found.push({ name: match[1], literal: value });
@@ -527,6 +534,12 @@ export function analyze(rollouts: Rollout[], opts: { png: string; allowedUrl: (u
         if (existsSync(path)) result.reads.push({ ...at, path: real(path) });
       }
       for (const url of call.text.match(URL_PATTERN) ?? []) if (!opts.allowedUrl(url) && call.kind !== "web") result.fetches.push({ ...at, what: `url: ${url}` });
+      // A GitHub connector call is a fetch unless it reads the allowed docs repository at the pin.
+      if (/mcp__\w*github/i.test(call.kind === "function" ? call.name : call.text)) {
+        const repos = [...call.text.matchAll(/repository_full_name\W+([\w.-]+\/[\w.-]+)/g)].map((m) => m[1]);
+        const refs = [...call.text.matchAll(/\bref\W+([\w./-]+)/g)].map((m) => m[1]);
+        if (!repos.length || !refs.length || repos.some((r) => refs.some((ref) => !opts.allowedUrl(`https://github.com/${r}/blob/${ref}/x`)))) result.fetches.push({ ...at, what: `github connector: ${call.text.slice(0, 120)}` });
+      }
       if (call.text.includes(base)) {
         const listingOnly = shellTexts.length > 0 && shellTexts.every((t) => simpleCommands(t).filter((w) => w.join(" ").includes(base)).every((w) => ["ls", "find", "tree"].includes(commandWords(w).name)));
         result.mentions.push({ ...at, text: call.text.slice(0, 200), listingOnly });
