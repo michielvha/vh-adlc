@@ -281,7 +281,7 @@ function substitute(argv: string[], values: Record<string, string>): string[] {
  * Codex's `--json` stream names the thread; its session log under `$HOME/.codex/sessions` records the
  * model that served it. Returns the reply text (the final agent message) and the attested model.
  */
-export function codexSession(stdout: string, home: string): { reply: string; model?: string; error?: string } {
+export function codexSession(stdout: string, home: string, codexHome?: string): { reply: string; model?: string; error?: string } {
   let thread: string | undefined, reply = "";
   for (const line of stdout.split("\n")) {
     let event: { type?: string; thread_id?: string; item?: { type?: string; text?: string } };
@@ -290,7 +290,8 @@ export function codexSession(stdout: string, home: string): { reply: string; mod
     if (event.type === "item.completed" && event.item?.type === "agent_message" && typeof event.item.text === "string") reply = event.item.text;
   }
   if (!thread || !/^[0-9a-f-]{16,}$/i.test(thread)) return { reply, error: "the Codex stream named no thread id, so the served model cannot be attested" };
-  const sessions = join(home, ".codex", "sessions");
+  // Codex keeps its sessions under CODEX_HOME when that is set, else under ~/.codex.
+  const sessions = codexHome ? join(codexHome, "sessions") : join(home, ".codex", "sessions");
   const found: string[] = [];
   const walk = (dir: string) => {
     let names: string[];
@@ -422,7 +423,8 @@ export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutc
     // profile is built from these resolved paths, after no scratch allow is shown to open a protected one.
     const deny = [repo, gitDir, commonDir, ...(cloneDir ? [cloneDir] : []), ...(exportDir ? [exportDir] : [])].map(resolvedPath);
     // The fixed credential stores under the home the reviewer gets.
-    const reviewerHome = request.env?.HOME ?? process.env.HOME;
+    // An unset HOME falls back to the account's home; an empty one names no home and no stores.
+    const reviewerHome = request.env?.HOME ?? process.env.HOME ?? homedir();
     const credentials = reviewerHome
       ? { directories: CREDENTIAL_DIRECTORIES.map(path => resolvedPath(join(reviewerHome, path))),
           files: CREDENTIAL_FILES.map(path => resolvedPath(join(reviewerHome, path))) }
@@ -451,7 +453,7 @@ export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutc
     } catch (error) { return { status: "pending", reason: `the reviewer command could not start: ${(error as Error).message}` }; }
     const cleanup = request.cleanup ? await request.cleanup(result) : result;
     const raw = readFileSync(stdout, "utf8");
-    const attestation = request.route.model_attestation === "codex-session" ? codexSession(raw, request.env?.HOME ?? process.env.HOME ?? homedir()) : undefined;
+    const attestation = request.route.model_attestation === "codex-session" ? codexSession(raw, request.env?.HOME ?? process.env.HOME ?? homedir(), request.env?.CODEX_HOME ?? process.env.CODEX_HOME) : undefined;
     const reply = attestation ? attestation.reply : raw;
     if (result.boundary === "marker") return { status: "pending", reason: NO_BOUNDARY, reply: readFileSync(stdout, "utf8") };
     if (!cleanup.confirmed) return { status: "pending", reason: `process cleanup could not confirm every reviewer process stopped (${cleanup.survivors.join(", ") || "group"})`, reply };

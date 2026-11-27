@@ -18,14 +18,15 @@ trap 'rm -rf "$controller"' EXIT
 git clone -q --no-hardlinks "$repo" "$controller/clone" && git -C "$controller/clone" checkout -q --detach "$full" || fail "could not check out $full"
 cli="$controller/clone/plugins/vh-adlc/scripts/loop/cli.ts"
 binary=$(bash "$controller/clone/plugins/vh-adlc/scripts/ensure-vh-adlc.sh") || fail "no verified vh-adlc binary"
-# Every measurement must succeed, or two identical partial snapshots could pass the comparison.
+# Every measurement must succeed, or two identical partial snapshots could pass the comparison. Like the
+# route, it judges the owning worktree's files, index, HEAD and branch: other sessions' branches in the
+# shared repository may move during a review.
 state() (
   set -e
   git -C "$repo" status --porcelain=v1 --ignored --untracked-files=all
   git -C "$repo" rev-parse HEAD
   # Exit 1 means a detached HEAD; any other failure is a failed measurement.
   if ref=$(git -C "$repo" symbolic-ref -q HEAD); then echo "$ref"; else rc=$?; [ "$rc" -eq 1 ] || exit 1; echo detached; fi
-  git -C "$repo" for-each-ref --format='%(refname) %(objectname)'
   git -C "$repo" ls-files --stage -v
   shasum -a 256 "$(git -C "$repo" rev-parse --absolute-git-dir)/index"
 )

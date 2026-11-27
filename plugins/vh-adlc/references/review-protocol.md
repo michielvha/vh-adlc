@@ -20,7 +20,7 @@ Before dispatching, read the reviewer role's route:
   before the CLI starts, because a command-route reviewer often cannot fetch one itself. Then: a spec review reads a read-only export of X and is launched
   from it; an implementation review runs in a private clone of X. Afterwards the clone, and the owning
   worktree's files, index, HEAD and branch, must be unchanged outside `review_scratch`. The CLI runs
-  inside the process boundary `references/loop-settings.md` describes: a PID namespace on Linux, a
+  inside the process boundary [loop-settings.md](loop-settings.md) describes: a PID namespace on Linux, a
   `sandbox-exec` write profile on macOS; without one the review stays pending. A route with `model_attestation: codex-session` takes the served model from
   Codex's own session log, so a `MODEL: unknown` self-report is accepted only when that attested model
   matches the request. Its JSON `status` is `ready` or `pending`. On `ready`, store its `records`
