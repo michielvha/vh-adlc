@@ -674,3 +674,85 @@ describe("the reviewer's environment", () => {
     expect(names).toContain("VH_PASSED");
   });
 });
+
+// AC-13: on macOS the profile refuses reads of a fixed list of credential stores under the reviewer's home.
+const STORE_FILES = [".ssh/id_test", ".aws/credentials", ".kube/config", ".docker/config.json", ".config/gh/hosts.yml",
+  ".config/gcloud/credentials.db", ".netrc", ".git-credentials"];
+/** A fake home holding a secret in each of the eight stores and an unlisted notes.txt. */
+function fakeHome(options: { withoutConfig?: boolean } = {}) {
+  const top = realpathSync(mkdtempSync(join(tmpdir(), "vh-review-home-")));
+  made.push(top);
+  const home = join(top, "home");
+  for (const path of STORE_FILES) {
+    if (options.withoutConfig && path.startsWith(".config/")) continue;
+    mkdirSync(dirname(join(home, path)), { recursive: true });
+    writeFileSync(join(home, path), "SECRET\n");
+  }
+  writeFileSync(join(home, "notes.txt"), "notes\n");
+  return { top, home };
+}
+async function reviewWithHome(root: string, commit: string, home: string, body: string, scratch: string[] = []) {
+  return runReviewRoute({ repo: root, commit, kind: "implementation", document: "docs/specs/feature.md",
+    route: { model: "gpt-6.1-sol", argv: [stub(body, ok(commit)), "{prompt_file}"] }, prompt: "p", scratch, timeoutMs: 10_000, env: { HOME: home } });
+}
+
+describe("credential stores under the reviewer's home", () => {
+  darwin("a reviewer can read none of the eight stores but can read other files", async () => {
+    const { root, commit } = repository();
+    const { home } = fakeHome();
+    const rec = recordFile();
+    const body = [...STORE_FILES, "notes.txt"].map(path => `if cat "${home}/${path}" >/dev/null 2>&1; then echo "read ${path}"; else echo "refused ${path}"; fi >> ${rec}`).join("\n");
+    expect((await reviewWithHome(root, commit, home, body)).status).toBe("ready");
+    const lines = readFileSync(rec, "utf8").trim().split("\n");
+    expect(lines).toEqual([...STORE_FILES.map(path => `refused ${path}`), "read notes.txt"]);
+  });
+
+  darwin("renaming a store, its parent or the home and reading through the new path is refused", async () => {
+    const { root, commit } = repository();
+    const { top, home } = fakeHome();
+    const rec = recordFile();
+    const attempts = [[`${home}/.ssh`, `${home}/moved-ssh`, "id_test"], [`${home}/.config`, `${home}/moved-config`, "gh/hosts.yml"],
+      [`${home}/.netrc`, `${home}/moved-netrc`, ""], [home, `${top}/moved-home`, ".ssh/id_test"]];
+    const body = attempts.map(([from, to, inside]) => {
+      const through = inside ? `${to}/${inside}` : to;
+      return `if mv "${from}" "${to}" 2>/dev/null && cat "${through}" >/dev/null 2>&1; then echo "read ${from}"; else echo "refused ${from}"; fi >> ${rec}`;
+    }).join("\n");
+    expect((await reviewWithHome(root, commit, home, body)).status).toBe("ready");
+    expect(readFileSync(rec, "utf8").trim().split("\n")).toEqual(attempts.map(([from]) => `refused ${from}`));
+    expect(existsSync(join(home, ".ssh/id_test"))).toBe(true);
+  });
+
+  for (const store of [".ssh", ".config"])
+    darwin(`a scratch symlink into the reviewer's ${store} leaves the review pending before the reviewer runs`, async () => {
+      const { root, commit } = repository();
+      const { home } = fakeHome();
+      const ran = recordFile();
+      symlinkSync(join(home, store), join(root, "cache"));
+      pending(await reviewWithHome(root, commit, home, `echo ran > ${ran}`, ["cache"]), "cache");
+      expect(existsSync(ran)).toBe(false);
+    });
+
+  darwin("with no .config in the home, a reviewer can still create one while the stores stay unreadable", async () => {
+    const { root, commit } = repository();
+    const { home } = fakeHome({ withoutConfig: true });
+    const rec = recordFile();
+    const body = `mkdir -p "${home}/.config/other" && echo ok > "${home}/.config/other/file" && echo created >> ${rec}
+if cat "${home}/.ssh/id_test" >/dev/null 2>&1; then echo "read ssh" >> ${rec}; else echo "refused ssh" >> ${rec}; fi`;
+    expect((await reviewWithHome(root, commit, home, body)).status).toBe("ready");
+    expect(readFileSync(rec, "utf8").trim().split("\n")).toEqual(["created", "refused ssh"]);
+  });
+
+  darwin("the credential rules win over a write allow that covers a store", async () => {
+    const { runOwnedClient } = await import("../../../plugins/vh-adlc/scripts/triage/owned-process");
+    const { top, home } = fakeHome();
+    const out = join(top, "moved-key");
+    const result = await runOwnedClient(["/bin/sh", "-c", `mv "${home}/.ssh/id_test" "${out}" && cat "${out}"`],
+      { cwd: top, env: { PATH: process.env.PATH ?? "/usr/bin:/bin" }, stdout: join(top, "o"), stderr: join(top, "e"),
+        writeDeny: { deny: [], allow: [join(home, ".ssh")], credentials: { directories: [join(home, ".ssh")], files: [] } } },
+      { timeout_ms: 5_000, grace_ms: 200, reap_ms: 1_000 });
+    expect(result.boundary).toBe("seatbelt");
+    expect(result.exit_code).not.toBe(0);
+    expect(existsSync(out)).toBe(false);
+    expect(readFileSync(join(top, "o"), "utf8")).not.toContain("SECRET");
+  });
+});
