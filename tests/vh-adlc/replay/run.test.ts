@@ -329,8 +329,13 @@ describe("stored brief identity", () => {
       "--companion-base", f.base, "--companion-head", f.head, "--routes", f.routes, "--results", f.results, "--executor", SCRIPTED, "--briefs", "new"],
     { stdout: "pipe", stderr: "pipe", env: { ...process.env, REPLAY_SCRIPT: f.script } });
     expect(r.exitCode, r.stderr.toString()).toBe(0);
-    const sets = readdirSync(join(f.dir, "runs-superseded"));
-    expect(readdirSync(join(f.dir, "runs-superseded", sets.find((d) => d.endsWith("-new-host"))!)).filter((n) => n.endsWith(".txt")).length).toBe(6);
+    const archives = join(f.dir, "runs-superseded");
+    const sets = readdirSync(archives);
+    const hostPassSets = sets
+      .filter((set) => set.endsWith("-new-host"))
+      .map((set) => readdirSync(join(archives, set)).filter((file) => /^new-host-pass-\d+\.txt$/.test(file)).sort())
+      .filter((files) => files.length > 0);
+    expect(hostPassSets).toEqual([Array.from({ length: 6 }, (_, index) => `new-host-pass-${index + 1}.txt`)]);
     expect(sets.some((d) => d.includes("-old-"))).toBe(false);
   });
 

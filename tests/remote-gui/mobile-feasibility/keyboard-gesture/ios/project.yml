@@ -1,0 +1,33 @@
+name: RemoteGUIKeyboardProbe
+options:
+  deploymentTarget:
+    iOS: "17.0"
+settings:
+  base:
+    GENERATE_INFOPLIST_FILE: YES
+    SWIFT_VERSION: "5.0"
+targets:
+  ProbeApp:
+    type: application
+    platform: iOS
+    sources: [ProbeApp]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.remote-gui.keyboard-probe
+  ProbeTests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [ProbeTests]
+    dependencies:
+      - target: ProbeApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.remote-gui.keyboard-probe.tests
+schemes:
+  RemoteGUIKeyboardProbe:
+    build:
+      targets:
+        ProbeApp: all
+        ProbeTests: [test]
+    test:
+      targets: [ProbeTests]

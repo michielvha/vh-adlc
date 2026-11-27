@@ -177,7 +177,7 @@ func removeForward(home, id string) error {
 }
 
 func privateCleanup(home, id string) error {
-	for _, name := range []string{"profile", "downloads", "Xauthority", "vnc.passwd", "control.sock"} {
+	for _, name := range []string{"profile", "downloads", "Xauthority", "vnc.passwd", "control.sock", "mobile-bus.xml"} {
 		if err := os.RemoveAll(filepath.Join(home, id, name)); err != nil {
 			return errors.New("private-resource-cleanup-pending")
 		}
@@ -566,7 +566,7 @@ func serve(ctx context.Context, r state.Record) (result error) {
 	if r.Kind == "share" {
 		connectionCheck = func(ctx context.Context, conn net.Conn) bool { return connectionOwned(ctx, r, conn) }
 	}
-	p, err := proxy.New(proxy.Options{OwnerLogin: ownerLogin, ServePeer: servePeer, ID: id, Origin: origin, Target: target, Deadline: r.Expires, UpstreamAlive: alive, UpstreamConnection: connectionCheck, ViewerAssets: bundle.Assets, ViewerPassword: bundle.Password, Clipboard: bundle.Clipboard, Resize: bundle.Resize})
+	p, err := proxy.New(proxy.Options{OwnerLogin: ownerLogin, ServePeer: servePeer, ID: id, Origin: origin, Target: target, Deadline: r.Expires, UpstreamAlive: alive, UpstreamConnection: connectionCheck, ViewerAssets: bundle.Assets, ViewerPassword: bundle.Password, Clipboard: bundle.Clipboard, Resize: bundle.Resize, MobileLookup: bundle.MobileLookup, MobilePhase: bundle.MobilePhase})
 	if err != nil {
 		return err
 	}

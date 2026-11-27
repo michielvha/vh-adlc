@@ -1,0 +1,32 @@
+<!doctype html><meta charset="utf-8"><title>Cooperating browser fixture</title>
+<style>html,body{margin:0;background:#f0f1f4;font:32px sans-serif}input{position:absolute;box-sizing:border-box;width:700px;height:110px;left:130px;font-size:42px}#a{top:110px}#b{top:315px}p{position:absolute;top:510px;left:130px}</style>
+<input id="a" placeholder="Remote field A"><input id="b" placeholder="Remote field B"><p>Plain content</p>
+<script>
+const fields={a:document.getElementById('a'),b:document.getElementById('b')};
+let generation=0, deliveredA=0, deliveredB=0, busy=false, polling=false;
+const post=(path,body)=>fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+for(const [id,field] of Object.entries(fields)) {
+    field.addEventListener('input',()=>{if(id==='a')deliveredA++;else deliveredB++;});
+}
+function publish() {
+    const values=Object.fromEntries(Object.entries(fields).map(([id,f])=>{const {x,y,width,height}=f.getBoundingClientRect();return [id,{x:x+screenX,y:y+screenY+outerHeight-innerHeight,width,height}];}));
+    return post('/geometry',{width:screen.width,height:screen.height,viewport:{width:innerWidth,height:innerHeight,x:screenX,y:screenY+outerHeight-innerHeight},fields:values,generation,focused:document.activeElement.id||null});
+}
+addEventListener('focusin',()=>{generation++;void publish();});
+addEventListener('resize',()=>void publish());
+void publish();
+setInterval(async()=>{
+    if (busy||polling) return;
+    polling=true;
+    try {
+        const edit=await fetch('/pending').then(response=>response.json());
+        if(!edit)return;
+        busy=true;
+        if(edit.race)fields.b.focus();
+        const target=fields[edit.id];
+        const status=generation===edit.generation&&document.activeElement===target
+            ? (document.execCommand('insertText',false,edit.text)?'applied':'failed'):'cancelled';
+        await post('/result',{status,exactA:fields.a.value==='z',emptyB:fields.b.value==='',deliveredA,deliveredB});
+    } finally {busy=false;polling=false;}
+},60);
+</script>
