@@ -273,9 +273,15 @@ type SpecRecords struct {
 // Clean reports whether the records are well formed with no blocking finding.
 func (s SpecRecords) Clean() bool { return s.WellFormed && !s.Blocking }
 
+// recordLine returns a stored record line as the record patterns match it.
+// Reviews are stored byte for byte, and some reviewers end each line with
+// spaces as a Markdown hard break, so trailing spaces and tabs are ignored.
+func recordLine(l string) string { return strings.TrimRight(l, " \t") }
+
 // SpecRecords checks a spec-review subsection: complete finding records
 // (each record_finding line followed by exactly one record_severity line
 // before the next finding), or exactly one record_no_findings line.
+// Trailing spaces and tabs on a line are ignored.
 func (r *Rules) SpecRecords(lines []string) SpecRecords {
 	var s SpecRecords
 	var nonBlank, noFindingLines int
@@ -290,6 +296,7 @@ func (r *Rules) SpecRecords(lines []string) SpecRecords {
 		if strings.TrimSpace(l) == "" {
 			continue
 		}
+		l = recordLine(l)
 		nonBlank++
 		switch {
 		case r.Re.RecordNoFindings.MatchString(l):
@@ -330,24 +337,26 @@ type ImplRecord struct {
 
 // ImplRecords reads the implementation-review records of a subsection: each
 // record_criterion line followed by a record_verdict line. It reports false
-// when there are no records or one is incomplete.
+// when there are no records or one is incomplete. Trailing spaces and tabs on
+// a line are ignored.
 func (r *Rules) ImplRecords(lines []string) ([]ImplRecord, bool) {
 	var recs []ImplRecord
 	for i := 0; i < len(lines); i++ {
-		m := r.Re.RecordCriterion.FindStringSubmatchIndex(lines[i])
+		line := recordLine(lines[i])
+		m := r.Re.RecordCriterion.FindStringSubmatchIndex(line)
 		if m == nil {
 			continue
 		}
 		if i+1 >= len(lines) {
 			return nil, false
 		}
-		v := r.Re.RecordVerdict.FindStringSubmatch(lines[i+1])
+		v := r.Re.RecordVerdict.FindStringSubmatch(recordLine(lines[i+1]))
 		if v == nil {
 			return nil, false
 		}
 		recs = append(recs, ImplRecord{
-			ID:      lines[i][m[2]:m[3]],
-			Text:    Fold(lines[i][m[1]:]),
+			ID:      line[m[2]:m[3]],
+			Text:    Fold(line[m[1]:]),
 			Verdict: v[1],
 		})
 		i++
