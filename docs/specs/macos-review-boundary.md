@@ -347,6 +347,114 @@ None.
 | 2026-11-27 | R-4 | spec | `b765e737` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 2 nits; full pass after the gpt-6.2-sol rename; host route |
 | 2026-11-27 | R-5 | spec | `58342e95` | claude-opus-5-5 | procedural | clean: 0 blocking, 1 should-fix and 2 nits, all outside the normative baseline (Tasks, Context); host route |
 | 2026-11-27 | R-5 | spec | `58342e95` | n/a | n/a | accepted by owner |
+| 2026-11-27 | R-6 | spec | `5ae4e466` | gpt-6.2-sol | procedural | 5 blocking, 8 should-fix, 2 nits; first review through the committed Codex command route on macOS (model attested from the session log), full pass |
+
+### R-6
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Goal, Owner summary (boundary guarantee), Scope (first In scope bullet), Design (Profile, What the route denies, Documentation), AC-02, Test Plan AC-02 (4)
+EVIDENCE: `settings.ts:70-79` validates scratch names lexically. `owned-process.ts:49-77` resolves them and places their allows after the protected-path denies. An otherwise valid scratch name can resolve to the owning worktree or its Git directory, making protected files writable. The before-and-after check cannot catch a detached process writing after it returns. The committed configuration declares no scratch, but the boundary is a plugin feature that explicitly supports it, and the proof tests only an ordinary `build` directory.
+PROPOSAL: Validate scratch destinations against the resolved protected roots before launching the reviewer. Preserve disjoint shared-cache symlinks and add a refusal test for a scratch destination that overlaps a protected root.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: Scope (Posture A stated limit), Owner summary (trade-offs and attestation), Design (What the route denies, Codex route), AC-05, AC-06, Test Plan AC-05 and AC-06
+EVIDENCE: Scope leaves writes outside the protected paths open and expressly includes “Codex's session log.” `review-route.ts:269-296,371-389` uses that reviewer-writable log as the authority for whether a reply from `MODEL: unknown` came from the owner's requested model. The model match decides whether a review may be stored. The same tool access the design grants the reviewer lets it alter the evidence used to decide its eligibility.
+PROPOSAL: Establish the served model through evidence that reviewer tools cannot modify. Keep the review pending when that evidence is unavailable, and change the proof to check that reviewer-writable data cannot establish a match.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: blocking
+WHERE: Scope (hard-linked Git files stated limit and third In scope bullet), Goal, Owner summary (boundary and hard-link paragraphs), Design (What the route denies, Pre-existing hard links, Documentation), AC-02, AC-08, Test Plan AC-08
+EVIDENCE: Scope excludes “a Git file other than the index and HEAD, such as a loose ref or an object, that already shares an inode with a path outside the protected trees.” `review-route.ts:314-342` skips `.git` apart from the index and HEAD. I created an ordinary local clone in scratch and verified that it shared a Git object inode with its source, with a link count of two. The path-based profile leaves the outside name writable. A reviewer process could corrupt an object containing unpublished work without changing a worktree file, index or ref or triggering the snapshot.
+PROPOSAL: Make the review pending when an object or ref in the protected Git storage has a writable outside alias that the boundary cannot protect. Add a proof using a disposable ordinary local clone.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: blocking
+WHERE: Test Plan AC-02 (linked-worktree fixture), Tasks T3 and T10
+EVIDENCE: The new fixture runs `git init`, `git add`, `git commit` and `git worktree add` through the helper at `review-route.test.ts:15-19,397-409`. The helper inherits `process.env`, including Git repository and index overrides. A run started by a Git hook can therefore direct these writes at the repository the hook is acting on. The pinned `conventions/testing.md:103-106` explicitly requires fixture builders to clear those variables.
+PROPOSAL: Clear Git's repository-local environment in fixture Git calls before running any write. Check that the fixture leaves an independently supplied repository and index untouched.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: blocking
+WHERE: Goal, Owner summary (test-nesting limit), Scope (test-nesting stated limit), Design (Codex route, Concurrency, failure and rollback, Documentation), AC-01 to AC-03, AC-06 to AC-08, Test Plan AC-01 to AC-03 and AC-06 to AC-08, Tasks T8 and T9
+EVIDENCE: The formal implementation review is assigned to the host route or Linux. At this target, `cli.ts route --operation review` returns `command`. The review skill uses that route in place of the host dispatch, and `cli.ts:181-184` reads policy from the reviewed commit. A local edit or per-user executable override cannot select the host route at that commit. Linux skips the Darwin-only proofs at `review-route.test.ts:376,418-498`. In this macOS review session, `sandbox-exec` returned `sandbox_apply: Operation not permitted`, and the route tests failed to establish the macOS boundary. The prescribed alternatives therefore leave no documented workflow that can establish all criteria at the committed target.
+PROPOSAL: Specify and prove how an independent reviewer outside Seatbelt on macOS produces the formal implementation review for the same commit while both Codex command routes stay configured. Raise an Open Question if that requires changing the repository's route-selection rules.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner summary (planned AC-06 proof), AC-06, Test Plan AC-06, Tasks T9
+EVIDENCE: The Test Plan specifies a manual procedure. `plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md:122-126` requires a committed script that reruns an agent session and keeps its transcript when agent behavior is the proof. The two stated pass checks also leave a gap. `review-route.ts:381-391` returns `ready` after checking the header, model and target, and `internal/review/review.go:25-39` checks that the stored bytes match the returned bytes. A malformed record set can pass both.
+PROPOSAL: Make T9 deliver a rerunnable script that captures both exact-target transcripts, verifies record format and criterion coverage as appropriate, and runs `review check` against the stored bytes. Commit that evidence before the formal implementation review so the covered evidence files belong to its target.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner summary (AC-02 proof changes), AC-02, Test Plan AC-02 (1) and (2), Tasks T10
+EVIDENCE: The revised wait proves that the writer finished, but does not prove when it attempted the write. `review-route.test.ts:382-389,419-444` starts a one-second sleep when the stub forks and observes the completion file after the route returns. If the controller takes longer than a second to finish, the writer can attempt the write before judgment and the same assertions still pass.
+PROPOSAL: Release each detached writer with a signal from the test after the route returns `ready`, then wait for its completion record. Keep a deadline for both waits.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner summary (mutation proof), Design (Profile), AC-02, Test Plan AC-02 (4), Tasks T5 and T10
+EVIDENCE: The row requires each boundary test to fail when the part it guards is removed. The scratch test at `review-route.test.ts:463-469` checks the allow rule, but `mutants.py:6-13` never removes that rule. The mutation evidence therefore does not establish the claim that every boundary test failed against the part it guards.
+PROPOSAL: Run the scratch test with the allow rule removed and record that the scratch write fails while the ordinary temporary write still succeeds.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope (documentation bullet), Design (Documentation), AC-07, Test Plan AC-07, Tasks T6
+EVIDENCE: AC-07 calls for both references to state four points. Design asks only for a sentence in `review-protocol.md` naming the boundary. The implementation follows Design at `review-protocol.md:19-21`, linking to `loop-settings.md:136-152` for the details. A reviewer reading the criterion literally would find three of its required statements absent from the protocol.
+PROPOSAL: State which reference owns the four details and what the protocol must say or link to. Make the proof and T6 use that same requirement.
+
+FINDING: F-10
+KIND: factual
+SEVERITY: should-fix
+WHERE: Goal, Owner summary (validation and rollout), Scope (plugin minor bump), Design (Concurrency, failure and rollback), Tasks T7 to T9
+EVIDENCE: `cli.ts context` from this export reported running 0.34.0, installed 0.33.0 and `stale: true`. The spec and review skills stop before writes on that result. The document records the mismatch in T8, but gives no way to install or run the candidate through the supported lifecycle before merge. A direct `cli.ts review` smoke run can reach `ready` while the operator still cannot store it through the documented workflow. The pinned delivery convention also requires the feature to name its artifact publication paths.
+PROPOSAL: Name the Claude Code and Codex plugin distribution paths and document how to load the candidate consistently before storing reviews. Verify the supported workflow from an older installation and state how to roll back for future targets and for targets that already committed the Codex routes.
+
+FINDING: F-11
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Pre-existing hard links, Concurrency, failure and rollback), AC-03, AC-08, Test Plan AC-03 and AC-08
+EVIDENCE: The reviews use separate temporary directories but share the owning worktree. The new preflight at `review-route.ts:314-342` performs a directory listing followed by separate `lstatSync` calls. An ordinary concurrent deletion between the two can throw and produce a CLI error instead of a pending review. Design also promises a command-start reason if Seatbelt cannot apply. A started `sandbox-exec` process that fails to apply its profile follows the child-exit path at `review-route.ts:366-380`, which reports a generic exit code.
+PROPOSAL: Define retryable pending results for a changing or unreadable protected tree and for profile-application failure. Add proofs that distinguish those failures from reviewer-command errors.
+
+FINDING: F-12
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter `covers`, Scope (committed routes), Design (Route acceptance, Codex route), AC-05, AC-06, Test Plan AC-05 and AC-06
+EVIDENCE: `covers` omits `plugins/vh-adlc/scripts/loop/cli.ts`, `settings.ts` and `pages.ts`. Those files decide the route, load policy at the exact commit and can stop both real reviews before the boundary starts. `internal/fresh/fresh.go:165-180` only invalidates an implementation review for changed covered paths. A later change that breaks route selection or page caching can therefore leave this feature's review current.
+PROPOSAL: Add the direct routing and preflight dependencies to `covers`, together with any fixtures the revised proof depends on.
+
+FINDING: F-13
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter `status_description`, Owner summary (opening and validation paragraphs), Tasks T8 to T10
+EVIDENCE: The change since the previous review committed `.vh-adlc/loop.yaml` and updated the late-writer tests. The status still lists T8 and T10 as outstanding, and the summary says there is no committed route and this spec still uses the host route. Both route lookups on the export returned `command`, `gpt-6.2-sol` and `codex-session`. The summary also gives a four-failure count while T8 gives five for its broader run. I reproduced the cache-stub failure in the targeted CLI test, but those counts refer to different runs.
+PROPOSAL: Update the status and summary to reflect the committed configuration and late-writer changes. Name the scope of any test counts and keep the two end-to-end runs and formal implementation review visible as remaining work.
+
+FINDING: F-14
+KIND: factual
+SEVERITY: nit
+WHERE: AC-05, Test Plan AC-05
+EVIDENCE: The criterion gives `bun scripts/loop/cli.ts route` “In this repository,” but that path does not exist at the repository root. Both commands in its Test Plan passed using `plugins/vh-adlc/scripts/loop/cli.ts`.
+PROPOSAL: Use the repository-relative CLI path in AC-05.
+
+FINDING: F-15
+KIND: factual
+SEVERITY: nit
+WHERE: Scope (plugin minor bump), Tasks T7
+EVIDENCE: T7 names only `.claude-plugin/plugin.json` and cites `(Design)` in place of a criterion. Both manifests at the target report 0.34.0. The named `plugin-version.test.ts` checks version reporting and stale detection. It does not prove that both manifests received the same minor bump.
+PROPOSAL: Name both manifests and make matching minor versions an explicit done condition linked to a criterion.
 
 ### R-5
 
