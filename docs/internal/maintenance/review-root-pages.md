@@ -84,7 +84,7 @@ Not yet run: the full plugin checker, and the Linux-only dispatch tests, which n
 
 After the first CI run on [PR #182](https://github.com/michielvha/vh-adlc/pull/182) (run 45980312542 at `0887fee9`):
 
-- `checker-macos` failed two package checks that this change caused. `a package change comes with a version change` needs a new plugin version, so both `plugin.json` files move to 0.33.1. `no em dash or en dash` found the literal en and em dash in the stop matcher's separator class in `review-route.ts`. They are now written as `–` and `—`, which matches the same characters. Both checks and the `reply bytes` tests pass locally after the change.
+- `checker-macos` failed two package checks that this change caused. `a package change comes with a version change` needs a new plugin version, so both `plugin.json` files move to 0.33.1. `no em dash or en dash` found the literal en and em dash in the stop matcher's separator class in `review-route.ts`. They are now written as the escapes `\u2013` and `\u2014`, which matches the same characters. Both checks and the `reply bytes` tests pass locally after the change.
 - `verify` failed in `TestBoundary` (`cmd/vh-adlc`, `golden_test.go:338`). Its first error is `open .../.git/objects/maintenance.lock: no such file or directory` inside the test's fixture repository. No Go file changed here, and the last `main` run at the task base passed this job.
 - `remote-gui` failed `two inline taps edit a URL and a field through stock Chromium and noVNC` (`tests/remote-gui/mobile.e2e.test.js:553`). A typed combining accent (U+0301) did not arrive in the field. This change touches no remote-gui file, and the last `main` run at the task base passed this job.
 
@@ -188,6 +188,23 @@ Isolation: procedural
 NO FINDINGS
 ```
 
+### R-6
+
+Target: `f23fafc18144fd6489abfa01155a6afe266a9a79`
+Model: claude-opus-5-5
+Isolation: procedural
+
+```text
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: docs/internal/maintenance/review-root-pages.md:87 (the `checker-macos` bullet under "After the first CI run on PR #182")
+EVIDENCE: The record says the dashes "are now written as `–` and `—`". `sed -n 87p docs/internal/maintenance/review-root-pages.md | od -c` shows bytes 342 200 223 and 342 200 224, so the record contains the literal U+2013 and U+2014 characters. The source at f23fafc1, plugins/vh-adlc/scripts/loop/review-route.ts:251, uses the escapes `[:\-–—]`. Read literally, the record says the fix left the characters unchanged, which is false. It was probably meant to read `–` and `—`. The prose rule (guides/humanize-prose.md section 8) allows dashes inside inline code, so this is only an accuracy slip and not a prose violation. Nothing else in the delta is wrong. I checked: `git diff 0887fee9 f23fafc1` touches only the record, both plugin.json files (0.33.0 to 0.33.1) and the one regex line. The escaped class matches the same characters. `git diff 2639a6ad 0887fee9` differs only by the main-side docs/specs/instruction-freshness.md and the R-5 record. `git diff 4f17f9a0 2f12dfa0` is only that spec file, and origin/main (4f465f03) has gained only docs since then, with the plugin still at 0.33.0. A patch bump fits conventions/delivery.md ("`fix` ... are patch"), and it matches earlier bumps that changed both plugin.json files (00752fea, bba11ee4). No other 0.33.0 reference has to move, because the others are historical evidence rows, and the v0.33.x git tags belong to the binary. My local runs passed: pages.test.ts 2 pass, review-route `reply bytes` 2 pass, check.test.ts `package text|version change` 7 pass, which includes "no em dash or en dash" and "a package change comes with a version change". Run 45980312542 is at 0887fee9 with checker-macos, verify and remote-gui failed. The 2f12dfa0..f23fafc1 change touches no Go and no remote-gui file. TestBoundary fails at golden_test.go:338, the `snapshot(t, f.Dir)` walk, on a transient .git/objects/maintenance.lock in the fixture repo, which looks like a git background-maintenance race. Main CI at 4f17f9a0 passed. Both unrelated-failure claims hold up against the code.
+PROPOSAL: Change the record to say the dashes are now written as the escapes `–` and `—` (or "as \u escapes") so that it matches review-route.ts:251.
+```
+
+After R-6: F-01 is fixed in the evidence text. The sentence now names the escapes `–` and `—` written with a literal backslash, and the record holds no literal en or em dash outside the stored R-6 text. R-6 found nothing else in the source delta. The fix touches only this record's evidence, not its Definition or any source path.
+
 ## State
 
-Review pending: the CI fixes (version bump and the dash escapes) changed source after R-5 at `2639a6ad`, so a new review is needed. Not complete yet: the two end-to-end dispatch tests still have to pass in Linux CI on the PR the owner asked for.
+Review pending: R-6 F-01 is a fix to the record's evidence text and needs confirming at the new commit. Not complete yet: the two end-to-end dispatch tests still have to pass in Linux CI on the PR the owner asked for.
