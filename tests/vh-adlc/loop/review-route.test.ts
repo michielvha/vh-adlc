@@ -375,9 +375,18 @@ describe("reply bytes", () => {
 // under a sandbox-exec profile that refuses writes to the paths the before-and-after check judges.
 const darwin = process.platform === "darwin" ? test : test.skip;
 
-/** A late writer: forks a process that leaves the session, clears its environment and runs `command` after a second. */
-function lateWriter(command: string) {
-  return `perl -MPOSIX -e 'if (fork() == 0) { POSIX::setsid(); exec("/usr/bin/env", "-i", "/bin/sh", "-c", $ARGV[0]); }' ${JSON.stringify(`sleep 1; ${command}`)}`;
+/**
+ * A late writer: forks a process that leaves the session, clears its environment, runs `command` after a
+ * second and then writes `done`, so a test can wait for it to finish instead of guessing a delay.
+ */
+function lateWriter(command: string, done: string) {
+  return `perl -MPOSIX -e 'if (fork() == 0) { POSIX::setsid(); exec("/usr/bin/env", "-i", "/bin/sh", "-c", $ARGV[0]); }' ${JSON.stringify(`sleep 1; ${command}; echo done > ${done}`)}`;
+}
+/** Waits for a late writer's `done` record, up to a deadline. */
+async function finished(done: string, deadlineMs = 10_000) {
+  const until = Date.now() + deadlineMs;
+  while (!existsSync(done) && Date.now() < until) await Bun.sleep(50);
+  expect(existsSync(done)).toBe(true);
 }
 
 /**
@@ -409,28 +418,28 @@ function recordFile() {
 describe("the macOS write boundary", () => {
   darwin("a detached writer that cleared its environment cannot write into the owning worktree after the review", async () => {
     const { wt, commit } = linkedWorktree();
-    const late = join(wt, "src/late.txt");
-    expect((await review(wt, commit, stub(lateWriter(`echo late > ${late}`), ok(commit)))).status).toBe("ready");
-    await Bun.sleep(2_000);
+    const late = join(wt, "src/late.txt"), done = recordFile();
+    expect((await review(wt, commit, stub(lateWriter(`echo late > ${late}`, done), ok(commit)))).status).toBe("ready");
+    await finished(done);
     expect(existsSync(late)).toBe(false);
   });
 
   darwin("a late writer cannot rename the worktree's grandparent and write through the new path", async () => {
     const { top, wt, commit } = linkedWorktree();
-    const rec = join(top, "rename-record"), late = join(wt, "src/late.txt");
-    const body = lateWriter(`if mv ${top}/a ${top}/ax 2>/dev/null; then echo renamed > ${rec}; echo late > ${top}/ax/b/wt/src/late.txt; mv ${top}/ax ${top}/a; else echo refused > ${rec}; fi`);
+    const rec = join(top, "rename-record"), late = join(wt, "src/late.txt"), done = join(top, "done");
+    const body = lateWriter(`if mv ${top}/a ${top}/ax 2>/dev/null; then echo renamed > ${rec}; echo late > ${top}/ax/b/wt/src/late.txt; mv ${top}/ax ${top}/a; else echo refused > ${rec}; fi`, done);
     expect((await review(wt, commit, stub(body, ok(commit)))).status).toBe("ready");
-    await Bun.sleep(2_000);
+    await finished(done);
     expect(readFileSync(rec, "utf8")).toBe("refused\n");
     expect(existsSync(late)).toBe(false);
   });
 
   darwin("a late writer cannot rename the main checkout and change the linked worktree's index through it", async () => {
     const { top, main, gitDir, wt, commit } = linkedWorktree();
-    const rec = join(top, "rename-record"), index = join(gitDir, "index"), before = contentDigest(index);
-    const body = lateWriter(`if mv ${main} ${main}x 2>/dev/null; then echo renamed > ${rec}; echo junk >> ${main}x/.git/worktrees/wt/index; mv ${main}x ${main}; else echo refused > ${rec}; fi`);
+    const rec = join(top, "rename-record"), index = join(gitDir, "index"), before = contentDigest(index), done = join(top, "done");
+    const body = lateWriter(`if mv ${main} ${main}x 2>/dev/null; then echo renamed > ${rec}; echo junk >> ${main}x/.git/worktrees/wt/index; mv ${main}x ${main}; else echo refused > ${rec}; fi`, done);
     expect((await review(wt, commit, stub(body, ok(commit)))).status).toBe("ready");
-    await Bun.sleep(2_000);
+    await finished(done);
     expect(readFileSync(rec, "utf8")).toBe("refused\n");
     expect(contentDigest(index)).toBe(before);
   });
