@@ -369,6 +369,19 @@ function scratchOverlap(allows: { entry: string; declared: string; resolved: str
   return undefined;
 }
 
+/**
+ * The environment a reviewer CLI gets: an allowlist from the controller's, then `request.env`. The reviewer
+ * runs the candidate's tests, often with network access, so it never inherits the controller's credentials.
+ */
+const REVIEWER_ENVIRONMENT = ["PATH", "HOME", "TMPDIR", "USER", "LOGNAME", "SHELL", "LANG", "TERM", "CODEX_HOME",
+  "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_RUNTIME_DIR"];
+function reviewerEnvironment(extra: Record<string, string> | undefined): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [name, value] of Object.entries(process.env))
+    if (typeof value === "string" && (REVIEWER_ENVIRONMENT.includes(name) || name.startsWith("LC_"))) env[name] = value;
+  return { ...env, ...extra };
+}
+
 export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutcome> {
   const repo = realpathSync(request.repo), scratch = (request.scratch ?? []).map(dir => dir.replace(/\/+$/, ""));
   const commit = git(repo, ["rev-parse", "--verify", `${request.commit}^{commit}`]).toString().trim();
@@ -413,7 +426,7 @@ export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutc
     const before = snapshot(repo, scratch, "owning"), cloneBefore = cloneDir ? snapshot(cloneDir, scratch, "full") : undefined;
     const stdout = join(work, "stdout"), stderr = join(work, "stderr");
     mkdirSync(dirname(stdout), { recursive: true });
-    const env = Object.fromEntries(Object.entries({ ...process.env, ...request.env }).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+    const env = reviewerEnvironment(request.env);
     let result;
     try {
       const writeDeny = { deny, allow: allows.map(allow => allow.resolved), resolved: true };
