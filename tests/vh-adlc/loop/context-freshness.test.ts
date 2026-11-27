@@ -103,7 +103,9 @@ describe("the checkout stays as it was", () => {
     const snapshot = () => ({
       head: git(clone, "rev-parse", "HEAD"), branch: git(clone, "symbolic-ref", "HEAD"),
       status: git(clone, "status", "--porcelain=v2"), tree: git(clone, "write-tree"),
-      refs: git(clone, "for-each-ref", "--format=%(refname) %(objectname)").split("\n").filter(line => !line.startsWith("refs/remotes/origin/main ")),
+      // A symbolic ref such as origin/HEAD is compared by its target, not by the commit it resolves to.
+      refs: git(clone, "for-each-ref", "--format=%(refname) %(if)%(symref)%(then)-> %(symref)%(else)%(objectname)%(end)")
+        .split("\n").filter(line => !line.startsWith("refs/remotes/origin/main ")),
     });
     const before = snapshot();
     const { code } = context(clone, "--default-branch", "main");
