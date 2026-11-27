@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Spec review R-13 is clean; waiting for owner acceptance."
+status: planned
+status_description: "Accepted at R-13 with the exact-reviewed-commit reading; re-entering implementation."
 issue: https://github.com/michielvha/vh-adlc/issues/187
 branch: feat/macos-review-boundary
 goal: "Spec and implementation reviews in this repository run on Codex from a Mac, with no owner step per review, and no reviewer process can change the owning worktree or the private clone once the review has been judged."
@@ -494,6 +494,7 @@ None.
 | 2026-11-27 | R-11 | spec | `6af33856` | claude-opus-5-5 | procedural | clean: 0 blocking, 2 should-fix, 1 nit; host route, the owner-directed gating pass continued |
 | 2026-11-27 | R-12 | spec | `e531af54` | claude-opus-5-5 | procedural | 1 blocking, 1 should-fix; host route, the owner-directed gating pass continued |
 | 2026-11-27 | R-13 | spec | `8543fb32` | claude-opus-5-5 | procedural | NO FINDINGS; host route, the owner-directed gating pass |
+| 2026-11-27 | R-13 | spec | `8543fb32` | n/a | n/a | accepted by owner |
 
 ### R-13
 
