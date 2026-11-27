@@ -1,8 +1,0 @@
-2026-11-27T16:06:51Z
-Darwin Mac 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:19:08 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T6050 arm64
-codex-cli 0.172.0
-commit=c55aa45ab6e9f15762efaceef3d06d5611fb5051
-kind=implementation
-review_exit=0
-transcript=rollout-2026-11-27T17-06-58-01a21dc2-8af9-76c3-b212-4ba6b9a486cd.jsonl
-result=ready, unchanged

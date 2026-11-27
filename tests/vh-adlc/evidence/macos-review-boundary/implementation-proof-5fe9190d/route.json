@@ -1,1 +1,0 @@
-{"role":"implementation_reviewer","route":"command","model":"gpt-6.2-sol","argv":["sh","-c","f=$1; shift; exec \"$@\" - < \"$f\"","sh","{prompt_file}","codex","exec","-m","{model}","-s","danger-full-access","--skip-git-repo-check","--json"],"model_attestation":"codex-session"}
