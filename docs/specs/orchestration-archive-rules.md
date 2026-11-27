@@ -234,7 +234,13 @@ irreversible step, and every rule here only adds conditions before it.
 
 ## Tasks
 
-None yet; written once the document is planned.
+- [ ] T1 `tests/vh-adlc/check.test.ts` - `requiredSentences()` merges this document's sentences into the earlier list by ID, with the merge proofs (a copy without S-56 reports `["S-56"]`, a copy with the old S-36 reports `["S-36"]`) and the incident row 13 check; `bun test tests/vh-adlc/check.test.ts -t "workstream orchestration reference"` fails on S-02, S-36, S-54 to S-57, S-59 and row 13 because the reference lacks them (AC-01)
+- [ ] T2 `plugins/vh-adlc/references/orchestrate.md` - S-02 and S-36 replaced, S-54 to S-57 and S-59 added under their sections, the explanation that S-56 and S-57 now state removed, incident row 13 reads `S-36, S-55, S-37`; the T1 tests pass (AC-01)
+- [ ] T3 `tests/vh-adlc/check.test.ts` - a check that the reference carries this document's two glossary rows verbatim, failing on a copy without either row; it fails because the rows are missing (AC-02)
+- [ ] T4 `plugins/vh-adlc/references/orchestrate.md` - the Work finished and Taken over rows added to the glossary table; the T3 test passes (AC-02)
+- [ ] T5 `tests/vh-adlc/check.test.ts` - the authority tests extended: the one orchestration row contains "under the Close-out rules" and "outside the workstream", and neither the row nor the reference contains "once each is done"; they fail on the current row (AC-03)
+- [ ] T6 `plugins/vh-adlc/references/authority.md` - the orchestration row's archive write ends "under the Close-out rules in `references/orchestrate.md`" and its second cell names archiving a session outside the workstream; the T5 tests pass (AC-03)
+- [ ] T7 `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - both manifests move to the next minor version above `origin/main`'s; "a package change comes with a version change" and the manifest tests pass, and `bun test tests/vh-adlc/check.test.ts` passes in full (AC-04)
 
 ## Open Questions
 
