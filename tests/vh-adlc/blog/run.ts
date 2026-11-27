@@ -205,20 +205,20 @@ ${run2}
   write("screen-1.png", asset("screen-1.png", screenHtml(), 1000, 560));
   const article = `${front("The plan review that keeps our ledger honest")}Before any change reaches the payments ledger, someone on the team reads its plan. Keelson shows the plan as a short list: what it will create, what it will change and what it will destroy. Nothing applies until a person approves it.
 
-I resisted this step at first. It felt slow, and most plans were dull. Then a routine change to a worker role turned out to touch the database as well, and the plan said so in plain text. We caught it because someone had to read the list before pressing a button.
+I resisted this step at first. It felt slow, and most plans were dull. Then a routine change to a worker role turned out to touch the database as well, and the plan said so in plain text. We caught it because someone read the plan before approving it.
 
-${figure("screen-1.png", "Keelson plan review for payments-ledger with two additions, one update and an Approve button", "A plan review in Keelson: two additions, one update and nothing destroyed, waiting for approval")}
+${figure("screen-1.png", "Keelson plan review for payments-ledger with two additions, one update and an Approve button", "A plan review in the Keelson demo workspace: two additions, one update and nothing destroyed, waiting for approval")}
 
-Now the review is part of every change. The person who wrote the change never approves it. The reviewer checks that the plan matches the ticket, that nothing is destroyed unless the ticket says so, and that the counts look right. When something looks odd, they ask before approving, not after.
+Now the review is part of every change. The person who wrote the change never approves it. The reviewer checks that the plan matches the ticket, that nothing is destroyed unless the ticket says so, and that the counts look right.
 
-It takes a few minutes. Most days it finds nothing, and that is fine. The value is in the days it does find something, and in knowing that every change on the ledger was read by two people.
+It takes a few minutes. It usually finds nothing, and that is fine. The value is in the days it does find something, and in knowing that every change on the ledger was read by two people.
 `;
   write("candidate.md", article);
   write("notes.md", `Brief: a short post about the plan review step in Keelson that guards our payments ledger.
 Notes from the author:
 - Every change to the payments ledger shows a plan first: creates, changes, destroys. Nothing applies until a person approves.
 - I resisted it at first; it felt slow and most plans were dull.
-- A routine worker role change also touched the database; the plan said so and we caught it.
+- A routine worker role change also touched the database; the plan said so in plain text, and we caught it because someone read the plan before approving it.
 - The author of a change never approves it. The reviewer checks the plan against the ticket, that nothing is destroyed unless the ticket says so, and the counts.
 - It takes a few minutes and usually finds nothing; the value is the days it does, and that two people read every change.
 - screen-1.png is a capture I took of the Keelson plan review for payments-ledger in our demo workspace.

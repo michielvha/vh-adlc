@@ -477,3 +477,12 @@ describe("visual reading GitHub connector fetches", async () => {
     expect(fetches.map((f) => f.what.includes("other/repo"))).toEqual([true]);
   });
 });
+
+describe("visual reading brace expansion", async () => {
+  const visual = await import("./blog/visual.ts");
+  test("brace words expand before paths are read", () => {
+    expect(visual.braces("p/{agents/a.md,references/b.md}")).toEqual(["p/agents/a.md", "p/references/b.md"]);
+    expect(visual.braces("{a,b}/{c,d}")).toEqual(["a/c", "a/d", "b/c", "b/d"]);
+    expect(visual.braces("plain")).toEqual(["plain"]);
+  });
+});

@@ -104,8 +104,12 @@ Revisions fall into three kinds:
   fixing a code block, and fix an identifiable defect in a code block, such as a
   stale command flag. It changes no treatment and otherwise adds or removes no
   heading and changes no heading level or code block. It reports presentation gaps
-  as findings.
+  as findings, including those in the article as it found them.
 - A review-only run changes no file and reports presentation gaps as findings.
+
+Name each presentation gap by its location: the heading it sits under and the
+opening words of the passage, for example "under The cutover, the run starting
+'The first weekend' has no break for 1,600 words".
 - A presentation revision adds, moves, removes or replaces treatments, corrects the
   caption or alt text of a treatment, or edits a diagram treatment, as the request
   names, and leaves every prose line, heading, front matter field, code block and
@@ -217,8 +221,10 @@ no additional critic contract.
 Apply justified minimal repairs and revert unnecessary paraphrases. Never treat
 a replacement article as an editor's verdict. Resolve factual findings against
 their evidence and expose changed recommendations or unknowns to the owner.
-List every entry of the editor's last `Presentation repairs` line in the handoff
-in the editor's own words, each marked `applied` or `open`.
+Let the editor finish its turn and use its final return; do not interrupt or
+close it after an earlier message. List every entry of the editor's last
+`Presentation repairs` line in the handoff, quoting each entry in the editor's own
+words, label included, on its own line marked `applied` or `open`.
 When independent dispatch is unavailable, do a self-edit and identify that limit;
 do not claim an independent review or certify prose with an AI-detector score.
 
@@ -231,7 +237,8 @@ routine repairs and surface factual corrections, meaning changes and unresolved
 questions with the affected passages. Group batch exceptions in one report.
 Report the treatments placed, no-visual exceptions, presentation gaps and
 rendered checks, or their limits, including every unverified check the editor
-named. Two of these are fixed lines, each at most once, at the start of a handoff
+named. Give each treatment placed its own line naming its image file, or the
+first words of its pull quote, and the point it serves. Two of these are fixed lines, each at most once, at the start of a handoff
 line or after a `- ` or `* ` list marker:
 
 - `No-visual exception: <category>: <explanation>`. The category is `short-read`

@@ -421,6 +421,13 @@ export function commandWords(words: string[]): { name: string; args: string[] } 
 const real = (path: string) => { try { return realpathSync(path); } catch { return resolve(path); } };
 const expand = (word: string) => word === "~" ? homedir() : word.startsWith("~/") ? join(homedir(), word.slice(2)) : word;
 
+/** Shell brace expansion of one word, innermost first: `a/{b,c}` gives `a/b` and `a/c`. */
+export function braces(word: string): string[] {
+  const m = word.match(/^(.*?)\{([^{}]*,[^{}]*)\}(.*)$/);
+  if (!m) return [word];
+  return m[2].split(",").flatMap((part) => braces(`${m[1]}${part}${m[3]}`));
+}
+
 /** Later words of a shell command that resolve to an existing file or directory. */
 export function shellReads(command: string, cwd: string): { paths: string[]; names: string[] } {
   const paths: string[] = [];
@@ -432,9 +439,9 @@ export function shellReads(command: string, cwd: string): { paths: string[]; nam
     // A command made only of assignments sets shell variables that later words in this command text may use.
     if (!name) for (const w of words) { const m = w.match(/^([A-Za-z_]\w*)=(.*)$/); if (m) vars.set(m[1], substitute(m[2])); }
     if (name) names.push(name);
-    for (const word of args) {
+    for (const word of args.flatMap((w) => braces(substitute(w)))) {
       if (!word) continue;
-      const path = resolve(cwd, expand(substitute(word)));
+      const path = resolve(cwd, expand(word));
       if (existsSync(path)) paths.push(real(path));
     }
   }
