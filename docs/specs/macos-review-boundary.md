@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Being implemented on feat/macos-review-boundary; T28 to T33 and T30 remain."
+status: complete
+status_description: "Complete with residuals on #195 (AC-02, AC-06, AC-08, AC-11) and #201 (AC-13); shipped as one PR, waiting for the owner's merge."
 issue: https://github.com/michielvha/vh-adlc/issues/187
 branch: feat/macos-review-boundary
 goal: "Spec and implementation reviews in this repository run on Codex from a Mac, with no owner step per review, and no reviewer process can change the owning worktree or the private clone once the review has been judged."
