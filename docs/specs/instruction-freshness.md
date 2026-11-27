@@ -305,7 +305,13 @@ the plugin removes the field and the rule together, because they ship in one ver
 
 ## Tasks
 
-None yet; written once the document is planned.
+- [ ] T1 `tests/vh-adlc/loop/context-freshness.test.ts` - the failing tests for the per-file states, the tip-pinned `read`, the untouched checkout and a clone without `origin/HEAD`; they fail because `context` prints no `freshness` (AC-01, AC-02, AC-04, AC-06, AC-08)
+- [ ] T2 `plugins/vh-adlc/scripts/loop/freshness.ts`, `plugins/vh-adlc/scripts/loop/cli.ts` - default-branch resolution, the guarded `--no-tags` fetch and the state classification; T1 passes (AC-01, AC-02, AC-04, AC-06, AC-08)
+- [ ] T3 `tests/vh-adlc/loop/context-freshness.test.ts` - the failing tests for the stale-settings fallback and every `unverified` cause; they fail because `context` still reads only the local settings and has no fallback reasons (AC-03, AC-05)
+- [ ] T4 `plugins/vh-adlc/scripts/loop/freshness.ts` - the tip-settings fallback, its load error, the null `read` for an absent settings file and the `unverified` reasons; T3 and T1 pass, and `tests/vh-adlc/loop/plugin-version.test.ts` still passes (AC-03, AC-05)
+- [ ] T5 `tests/vh-adlc/loop/context-freshness.test.ts`, `tests/vh-adlc/loop/glossary.test.ts` - the failing text tests for the read rule with the Test Plan's must-pass and must-fail sentences, and the Instruction freshness glossary row; they fail because no skill or reference states the rule yet (AC-07)
+- [ ] T6 `plugins/vh-adlc/references/loop-settings.md`, `plugins/vh-adlc/references/loop.md`, the seven SDD `SKILL.md` files and `plugins/vh-adlc/skills/vh-adlc-orchestrate/SKILL.md` - the Instruction freshness section and glossary row, and the pointer in each skill and in `references/loop.md:143`; T5 passes, and `tests/vh-adlc/check.test.ts`, `tests/vh-adlc/direct-operation-compatibility.test.ts` and `tests/vh-adlc/proportional-review.test.ts` still pass (AC-07)
+- [ ] T7 `plugins/vh-adlc/plugin.json` - the minor version bump the Scope names; `tests/vh-adlc/check.test.ts` passes (Design)
 
 ## Open Questions
 
