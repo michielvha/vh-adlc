@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Back to draft for drift re-review R-18: the reviewer gets an allowlisted environment."
+status_description: "Revised for drift re-review R-18: the reviewer gets an allowlisted environment; a host re-review is pending, then owner acceptance."
 issue: https://github.com/michielvha/vh-adlc/issues/187
 branch: feat/macos-review-boundary
 goal: "Spec and implementation reviews in this repository run on Codex from a Mac, with no owner step per review, and no reviewer process can change the owning worktree or the private clone once the review has been judged."
@@ -61,8 +61,11 @@ judges those criteria from that recorded run, in place of the review protocol's 
 stored results. Planned: run inside a sandbox, the route tests will fail once with a clear reason ("The
 route tests need an unsandboxed run: ...") instead of failing one by one.
 
-The trade-offs, in plain words. Codex tool commands can write anywhere outside the protected paths and
-reach the network. That includes the home directory, other repositories, Codex's own session log, and
+The trade-offs, in plain words. The reviewer CLI and everything it starts get only an allowlisted
+environment (paths, user, locale and terminal variables, `CODEX_HOME` and the XDG directories), so tokens in
+the session that runs the review, such as `GH_TOKEN` or cloud keys, never reach reviewer commands or the
+candidate's tests. Codex still authenticates and attests from `~/.codex`. Codex tool commands can write
+anywhere outside the protected paths and reach the network. That includes the home directory, other repositories, Codex's own session log, and
 user-level schedulers such as `~/Library/LaunchAgents`, crontab, shell startup files and `~/.gitconfig`.
 Something planted there could change the worktree later, and this feature doesn't stop that, on macOS or on
 Linux. The host Claude reviewer has the same access today through its Bash tool. The model attestation
@@ -82,15 +85,19 @@ returns; a script for the real-Codex proof that fails closed, used for the imple
 spec half rests on the stored Codex spec reviews R-6 to R-9 instead of a rerun; the delivery path;
 and the files that decide routing, the reviewer's instructions and publication in `covers`.
 
-Observed so far on this Mac: T1 to T8 and T10 are built, each test watched failing first, and a committed
-mutant script shows the late-writer, rename, clone, export, Git-directory, hard-link and nested-sandbox
-tests each failing against the part it guards; the allow-rule mutation is still planned. `loop.yaml` is committed, and
-the first real Codex spec review through `cli.ts review` came back ready with `gpt-6.2-sol` attested and
-the worktree unchanged (R-6). Five tests in `tests/vh-adlc/loop/` fail here because their page-cache stub
-writes where macOS doesn't read, which #182 fixes; the recorded run needs #182 merged first so it passes.
-Still planned: the scratch and tree checks, the single clear failure inside a sandbox, the runner that
-fails closed, the recorded unsandboxed run, the real Codex implementation proof run and the formal
-implementation review that judges from both, and Linux CI after merge.
+What changed since the R-13 acceptance: drift re-review R-18 found that the route handed the reviewer the
+whole environment of the session running it, credentials included, against the repository's coding
+convention. The reviewer now gets an allowlisted environment (AC-12). Nothing else in the scope changed.
+
+Observed so far on this Mac: T1 to T27 are built, each test watched failing first. #182 is merged, and
+`tests/vh-adlc/loop/` passes. The recorded unsandboxed run at `5168340e` shows the boundary tests passing,
+one clear failure inside a sandbox, and the mutant script catching all twelve mutations. The formal Codex
+implementation review R-17 came back ready, attested and with the worktree unchanged; it rated AC-01, AC-03,
+AC-04, AC-05, AC-07 and AC-10 met and AC-02, AC-06, AC-08 and AC-11 not met on edge cases, which the
+orchestrator residualised to #195 (an alternate `GIT_INDEX_FILE`, the runner's porcelain-only state check,
+HEAD removed mid-check, and a dangling scratch symlink, which Seatbelt still refuses to write through). This
+revision resets those ticks and residuals. Still planned: the environment allowlist and its test, a new
+recorded run, proof run and formal Codex implementation review, then Linux CI after merge.
 
 Acceptance authorizes implementing this on the feature branch and opening a PR. Merging still needs the
 owner.
@@ -182,6 +189,8 @@ In scope:
   Codex reviewer judges the darwin-only criteria from that record.
 - The route test file fails once, with an "unsandboxed run" reason, on a process that has no boundary,
   instead of failing test by test.
+- The reviewer CLI, and every process it starts, gets an allowlisted environment instead of the
+  controller's.
 - `pidNamespaceAvailable()` returns false when `unshare` can't be started, instead of throwing.
 - `.vh-adlc/loop.yaml` in this repository routes `spec_reviewer` and `implementation_reviewer` to Codex.
 - The command-route paragraphs of `references/loop-settings.md`, which own the details, and the
@@ -296,6 +305,17 @@ message says the route tests need an unsandboxed run, because this process is in
 nest, and it skips every test that runs the route. The tests that don't
 run the route, such as the snapshot and reply-parsing tests, still run.
 
+**Reviewer environment.** An implementation reviewer runs the candidate's tests, and the Codex route gives it
+network access, so the reviewer CLI must not inherit the controller's environment, which holds the session's
+credentials (`conventions/coding.md`: a process that runs user-supplied code gets an explicit allowlisted
+environment). `runReviewRoute` passes only these variables from `process.env`, when set: `PATH`, `HOME`,
+`TMPDIR`, `USER`, `LOGNAME`, `SHELL`, `LANG`, every `LC_*`, `TERM`, `CODEX_HOME`, `XDG_CONFIG_HOME`,
+`XDG_CACHE_HOME`, `XDG_DATA_HOME`, `XDG_STATE_HOME` and `XDG_RUNTIME_DIR`, then `request.env` on top.
+`cli.ts review` passes no `request.env`. Measured on this Mac: `codex exec -m gpt-6.2-sol -s
+danger-full-access --json` started with only `PATH`, `HOME`, `TMPDIR`, `USER`, `LOGNAME`, `SHELL`, `LANG` and
+`TERM` exited 0, and its session log recorded only `gpt-6.2-sol`, so authentication and attestation keep
+working. The owned-process marker is added by `runOwnedClient` as before.
+
 **Route acceptance.** The check at `review-route.ts:338` accepts `pid-namespace` or `seatbelt`. Its
 pending reason names both boundaries ("a PID namespace through unshare on Linux, or a sandbox-exec write
 boundary on macOS"). The cleanup confirmation, the before-and-after check and every later check stay as
@@ -397,48 +417,41 @@ sentence and links to `loop-settings.md`. The Instruction freshness section and
 
 ## Acceptance Criteria
 
-- [x] AC-01: On macOS, a command-route review whose reply passes every existing check comes back `ready`.
-      Evidence: `tests/vh-adlc/evidence/macos-review-boundary/recorded-run/record-5168340e.md` (code commit 5168340e, this Mac outside any sandbox): the route tests pass, 69 pass, 5 skip, 0 fail; R-17 at bc5cf01c returned met.
+- [ ] AC-01: On macOS, a command-route review whose reply passes every existing check comes back `ready`.
 - [ ] AC-02: On macOS, no reviewer process can change the owning worktree (files, ignored files, index,
       HEAD, refs) or the private clone outside `review_scratch`, during or after the review, either through
       their own paths or by renaming a parent directory. This includes a descendant that detaches into its
       own session, clears its environment and writes after the reviewer has exited. Writes inside
       `review_scratch` and in the temporary directory still succeed.
-      Residual: https://github.com/michielvha/vh-adlc/issues/195
-- [x] AC-03: On a host where neither boundary can be applied, including a macOS process already inside a
+- [ ] AC-03: On a host where neither boundary can be applied, including a macOS process already inside a
       Seatbelt sandbox, a command-route review stays pending with a reason that names the missing boundary.
-      Evidence: Same record: the nested-sandbox and `boundary: "unavailable"` tests pass, and the boundary-precheck mutation fails the nested-sandbox test; R-17 at bc5cf01c returned met.
-- [x] AC-04: On a host without `unshare`, `runOwnedClient` with `pidNamespace: true` and no `writeDeny`
+- [ ] AC-04: On a host without `unshare`, `runOwnedClient` with `pidNamespace: true` and no `writeDeny`
       runs the client with the `marker` boundary instead of throwing.
-      Evidence: Same record: the no-unshare subprocess test in `owned-process.test.ts` passes; R-17 at bc5cf01c returned met.
-- [x] AC-05: In this repository, `bun plugins/vh-adlc/scripts/loop/cli.ts route` returns a `command` route
+- [ ] AC-05: In this repository, `bun plugins/vh-adlc/scripts/loop/cli.ts route` returns a `command` route
       with model `gpt-6.2-sol` and `model_attestation: codex-session` for both `spec review` and `review`.
-      Evidence: `bun plugins/vh-adlc/scripts/loop/cli.ts route --repo . --operation "spec review"` and `--operation review` print `"route":"command"`, `"model":"gpt-6.2-sol"` and `"model_attestation":"codex-session"` (T8); R-17 at bc5cf01c returned met.
 - [ ] AC-06: On this Mac, real Codex spec reviews through `cli.ts review` are stored with outcome `ready`,
       the served model attested from the session log and `git status` unchanged (R-6 to R-9). A real Codex
       implementation review through the final route code comes back `ready` the same way, its reviewer
       having read the recorded unsandboxed run, with the owning worktree's status and refs unchanged. The
       committed script that ran it fails unless the outcome is `ready` for that commit and nothing changed,
       and keeps the run's Codex transcript.
-      Residual: https://github.com/michielvha/vh-adlc/issues/195
-- [x] AC-07: `references/loop-settings.md` states the macOS boundary and what it denies, what stays
+- [ ] AC-07: `references/loop-settings.md` states the macOS boundary and what it denies, what stays
       writable, the pending cases, the `-s danger-full-access` requirement for Codex under it, and that tests
       starting their own `sandbox-exec` need a run outside any sandbox; `references/review-protocol.md` names
       the boundary and links to `loop-settings.md`.
-      Evidence: `loop-settings.md` and `review-protocol.md` at bc5cf01c state the AC-07 points (T20); R-17 returned met.
 - [ ] AC-08: On macOS, a command-route review whose owning worktree holds a protected file with a second
       hard link stays pending, with a reason naming that file, and a protected file that disappears or can't
       be read during that check leaves the review pending with a retryable reason instead of an error.
-      Residual: https://github.com/michielvha/vh-adlc/issues/195
-- [x] AC-10: Run on a process without a boundary, such as inside a Seatbelt sandbox,
+- [ ] AC-10: Run on a process without a boundary, such as inside a Seatbelt sandbox,
       `tests/vh-adlc/loop/review-route.test.ts` reports one failure whose message says the route tests need
       an unsandboxed run, and skips its route tests instead of failing each one.
-      Evidence: Same record: under `sandbox-exec` the route test file reports the single "The route tests need an unsandboxed run" failure, 58 skipped; R-17 at bc5cf01c returned met.
 - [ ] AC-11: On macOS, a `review_scratch` entry that resolves to a protected path, a parent of one, or a path
       inside the Git directory or common Git directory, or a symlink to a path inside a denied path, leaves the
       review pending with a reason naming the entry, while a real scratch directory and a scratch symlink to a
       disjoint directory still work.
-      Residual: https://github.com/michielvha/vh-adlc/issues/195
+- [ ] AC-12: A command-route reviewer and every process it starts see only the allowlisted environment
+      variables and `request.env`, never another variable of the controller's environment, and Codex still
+      authenticates and attests with that environment.
 
 ## Test Plan
 
@@ -454,6 +467,7 @@ sentence and links to `loop-settings.md`. The Instruction freshness section and
 | AC-08 | Darwin-only tests in `review-route.test.ts`: (1) the fixture hard-links a tracked file to a path in the temporary directory before the review; the review stays pending with a reason naming that file, and the reviewer stub never runs (it would create a marker file; fails without the link-count check). (2) A unit test of the link check over a tree whose file is removed between the directory listing and the `lstat`, through a seam that removes it, returns the retryable pending reason and doesn't throw (fails without the guard). |
 | AC-10 | Run `/usr/bin/sandbox-exec -p '(version 1)(allow default)' bun test --timeout 60000 tests/vh-adlc/loop/review-route.test.ts` on this Mac, as part of the recorded run: one failure whose message contains "unsandboxed run" (must pass: "The route tests need an unsandboxed run: this process is inside a Seatbelt sandbox, which cannot nest"; must fail: "no process boundary on this host" and a run with no failure), the route tests reported as skipped, and the non-route tests passing. Watched failing first: before the change the same run gives 50 failures with per-test pending reasons. |
 | AC-11 | Darwin-only tests in `review-route.test.ts`: a scratch entry that is a symlink to the owning worktree's root, one that is a symlink into the common Git directory, and one that is a symlink to the worktree's tracked `src` directory each leave the review pending with a reason naming the entry, and the reviewer stub never runs (fails without the overlap check). A real scratch directory and a scratch entry that is a symlink to a directory outside every protected path still let the stub write through them. |
+| AC-12 | `tests/vh-adlc/loop/review-route.test.ts`, on every platform with a boundary: with a sentinel variable such as `VH_REVIEW_SENTINEL` set in the test process, an implementation reviewer stub writes `env` to a record file outside the protected paths; the record holds `PATH` and `HOME` and no sentinel, and a variable passed through `request.env` is present. Watched failing first: today the sentinel appears. The authentication and attestation half is the AC-06 proof run and the formal review, which run real Codex through the route with this environment. |
 
 ## Tasks
 
@@ -495,6 +509,10 @@ sentence and links to `loop-settings.md`. The Instruction freshness section and
       Evidence: Git paths now drop only the trailing newline, `settings.ts` refuses scratch entries with a `.` component, and the runner treats only exit 1 from `symbolic-ref` as detached. `bun test --timeout 60000 tests/vh-adlc/loop/ tests/vh-adlc/triage/owned-process.test.ts`: 215 pass, 5 skip, 0 fail, so T26 passes. With a `git` shim whose `symbolic-ref` exits 128, the runner exits 1 with "the state before the review could not be measured", before any review starts. A first version of that guard written as an AND-OR list did not stop the run under `set -e`: that run went on to a full Codex review, which passed. The `if` form fixes it, and the snippet was checked on its own before the rerun.
 - [x] T22 `tests/vh-adlc/evidence/macos-review-boundary/recorded-run/` - once #182 has reached the branch, the owner-directed recorded run on this Mac outside any sandbox, in a fresh clone of the code commit: the boundary test files, the AC-10 sandboxed invocation and the mutant script, each with command, commit, exit code and output, committed on top of the code commit as commit P; then the `implementation` proof run on P, its records stored as a diagnostic implementation review and its artifacts committed as commit Q under `implementation-proof-P`; then the formal Codex implementation review on Q, its records stored, and `vh-adlc review check` and `vh-adlc lint` passing (AC-01, AC-02, AC-03, AC-06, AC-08, AC-10, AC-11)
       Evidence: Recorded run at code commit 5168340e (`recorded-run/record-5168340e.md`): boundary tests 69 pass, 5 skip, 0 fail; AC-10 sandboxed run 1 failure, 58 skip; mutant script exit 0, 12/12 caught. Committed as e274ff17. The proof run R-16 on e274ff17 was `ready`, attested `gpt-6.2-sol`, state unchanged, runner exit 0, with artifacts committed at bc5cf01c (`implementation-proof-e274ff17`). The formal Codex implementation review R-17 on bc5cf01c was `ready` and attested, with the state unchanged and artifacts in `implementation-review-bc5cf01c`. Both record sets pass `vh-adlc review check`. Earlier cycles: R-14 at c55aa45a and R-15 at b8c1a07f led to T23 to T27.
+
+- [ ] T28 `tests/vh-adlc/loop/review-route.test.ts` - the AC-12 sentinel test; fails because the reviewer inherits the controller's environment (AC-12, R-18 F-01)
+- [ ] T29 `plugins/vh-adlc/scripts/loop/review-route.ts` - pass the allowlisted environment plus `request.env`; T28 passes and `tests/vh-adlc/loop/` passes (AC-12)
+- [ ] T30 `tests/vh-adlc/evidence/macos-review-boundary/` - the recorded unsandboxed run at the new code commit, the AC-06 proof run on the commit that holds it, and the formal Codex implementation review on the commit that holds the proof artifacts, each stored and checked as in T22 (AC-01 to AC-08, AC-10 to AC-12)
 
 ## Open Questions
 
