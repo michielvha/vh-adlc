@@ -218,4 +218,4 @@ NO FINDINGS
 
 ## State
 
-The independent review is current with no open findings (R-7 at `fc6b45f9`). The two end-to-end dispatch tests passed in Linux CI (run 45980312542). Remaining: CI on the pushed head, with the package checks fixed. Merging waits for the owner.
+The independent review is current with no open findings (R-7 at `fc6b45f9`). The two end-to-end dispatch tests passed in Linux CI (run 45980312542). On the pushed head `718e0cd4` ([run 45984815583](https://github.com/michielvha/vh-adlc/actions/runs/45984815583)), `checker`, `checker-macos`, `verify` and `paseo-hosts` pass. `remote-gui` fails again with the same first error: the mobile test's typed U+0301 never reaches the field. Both failing runs used the runner's preinstalled Google Chrome 158.0.8127.36. The last `main` run that executed that test ([run 45898546605](https://github.com/michielvha/vh-adlc/actions/runs/45898546605)) passed on Chrome 157.0.8103.78, with the same runner image version (ubuntu-26.04, 20261111.635). This change touches no remote-gui file, so the failure follows the Chrome update, not this change. Merging waits for the owner.
