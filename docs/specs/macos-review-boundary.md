@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Accepted again at R-5 with gpt-6.2-sol; re-entering implementation on feat/macos-review-boundary."
+status: in-progress
+status_description: "Being implemented on feat/macos-review-boundary; T10, T8 and T9 remain."
 issue: https://github.com/michielvha/vh-adlc/issues/187
 branch: feat/macos-review-boundary
 goal: "Spec and implementation reviews in this repository run on Codex from a Mac, with no owner step per review, and no reviewer process can change the owning worktree or the private clone once the review has been judged."
