@@ -404,6 +404,7 @@ sentence and links to `loop-settings.md`. The Instruction freshness section and
       their own paths or by renaming a parent directory. This includes a descendant that detaches into its
       own session, clears its environment and writes after the reviewer has exited. Writes inside
       `review_scratch` and in the temporary directory still succeed.
+      Residual: https://github.com/michielvha/vh-adlc/issues/195
 - [x] AC-03: On a host where neither boundary can be applied, including a macOS process already inside a
       Seatbelt sandbox, a command-route review stays pending with a reason that names the missing boundary.
       Evidence: Same record: the nested-sandbox and `boundary: "unavailable"` tests pass, and the boundary-precheck mutation fails the nested-sandbox test; R-17 at bc5cf01c returned met.
@@ -419,6 +420,7 @@ sentence and links to `loop-settings.md`. The Instruction freshness section and
       having read the recorded unsandboxed run, with the owning worktree's status and refs unchanged. The
       committed script that ran it fails unless the outcome is `ready` for that commit and nothing changed,
       and keeps the run's Codex transcript.
+      Residual: https://github.com/michielvha/vh-adlc/issues/195
 - [x] AC-07: `references/loop-settings.md` states the macOS boundary and what it denies, what stays
       writable, the pending cases, the `-s danger-full-access` requirement for Codex under it, and that tests
       starting their own `sandbox-exec` need a run outside any sandbox; `references/review-protocol.md` names
@@ -427,6 +429,7 @@ sentence and links to `loop-settings.md`. The Instruction freshness section and
 - [ ] AC-08: On macOS, a command-route review whose owning worktree holds a protected file with a second
       hard link stays pending, with a reason naming that file, and a protected file that disappears or can't
       be read during that check leaves the review pending with a retryable reason instead of an error.
+      Residual: https://github.com/michielvha/vh-adlc/issues/195
 - [x] AC-10: Run on a process without a boundary, such as inside a Seatbelt sandbox,
       `tests/vh-adlc/loop/review-route.test.ts` reports one failure whose message says the route tests need
       an unsandboxed run, and skips its route tests instead of failing each one.
@@ -435,6 +438,7 @@ sentence and links to `loop-settings.md`. The Instruction freshness section and
       inside the Git directory or common Git directory, or a symlink to a path inside a denied path, leaves the
       review pending with a reason naming the entry, while a real scratch directory and a scratch symlink to a
       disjoint directory still work.
+      Residual: https://github.com/michielvha/vh-adlc/issues/195
 
 ## Test Plan
 
