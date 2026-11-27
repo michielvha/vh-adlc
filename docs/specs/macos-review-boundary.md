@@ -463,6 +463,58 @@ None.
 | 2026-11-27 | R-7 | spec | `519dbbfd` | gpt-6.2-sol | procedural | 8 blocking, 7 should-fix, 1 nit; Codex command route; convergence trigger fired (R-6 had 5 blocking), revision held for the owner's proportionality answer |
 | 2026-11-27 | R-8 | spec | `cc7bb1ac` | gpt-6.2-sol | procedural | 6 blocking, 8 should-fix; Codex command route; F-05 and F-06 re-raise owner-accepted limits; held for the owner |
 | 2026-11-27 | R-9 | spec | `34633957` | gpt-6.2-sol | procedural | 9 blocking, 8 should-fix; Codex command route; convergence trigger fired again (R-8 had 6 blocking); held for the owner |
+| 2026-11-27 | R-10 | spec | `7fd292bb` | claude-opus-5-5 | procedural | 1 blocking, 4 should-fix, 2 nits; host route, owner-directed gating pass on #187 because the convergence trigger fired twice (R-7, R-9) on Codex findings that re-raise owner decisions; Codex stays the route for every other review |
+
+### R-10
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Test Plan AC-06, Acceptance Criteria AC-06, Tasks T22
+EVIDENCE: The new Test Plan AC-06 text, added in this revision for R-9 F-08, says "The implementation review judges AC-06 from the spec review's kept artifacts and from its own dispatch, which the route only reaches with a `ready` outcome." That premise is false. At X, `plugins/vh-adlc/scripts/loop/review-route.ts:366` dispatches the reviewer through `runOwnedClient`. The route decides the outcome only afterwards: the unchanged-worktree check at 375-378, the exit check at 380, the model attestation at 384-388 and `ready` at 391. So a reviewer that is running has not been shown to come back `ready`. It cannot observe its own attestation result, the worktree after it exits, or `run-review.sh`'s exit status. The spec review's artifacts say nothing about the implementation half of AC-06. T22 has one `run-review.sh` implementation run, and its records are the ones stored, so that formal review has to give an AC-06 verdict from events that have not happened yet. An honest reviewer returns `not verified`, `impl_review_clean` fails, and a correct implementation cannot reach `complete` on this plan.
+PROPOSAL: Make T22's `run-review.sh` implementation run a completed proof run whose kept artifacts (outcome, attestation, before-and-after snapshots, transcript, exit status) are committed to the evidence directory. Have the formal implementation review judge AC-06 from those artifacts and the spec run's artifacts, and say in T22 which run is diagnostic and which counts.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner summary (second paragraph on the recorded run), Scope (recorded-run bullet), Design (Recorded unsandboxed run), frontmatter status_description
+EVIDENCE: Design cites "(orchestrator under the owner's delegation, #187: "run it on the Mac at the code that's being reviewed")". No comment on #187 contains that phrase (`gh api repos/michielvha/vh-adlc/issues/187/comments --paginate` filtered for "code that.s being reviewed" returned nothing). The owner's direction (comment 7220327075) says "at the exact reviewed commit". The reinterpretation comes from the orchestrator's decision (comment 7220697331): "'Exact reviewed commit' means the code commit whose tree the reviewed commit carries unchanged". The Owner summary now says "For this feature the owner directed the simplest answer on #187: the implementer runs those tests ... at the code being reviewed". That puts the orchestrator's wording in the owner's mouth and hides a material change that the owner should see before accepting. This text changed in this revision.
+PROPOSAL: Replace the invented quote with a citation of comment 7220697331 and its actual words. In the Owner summary, say that the owner directed the exact reviewed commit and that the orchestrator ruled the code commit counts, as a change for the owner to confirm when accepting.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner summary (second paragraph, "now fail once"; "Observed so far" paragraph, "Still planned" list), Test Plan AC-10
+EVIDENCE: The Owner summary says "Run inside a sandbox, the route tests now fail once with a clear "needs an unsandboxed run" reason". At X, `grep -n "unsandboxed\|seatbeltAvailable" tests/vh-adlc/loop/review-route.test.ts` finds nothing, and T18, which adds that behaviour, is unticked. `run-review.sh:17-19` still logs the exit and then returns the status of its reporting command. The "Still planned" list leaves out both the loud failure and the fail-closed runner, so the summary presents planned work as observed. R-9 F-16 raised this. It is still unapplied, and this revision edited the paragraph. The quoted reason "needs an unsandboxed run" also differs from the AC-10 must-pass example in this revision, "The route tests need an unsandboxed run: ...", which does not contain "needs".
+PROPOSAL: Describe the single failure and the fail-closed runner as planned, and add both to "Still planned". Quote the reason as the Test Plan's must-pass example gives it.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-08, Test Plan AC-08, Scope (pending-cases bullet), Owner summary (third paragraph), Design (Pre-existing hard links, Concurrency, failure and rollback)
+EVIDENCE: AC-08, Scope and the Owner summary promise a retryable pending outcome when "a protected tree that changes during that check". Design limits it to "A file that disappears or can't be read during the check". The walk at `review-route.ts:316-323` lists each directory once, so a file added to a directory it has already listed is never seen, and no error is raised. Proof (2) only removes a file between listing and `lstat`. A check that misses every addition passes the proof, and two implementers could read AC-08 as needing either the narrow or the broad check. The AC-08 row and criterion were rewritten in this revision. The same gap was raised as R-9 F-13 and still applies to the reverted text.
+PROPOSAL: Narrow AC-08, the Scope bullet and the Owner summary to Design's case: a file that disappears or cannot be read during the check leaves the review pending with a retryable reason.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Recorded unsandboxed run), frontmatter covers, Tasks T22
+EVIDENCE: This revision defines "exact reviewed commit" as the code commit, "whose tree the reviewed commit carries unchanged apart from the document and the evidence". It also says "only the feature document and the evidence directory may change". `covers` lists `tests/vh-adlc/evidence/macos-review-boundary/mutants.py` and `.../run-review.sh`, which sit in that directory. So the mutant script or the runner at the reviewed commit can differ from the version that produced the record, and the `git diff --name-only` check still passes. The reviewer would then read a script that is not the one whose output it judges AC-02, AC-03, AC-08 and AC-11 from. R-9 F-10 raised the same delta.
+PROPOSAL: Limit the allowed delta to the feature document, `recorded-run/` and the kept review artifact directories, and require both covered scripts to be byte-identical to the code commit.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Pre-existing hard links)
+EVIDENCE: "the route makes it with `--no-hardlinks` (`review-route.ts:317`)". At X, line 317 is the `readdirSync` call in `linkedFile`, and the `git clone -q --no-hardlinks` call is at `review-route.ts:349`. R-9 F-17 raised this, and the paragraph was rewritten in this revision without correcting it.
+PROPOSAL: Cite `review-route.ts:349`.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Owner summary ("What changed since the R-5 acceptance"), Scope (Not handled: a Git file other than the index and HEAD)
+EVIDENCE: The summary lists "two stated limits" as changes since R-5. The Git-file limit was already in the accepted R-5 text (`git show 58342e95:docs/specs/macos-review-boundary.md` lines 161-163), so only the session-log limit is new. The restored limit also changes its reason. R-5 said "Git doesn't create such links for refs, and an object file isn't part of what the check judges". The new reason, "checking for them would leave every review pending for anyone with such a clone", explains objects but not the loose refs the same line names. The orchestrator's comment 7220697331 says the limit "is restored as it was".
+PROPOSAL: Name the one new limit and the reworded one in the summary. Either restore the R-5 reason for refs or add it next to the clone reason.
 
 ### R-9
 
