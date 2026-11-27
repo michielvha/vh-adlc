@@ -47,7 +47,7 @@ export function seatbeltAvailable(): boolean {
 }
 
 /** The resolved path, following symlinks through its longest existing prefix; Seatbelt matches resolved paths. */
-function resolvedPath(path: string): string {
+export function resolvedPath(path: string): string {
   try { return realpathSync(path); } catch {
     const parent = dirname(path);
     return parent === path ? path : join(resolvedPath(parent), basename(path));

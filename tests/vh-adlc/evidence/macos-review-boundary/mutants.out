@@ -1,21 +1,30 @@
-## no denied paths: 6 fail
+## no denied paths: 6 fail (exit 1, ran 15)
    - a detached writer that cleared its environment cannot write into the owning worktree after the review
    - a late writer cannot rename the worktree's grandparent and write through the new path
    - a late writer cannot rename the main checkout and change the linked worktree's index through it
    - an implementation reviewer cannot write into its private clone during the review
    - a spec reviewer cannot make the export writable and write into it during the review
    - refs and the linked worktree's index stay unchanged
-## no parent literal denies: 2 fail
+## no parent literal denies: 2 fail (exit 1, ran 15)
    - a late writer cannot rename the worktree's grandparent and write through the new path
    - a late writer cannot rename the main checkout and change the linked worktree's index through it
-## no Git-directory denies: 2 fail
+## no Git-directory denies: 2 fail (exit 1, ran 15)
    - a late writer cannot rename the main checkout and change the linked worktree's index through it
    - refs and the linked worktree's index stay unchanged
-## no clone deny: 1 fail
+## no clone deny: 1 fail (exit 1, ran 15)
    - an implementation reviewer cannot write into its private clone during the review
-## no export deny: 1 fail
+## no export deny: 1 fail (exit 1, ran 15)
    - a spec reviewer cannot make the export writable and write into it during the review
-## no link-count check: 1 fail
+## no allow rules: 2 fail (exit 1, ran 15)
+   - writes into a declared scratch directory and the temporary directory still land
+   - a real scratch directory and a scratch symlink to a disjoint directory stay writable
+## no link-count check: 1 fail (exit 1, ran 15)
    - a protected file that already has a second hard link leaves the review pending before the reviewer runs
-## no boundary precheck: 1 fail
+## no disappearing-file guard: 1 fail (exit 1, ran 15)
+   - a file that disappears between the listing and its lstat gives a retryable result, not an error
+## no scratch overlap check: 3 fail (exit 1, ran 15)
+   - a scratch symlink to the owning worktree's root leaves the review pending before the reviewer runs
+   - a scratch symlink to the common Git directory leaves the review pending before the reviewer runs
+   - a scratch symlink to a tracked directory of the worktree leaves the review pending before the reviewer runs
+## no boundary precheck: 1 fail (exit 1, ran 15)
    - a route started inside another Seatbelt sandbox stays pending and names the missing boundary

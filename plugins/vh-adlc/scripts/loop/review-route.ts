@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { pidNamespaceAvailable, runOwnedClient, seatbeltAvailable } from "../triage/owned-process";
+import { pidNamespaceAvailable, resolvedPath, runOwnedClient, seatbeltAvailable } from "../triage/owned-process";
 import { nulRecords, statusEntries } from "./git-paths";
 import { gitEnvironment, gitReadArguments, readGitWithEnvironment } from "../git-read";
 
@@ -326,19 +326,40 @@ const NO_BOUNDARY = "no process boundary on this host keeps reviewer processes o
  * hard link. Seatbelt checks the path a write goes through, so such a file could be changed through its
  * other name.
  */
-function linkedFile(root: string, scratch: string[], extra: string[]): string | undefined {
-  for (const path of extra) { try { const info = lstatSync(path); if (info.isFile() && info.nlink > 1) return path; } catch { /* absent */ } }
-  const walk = (path: string): string | undefined => {
-    for (const name of readdirSync(join(root, path))) {
+export function protectedLinkCheck(root: string, scratch: string[], extra: string[],
+  hooks: { afterList?: (dir: string) => void } = {}): { linked?: string; changed?: string } {
+  for (const path of extra) { try { const info = lstatSync(path); if (info.isFile() && info.nlink > 1) return { linked: path }; } catch { /* absent */ } }
+  // Another session may remove or lock a file between the listing and its lstat: that is a retry, not an error.
+  const walk = (path: string): { linked?: string; changed?: string } | undefined => {
+    let names: string[];
+    try { names = readdirSync(join(root, path)); } catch { return { changed: path || "." }; }
+    hooks.afterList?.(path);
+    for (const name of names) {
       const child = path ? `${path}/${name}` : name;
       if (child === ".git" || underScratch(child, scratch)) continue;
-      const info = lstatSync(join(root, child));
+      let info;
+      try { info = lstatSync(join(root, child)); } catch { return { changed: child }; }
       if (info.isDirectory()) { const found = walk(child); if (found) return found; }
-      else if (info.isFile() && info.nlink > 1) return child;
+      else if (info.isFile() && info.nlink > 1) return { linked: child };
     }
     return undefined;
   };
-  return walk("");
+  return walk("") ?? {};
+}
+
+/**
+ * The first scratch allow that would open a protected path: one that resolves to a denied path or a parent
+ * of one, into a Git directory, or, through a symlink, to anywhere inside a denied path. The snapshot skips
+ * a scratch entry by its declared path, not by what it points at.
+ */
+function scratchOverlap(allows: { entry: string; declared: string }[], deny: string[], gitDirs: string[]): { entry: string; resolved: string } | undefined {
+  const inside = (path: string, dir: string) => path === dir || path.startsWith(`${dir}/`);
+  for (const { entry, declared } of allows) {
+    const resolved = resolvedPath(declared);
+    if (deny.some(dir => inside(dir, resolved)) || gitDirs.some(dir => inside(resolved, dir))
+      || resolved !== declared && deny.some(dir => inside(resolved, dir))) return { entry, resolved };
+  }
+  return undefined;
 }
 
 export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutcome> {
@@ -353,8 +374,9 @@ export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutc
     const gitDir = git(repo, ["rev-parse", "--absolute-git-dir"]).toString().trim();
     const commonDir = git(repo, ["rev-parse", "--path-format=absolute", "--git-common-dir"]).toString().trim();
     if (seatbelt) {
-      const linked = linkedFile(repo, scratch, [join(gitDir, "index"), join(gitDir, "HEAD")]);
-      if (linked) return { status: "pending", reason: `a protected file already has a second hard link, through which a reviewer could change it after the review: ${linked}` };
+      const links = protectedLinkCheck(repo, scratch, [join(gitDir, "index"), join(gitDir, "HEAD")]);
+      if (links.changed) return { status: "pending", reason: `a protected file changed while the link check read it (${links.changed}); retry the review` };
+      if (links.linked) return { status: "pending", reason: `a protected file already has a second hard link, through which a reviewer could change it after the review: ${links.linked}` };
     }
     if (request.kind === "spec") {
       try { exportDir = exportCommit(repo, commit); } catch (error) { return { status: "pending", reason: (error as Error).message }; }
@@ -364,6 +386,15 @@ export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutc
       const clone = Bun.spawnSync(["git", "clone", "-q", "--no-hardlinks", repo, cloneDir], { stdout: "pipe", stderr: "pipe" });
       const checkout = clone.exitCode === 0 ? Bun.spawnSync(["git", "-C", cloneDir, "checkout", "-q", "--detach", commit], { stdout: "pipe", stderr: "pipe" }) : clone;
       if (checkout.exitCode !== 0) return { status: "pending", reason: "the private review clone could not be prepared" };
+    }
+    // Under the macOS boundary no reviewer process may write what the before-and-after check judges. The
+    // profile is built from these resolved paths, after no scratch allow is shown to open a protected one.
+    const deny = [repo, gitDir, commonDir, ...(cloneDir ? [cloneDir] : []), ...(exportDir ? [exportDir] : [])].map(resolvedPath);
+    const allows = [...scratch.map(entry => ({ entry, declared: join(repo, entry) })),
+      ...(cloneDir ? scratch.map(entry => ({ entry, declared: join(cloneDir!, entry) })) : [])];
+    if (seatbelt) {
+      const overlap = scratchOverlap(allows, deny, [resolvedPath(gitDir), resolvedPath(commonDir)]);
+      if (overlap) return { status: "pending", reason: `the review_scratch entry ${overlap.entry} resolves onto a protected path (${overlap.resolved}), so allowing writes there would open it` };
     }
     const promptFile = join(work, "prompt.md");
     writeFileSync(promptFile, request.prompt);
@@ -375,9 +406,7 @@ export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutc
     const env = Object.fromEntries(Object.entries({ ...process.env, ...request.env }).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
     let result;
     try {
-      // Under the macOS boundary no reviewer process may write what the before-and-after check judges.
-      const writeDeny = { deny: [repo, gitDir, commonDir, ...(cloneDir ? [cloneDir] : []), ...(exportDir ? [exportDir] : [])],
-        allow: [...scratch.map(dir => join(repo, dir)), ...(cloneDir ? scratch.map(dir => join(cloneDir!, dir)) : [])] };
+      const writeDeny = { deny, allow: allows.map(allow => resolvedPath(allow.declared)) };
       result = await runOwnedClient(argv, { cwd: exportDir ?? cloneDir ?? repo, env, stdout, stderr, pidNamespace: namespace, writeDeny },
         { timeout_ms: request.timeoutMs ?? 15 * 60_000, grace_ms: 500, reap_ms: 2_000 });
     } catch (error) { return { status: "pending", reason: `the reviewer command could not start: ${(error as Error).message}` }; }
