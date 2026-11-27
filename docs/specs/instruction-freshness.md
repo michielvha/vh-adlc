@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Spec review R-4 left no blocking or should-fix finding; waits for owner acceptance."
+status: planned
+status_description: "Accepted by the owner at R-4; waits for tasks and implementation."
 issue: https://github.com/michielvha/vh-adlc/issues/139
 goal: "SDD operations read the repository's listed instruction files and project procedure as they stand at the default branch tip, even from a checkout that is behind it."
 covers:
@@ -319,6 +319,7 @@ None.
 | 2026-11-27 | R-2 | spec | `5f5b05b` | claude-opus-5-5 | procedural | 3 should-fix, 5 nits; revision follows |
 | 2026-11-27 | R-3 | spec | `ed52406` | claude-opus-5-5 | procedural | 1 blocking, 1 should-fix, 1 nit; revision follows |
 | 2026-11-27 | R-4 | spec | `45cad2a` | claude-opus-5-5 | procedural | 2 nits, both in Context; applied outside the baseline |
+| 2026-11-27 | R-4 | spec | `45cad2a` | n/a | n/a | accepted by owner |
 
 ### R-1
 
