@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised for R-22: a direct proof of the credential rule order and the loop-settings text; a host re-review is pending, then owner acceptance."
+status_description: "Spec review R-23 is clean; waiting for owner re-acceptance."
 issue: https://github.com/michielvha/vh-adlc/issues/187
 branch: feat/macos-review-boundary
 goal: "Spec and implementation reviews in this repository run on Codex from a Mac, with no owner step per review, and no reviewer process can change the owning worktree or the private clone once the review has been judged."
@@ -107,7 +107,7 @@ orchestrator residualised to #195 (an alternate `GIT_INDEX_FILE`, the runner's p
 HEAD removed mid-check, and a dangling scratch symlink, which Seatbelt still refuses to write through). This
 revision resets those ticks and residuals; their code is unchanged, so after the new formal review those
 four criteria go back to the owner to be residualised to #195 again. Still planned: the environment
-allowlist, the credential read denies and their tests, a new recorded run, proof run and formal Codex
+allowlist, the credential read denies and their tests, the `loop-settings.md` text for them, a new recorded run, proof run and formal Codex
 implementation review, then Linux CI after merge.
 
 Acceptance authorizes implementing this on the feature branch and opening a PR. Merging still needs the
@@ -570,9 +570,9 @@ readable, and that a scratch entry touching a store or its parent leaves the rev
 - [ ] T29 `plugins/vh-adlc/scripts/loop/review-route.ts` - pass the allowlisted environment plus `request.env`; T28 passes and `tests/vh-adlc/loop/` passes (AC-12)
 - [ ] T31 `tests/vh-adlc/loop/review-route.test.ts` - the AC-13 tests: direct reads of all eight stores, the four renames, the two scratch symlinks into stores, the missing-`.config` write and the direct rule-order case; they fail because nothing denies reads (AC-13, R-19 to R-22)
 - [ ] T32 `plugins/vh-adlc/scripts/loop/review-route.ts`, `plugins/vh-adlc/scripts/triage/owned-process.ts`, `tests/vh-adlc/evidence/macos-review-boundary/mutants.py` - the read-deny list with its store and existing-parent write denies placed after the scratch allows, and the overlap check over stores; T31 passes, `tests/vh-adlc/loop/` passes, and the mutant script, extended with the read denies, the store write denies, the parent write denies, the store overlap check and the rule order, catches every mutation (AC-13)
+- [ ] T33 `plugins/vh-adlc/references/loop-settings.md` - the command-route paragraphs add the reviewer's allowlisted environment, the macOS credential read denies with their Keychain and Linux limits, and the scratch-over-a-store pending case; `tests/vh-adlc/direct-operation-compatibility.test.ts` passes (AC-07, R-22 F-02)
 - [ ] T30 `tests/vh-adlc/evidence/macos-review-boundary/` - the recorded unsandboxed run at the new code commit, including the AC-12 and AC-13 tests; the AC-06 proof run on the commit that holds it; and the formal Codex implementation review on the commit that holds the proof artifacts, each stored and checked as in T22. AC-02, AC-06, AC-08 and AC-11, whose code is unchanged, then go back to the owner to be residualised to #195 again (AC-01 to AC-08, AC-10 to AC-13)
 
-- [ ] T33 `plugins/vh-adlc/references/loop-settings.md` - the command-route paragraphs add the reviewer's allowlisted environment, the macOS credential read denies with their Keychain and Linux limits, and the scratch-over-a-store pending case; `tests/vh-adlc/direct-operation-compatibility.test.ts` passes (AC-07, R-22 F-02)
 
 ## Open Questions
 
@@ -607,6 +607,23 @@ None.
 | 2026-11-27 | R-20 | spec | `4a90e8cb` | claude-opus-5-5 | procedural | 1 blocking, 4 should-fix; host route, owner-directed |
 | 2026-11-27 | R-21 | spec | `bfeba473` | claude-opus-5-5 | procedural | 1 blocking, 2 should-fix; host route; convergence trigger fired (R-20 had 1 blocking), held for the owner |
 | 2026-11-27 | R-22 | spec | `a1d16f9d` | claude-opus-5-5 | procedural | 1 blocking, 1 should-fix; host route; mechanical fixes in the same layer, applied by the orchestrator's standing instruction |
+| 2026-11-27 | R-23 | spec | `0ad167e1` | claude-opus-5-5 | procedural | clean: 0 blocking, 1 should-fix (Tasks order, applied outside the baseline), 1 nit unapplied; host route, owner-directed |
+
+### R-23
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks (T33 sits after T30: "- [ ] T30 ... the recorded unsandboxed run at the new code commit ... and the formal Codex implementation review ... (AC-01 to AC-08, AC-10 to AC-13)" and then "- [ ] T33 `plugins/vh-adlc/references/loop-settings.md` - the command-route paragraphs add ... (AC-07, R-22 F-02)"), Design (Recorded unsandboxed run: "Between the code commit and the reviewed commit only the feature document, `recorded-run/` and the kept review artifact directories (`spec-review-*`, `implementation-proof-*`) may change"), Context (Owner summary: "Still planned: the environment allowlist, the credential read denies and their tests, a new recorded run, proof run and formal Codex implementation review, then Linux CI after merge.")
+EVIDENCE: This revision added T33 after T30. `conventions/feature-documents.md` (Tasks) says "Order by dependency", and T30 depends on T33. `loop-settings.md` is in `covers` (frontmatter line 13), T30's formal review judges AC-07, and AC-07 now requires the allowlisted environment, the credential read denies and the scratch-over-a-store case, which only T33 writes. An implementer who works the tasks in order records the run, runs the proof and gets the formal Codex review before `loop-settings.md` changes. That review then rates AC-07 not met. T33 then edits a covered file after the code commit, which breaks the Design rule quoted above, so the recorded run, the proof run and the formal review all have to be redone. An implementer who moves T33 ahead of T30 avoids this. The two would produce review histories that differ in a way the owner sees. The Owner summary's "Still planned" list also leaves out the reference update. The convention's check is satisfied otherwise: `vh-adlc lint` passes at X.
+PROPOSAL: Move T33 ahead of T30, for example right after T32, and add the `loop-settings.md` update to the Owner summary's "Still planned" list.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Documentation: "and that a scratch entry touching a store or its parent leaves the review pending"), Design (Scratch overlap: "a scratch entry whose resolved path equals, contains or lies inside a store, or equals a store's parent, leaves the review pending"), Acceptance Criteria (AC-07: "the scratch-over-a-store pending case"), Tasks (T33: "the scratch-over-a-store pending case")
+EVIDENCE: This revision added the Documentation sentence. "Touching ... its parent" reads as covering an entry inside a store's parent, such as `~/.config/other`. Design refuses only an entry that equals the parent, and AC-13 part (4) requires a write to `.config/other/file` to land. If someone writes `loop-settings.md` from the Documentation paragraph, the reference can overstate the pending case. The AC-07 Test Plan row only checks that each listed statement is present, so it would not catch the error.
+PROPOSAL: Say it the way Design does: a scratch entry that equals, contains or lies inside a store, or equals a store's parent, leaves the review pending.
 
 ### R-22
 
