@@ -240,7 +240,19 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-None.
+### Q1: When a route stops at 6 passes with L-08 or L-10 found exactly once, should a second set run?
+
+**Recommendation:** A. Drop the second set and accept the stated risk, because a false failure only leaves
+both labels as the known losses they already are, while the second set needs a manual stop-and-count
+procedure that has drawn a finding in each of the last three reviews.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. No second set** | Plain harness runs with no manual counting or hand-written results rows. A route that stops at 6 with exactly one hit fails the label check. | If the sentence restores a label at 1 in 3 passes, a false failure about 11% of the time on the Claude route and 23% on the Codex route. At the old brief's 2 in 3, under 1.5% on either route. |
+| **B. Keep the second set, counted exactly** | No dead end at one hit: the route is judged on 12 passes. | A manual procedure: stop at the sixth counted pass, by order of the verdict files rather than file number. Write the second set's results rows by hand, with retention recounted over the 12 judged passes. Up to 6 more passes on that route. |
+
+**Why this is yours:** it trades the risk of rejecting a sentence that works against an extra manual
+procedure and its passes. The goal and the recorded rules do not decide that.
 
 ## Review Log
 
