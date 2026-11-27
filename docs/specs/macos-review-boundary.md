@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised for drift re-review R-18: the reviewer gets an allowlisted environment; a host re-review is pending, then owner acceptance."
+status_description: "Revised for R-19 on the owner's choice B: allowlisted environment plus read denies for a fixed list of credential stores; a host re-review is pending, then owner acceptance."
 issue: https://github.com/michielvha/vh-adlc/issues/187
 branch: feat/macos-review-boundary
 goal: "Spec and implementation reviews in this repository run on Codex from a Mac, with no owner step per review, and no reviewer process can change the owning worktree or the private clone once the review has been judged."
@@ -62,9 +62,14 @@ stored results. Planned: run inside a sandbox, the route tests will fail once wi
 route tests need an unsandboxed run: ...") instead of failing one by one.
 
 The trade-offs, in plain words. The reviewer CLI and everything it starts get only an allowlisted
-environment (paths, user, locale and terminal variables, `CODEX_HOME` and the XDG directories), so tokens in
-the session that runs the review, such as `GH_TOKEN` or cloud keys, never reach reviewer commands or the
-candidate's tests. Codex still authenticates and attests from `~/.codex`. Codex tool commands can write
+environment (paths, user, locale and terminal variables, `CODEX_HOME` and the XDG directories), so tokens held
+in environment variables of the session that runs the review, such as `GH_TOKEN` or cloud keys, don't reach
+reviewer commands or the candidate's tests. On macOS the profile also refuses reads of a fixed list of
+credential stores: `~/.ssh`, `~/.aws`, `~/.kube`, `~/.docker`, `~/.config/gh`, `~/.config/gcloud`,
+`~/.netrc` and `~/.git-credentials`. The macOS Keychain stays reachable: denying it also broke Codex's
+network connections when measured, so a token kept there can still be read by a reviewer command that
+queries the Keychain directly. Other files the user can read stay readable. Codex still authenticates and
+attests from `~/.codex`. Codex tool commands can write
 anywhere outside the protected paths and reach the network. That includes the home directory, other repositories, Codex's own session log, and
 user-level schedulers such as `~/Library/LaunchAgents`, crontab, shell startup files and `~/.gitconfig`.
 Something planted there could change the worktree later, and this feature doesn't stop that, on macOS or on
@@ -87,7 +92,9 @@ and the files that decide routing, the reviewer's instructions and publication i
 
 What changed since the R-13 acceptance: drift re-review R-18 found that the route handed the reviewer the
 whole environment of the session running it, credentials included, against the repository's coding
-convention. The reviewer now gets an allowlisted environment (AC-12). Nothing else in the scope changed.
+convention. The reviewer now gets an allowlisted environment (AC-12), and, on the owner's choice after R-19,
+the macOS profile refuses reads of a fixed list of credential stores (AC-13), with the Keychain as a stated
+limit. Nothing else in the scope changed.
 
 Observed so far on this Mac: T1 to T27 are built, each test watched failing first. #182 is merged, and
 `tests/vh-adlc/loop/` passes. The recorded unsandboxed run at `5168340e` shows the boundary tests passing,
@@ -96,8 +103,10 @@ implementation review R-17 came back ready, attested and with the worktree uncha
 AC-04, AC-05, AC-07 and AC-10 met and AC-02, AC-06, AC-08 and AC-11 not met on edge cases, which the
 orchestrator residualised to #195 (an alternate `GIT_INDEX_FILE`, the runner's porcelain-only state check,
 HEAD removed mid-check, and a dangling scratch symlink, which Seatbelt still refuses to write through). This
-revision resets those ticks and residuals. Still planned: the environment allowlist and its test, a new
-recorded run, proof run and formal Codex implementation review, then Linux CI after merge.
+revision resets those ticks and residuals; their code is unchanged, so after the new formal review those
+four criteria go back to the owner to be residualised to #195 again. Still planned: the environment
+allowlist, the credential read denies and their tests, a new recorded run, proof run and formal Codex
+implementation review, then Linux CI after merge.
 
 Acceptance authorizes implementing this on the feature branch and opening a PR. Merging still needs the
 owner.
@@ -191,6 +200,9 @@ In scope:
   instead of failing test by test.
 - The reviewer CLI, and every process it starts, gets an allowlisted environment instead of the
   controller's.
+- On macOS, the profile refuses reads of a fixed list of credential stores under the reviewer's home:
+  `~/.ssh`, `~/.aws`, `~/.kube`, `~/.docker`, `~/.config/gh`, `~/.config/gcloud`, `~/.netrc` and
+  `~/.git-credentials`. The list is fixed; further stores are follow-up work.
 - `pidNamespaceAvailable()` returns false when `unshare` can't be started, instead of throwing.
 - `.vh-adlc/loop.yaml` in this repository routes `spec_reviewer` and `implementation_reviewer` to Codex.
 - The command-route paragraphs of `references/loop-settings.md`, which own the details, and the
@@ -215,6 +227,11 @@ crontab, shell startup files, `~/.gitconfig` (`core.hooksPath`), plugin and bina
 session log. The boundary covers reviewer processes and their descendants, which is what the Linux
 namespace covers. Posture A, decided by the orchestrator under the owner's delegation of the Codex-review
 setup on 2026-11-27 (ledger #179) (R-1 F-04).
+
+Not handled: the macOS Keychain and credential files outside the fixed list. Denying the Keychain's Mach
+service (`com.apple.SecurityServer`) stopped `gh auth token` but also made `codex exec` fail with
+"Connection failed", so a reviewer command can still query the Keychain for a token kept there; and any file
+the user can read outside the fixed list stays readable. Decided by the owner on #187 (option B) (R-19 F-01).
 
 Not handled: a macOS reviewer process that outlives the review keeps running until it exits on its own.
 It can't change the protected paths, but it can write elsewhere as above. The PID namespace kills such
@@ -314,7 +331,18 @@ environment). `runReviewRoute` passes only these variables from `process.env`, w
 `cli.ts review` passes no `request.env`. Measured on this Mac: `codex exec -m gpt-6.2-sol -s
 danger-full-access --json` started with only `PATH`, `HOME`, `TMPDIR`, `USER`, `LOGNAME`, `SHELL`, `LANG` and
 `TERM` exited 0, and its session log recorded only `gpt-6.2-sol`, so authentication and attestation keep
-working. The owned-process marker is added by `runOwnedClient` as before.
+working. The owned-process marker (`VH_ADLC_OWNED_PROCESS`) is the one variable `runOwnedClient` adds, as
+before; shells the reviewer starts set their own `PWD`, `SHLVL` and `_`.
+
+**Credential read denies.** On macOS, `writeDeny` gains a `readDeny` list, and the profile gains
+`(deny file-read* (subpath (param "R0")) ...)` for each directory and `(literal (param "Rn"))` for each
+file. The route fills it from the home directory the reviewer gets (`request.env.HOME`, else the
+controller's `HOME`): `.ssh`, `.aws`, `.kube`, `.docker`, `.config/gh` and `.config/gcloud` as directories,
+`.netrc` and `.git-credentials` as files, each resolved through its longest existing prefix like the other
+paths. Measured on this Mac with those denies in place: listing each of the existing stores exited 1,
+`gh auth token` exited 1 because `gh` could not read its account file, and `codex exec -m gpt-6.2-sol -s
+danger-full-access --json` exited 0 with only `gpt-6.2-sol` in its session log, its own `ls ~/.ssh` refused.
+Under the PID namespace on Linux there is no read deny; the environment allowlist applies on both.
 
 **Route acceptance.** The check at `review-route.ts:338` accepts `pid-namespace` or `seatbelt`. Its
 pending reason names both boundaries ("a PID namespace through unshare on Linux, or a sandbox-exec write
@@ -366,8 +394,10 @@ reviewed commit only the feature document, `recorded-run/` and the kept review a
 byte-identical; the record names the code commit, and `git diff --name-only <code commit> <reviewed commit>`
 in the clone shows that. The owner directed "at the exact reviewed commit"; the orchestrator's decision on
 #187 (comment 7220697331) reads: "'Exact reviewed commit' means the code commit whose tree the reviewed
-commit carries unchanged; only the document and evidence differ." The Codex reviewer judges AC-01 to
-AC-03, AC-08, AC-10 and AC-11 from the record while reviewing the code.
+commit carries unchanged; only the document and evidence differ." The Codex reviewer judges AC-01 to AC-03, AC-08 and AC-10 to AC-13 from the record while reviewing the code: the
+recorded test files include the AC-12 environment test and the AC-13 read-deny test, which the reviewer
+can't run inside its own profile. The AC-12 authentication and attestation half is judged from the AC-06
+proof artifacts, a real Codex run through the route with that environment and those denies.
 
 **The AC-06 proof runs.** A review can't observe its own outcome, so AC-06 is judged from completed runs.
 The spec half is already on record: the Codex spec reviews R-6 to R-9 ran through `cli.ts review` on this
@@ -449,9 +479,12 @@ sentence and links to `loop-settings.md`. The Instruction freshness section and
       inside the Git directory or common Git directory, or a symlink to a path inside a denied path, leaves the
       review pending with a reason naming the entry, while a real scratch directory and a scratch symlink to a
       disjoint directory still work.
-- [ ] AC-12: A command-route reviewer and every process it starts see only the allowlisted environment
-      variables and `request.env`, never another variable of the controller's environment, and Codex still
-      authenticates and attests with that environment.
+- [ ] AC-12: No variable of the controller's environment reaches a command-route reviewer or any process it
+      starts except the allowlisted ones and `request.env`; the owned-process marker is the one variable the
+      route adds. Codex still authenticates and attests with that environment.
+- [ ] AC-13: On macOS, no reviewer process can read the fixed credential stores under the reviewer's home
+      (`.ssh`, `.aws`, `.kube`, `.docker`, `.config/gh`, `.config/gcloud`, `.netrc`, `.git-credentials`),
+      while other files there stay readable and Codex still runs and attests.
 
 ## Test Plan
 
@@ -467,7 +500,8 @@ sentence and links to `loop-settings.md`. The Instruction freshness section and
 | AC-08 | Darwin-only tests in `review-route.test.ts`: (1) the fixture hard-links a tracked file to a path in the temporary directory before the review; the review stays pending with a reason naming that file, and the reviewer stub never runs (it would create a marker file; fails without the link-count check). (2) A unit test of the link check over a tree whose file is removed between the directory listing and the `lstat`, through a seam that removes it, returns the retryable pending reason and doesn't throw (fails without the guard). |
 | AC-10 | Run `/usr/bin/sandbox-exec -p '(version 1)(allow default)' bun test --timeout 60000 tests/vh-adlc/loop/review-route.test.ts` on this Mac, as part of the recorded run: one failure whose message contains "unsandboxed run" (must pass: "The route tests need an unsandboxed run: this process is inside a Seatbelt sandbox, which cannot nest"; must fail: "no process boundary on this host" and a run with no failure), the route tests reported as skipped, and the non-route tests passing. Watched failing first: before the change the same run gives 50 failures with per-test pending reasons. |
 | AC-11 | Darwin-only tests in `review-route.test.ts`: a scratch entry that is a symlink to the owning worktree's root, one that is a symlink into the common Git directory, and one that is a symlink to the worktree's tracked `src` directory each leave the review pending with a reason naming the entry, and the reviewer stub never runs (fails without the overlap check). A real scratch directory and a scratch entry that is a symlink to a directory outside every protected path still let the stub write through them. |
-| AC-12 | `tests/vh-adlc/loop/review-route.test.ts`, on every platform with a boundary: with a sentinel variable such as `VH_REVIEW_SENTINEL` set in the test process, an implementation reviewer stub writes `env` to a record file outside the protected paths; the record holds `PATH` and `HOME` and no sentinel, and a variable passed through `request.env` is present. Watched failing first: today the sentinel appears. The authentication and attestation half is the AC-06 proof run and the formal review, which run real Codex through the route with this environment. |
+| AC-12 | `tests/vh-adlc/loop/review-route.test.ts`, on every platform with a boundary: the test process sets `VH_REVIEW_SENTINEL`, a `GH_TOKEN`-style name, `GIT_DIR` and `SSH_AUTH_SOCK` stand-ins; an implementation reviewer stub writes `env` to a record file outside the protected paths, and every name in it must be in the allowlist, `request.env`, `VH_ADLC_OWNED_PROCESS`, or the stub shell's own `PWD`, `SHLVL`, `_` and `OLDPWD`; `PATH` and `HOME` are present, and a variable passed through `request.env` is present. Watched failing first: today the stand-ins appear. It is in the recorded run. The authentication and attestation half is the AC-06 proof run, real Codex through the route with this environment. |
+| AC-13 | Darwin-only test in `review-route.test.ts`: `request.env.HOME` points at a fake home holding `.ssh/id_test`, `.aws/credentials`, `.config/gh/hosts.yml`, `.netrc` and an unlisted `notes.txt`; an implementation reviewer stub tries to read each and records which reads were refused. All five listed reads are refused, `notes.txt` is read, and the review is ready. Watched failing first, and failing again with the read denies removed through the mutant script. It is in the recorded run. That Codex still runs and attests with the denies is the AC-06 proof run. |
 
 ## Tasks
 
@@ -512,7 +546,9 @@ sentence and links to `loop-settings.md`. The Instruction freshness section and
 
 - [ ] T28 `tests/vh-adlc/loop/review-route.test.ts` - the AC-12 sentinel test; fails because the reviewer inherits the controller's environment (AC-12, R-18 F-01)
 - [ ] T29 `plugins/vh-adlc/scripts/loop/review-route.ts` - pass the allowlisted environment plus `request.env`; T28 passes and `tests/vh-adlc/loop/` passes (AC-12)
-- [ ] T30 `tests/vh-adlc/evidence/macos-review-boundary/` - the recorded unsandboxed run at the new code commit, the AC-06 proof run on the commit that holds it, and the formal Codex implementation review on the commit that holds the proof artifacts, each stored and checked as in T22 (AC-01 to AC-08, AC-10 to AC-12)
+- [ ] T31 `tests/vh-adlc/loop/review-route.test.ts` - the AC-13 read-deny test; fails because nothing denies reads (AC-13, R-19)
+- [ ] T32 `plugins/vh-adlc/scripts/loop/review-route.ts`, `plugins/vh-adlc/scripts/triage/owned-process.ts`, `tests/vh-adlc/evidence/macos-review-boundary/mutants.py` - the read-deny list and profile rule; T31 passes, `tests/vh-adlc/loop/` passes, and the mutant script, extended with the read denies, catches every mutation (AC-13)
+- [ ] T30 `tests/vh-adlc/evidence/macos-review-boundary/` - the recorded unsandboxed run at the new code commit, including the AC-12 and AC-13 tests; the AC-06 proof run on the commit that holds it; and the formal Codex implementation review on the commit that holds the proof artifacts, each stored and checked as in T22. AC-02, AC-06, AC-08 and AC-11, whose code is unchanged, then go back to the owner to be residualised to #195 again (AC-01 to AC-08, AC-10 to AC-13)
 
 ## Open Questions
 
