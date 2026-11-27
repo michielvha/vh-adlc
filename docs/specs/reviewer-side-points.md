@@ -37,10 +37,13 @@ when any label still fails after 6, which is likely on the Claude route. Executi
 Pass conditions:
 
 - L-08 is raised at its minimum severity on the Claude route, and L-10 on the Codex route, in at least 2 of
-  6 passes, or 3 of 12. A single hit could be chance. A route that stops at 6 passes with exactly one hit
+  the first 6 counted passes, or in 3 of all 12 when the harness extended the set; an extended route
+  passes on either count. A single hit could be chance. A route that stops at 6 passes with exactly one hit
   fails this check. If the sentence restores a label at 1 in 3 passes, that happens about 11% of the time
-  on the Claude route and 23% on the Codex route. The orchestrator accepted that risk under the owner's
-  delegation, because a false failure only leaves both labels as known losses.
+  on the Claude route and 23% on the Codex route. The workstream orchestrator accepted that risk on
+  2026-11-27, acting for the owner, who delegated this follow-up work to it
+  ([decision](https://github.com/michielvha/vh-adlc/issues/172#issuecomment-7226459817)). A false failure
+  only leaves both labels as known losses.
 - No label the new brief raised reliably, in 6 or more of 12 passes, is lost. The 16 label and route pairs
   it raised less often are reported but do not decide the result, because they could miss by chance alone.
 - The mean of blocking findings per pass stays within the new brief's normal spread on each route, so the
@@ -165,7 +168,8 @@ check that both commits carry the sentence byte for byte.
 - The harness counts 6 new-brief first passes per route, and extends the set to 12 when any label fails
   retention after 6 (`run.ts:48`, `run.ts:578`). A run that reports another route or model is recorded as
   not counted and replaced, up to the harness's limit of three runs per needed pass (`run.ts:227-236`).
-- AC-02 asks for 2 hits in 6 or 3 in 12, not the single hit the harness's retention rule accepts
+- AC-02 asks for 2 hits in the first 6 counted passes or, when the set was extended, 3 in all 12, and an
+  extended route passes on either count. That is more than the single hit the harness's retention rule accepts
   (`run.ts:268-270`). The old brief raised each label in 2 of 3 passes. At a leftover rate of 5% per pass,
   a single hit in 12 passes would happen about 46% of the time, while 3 in 12 would happen about 2% of
   the time.
@@ -173,8 +177,9 @@ check that both commits carry the sentence byte for byte.
   a route can stop at 6 passes with L-08 or L-10 at exactly 1 of 6, which is neither 2 of 6 nor a chance
   to reach 3 of 12. For a sentence that restores the label at 1 in 3 passes, that outcome would come up
   about 11% of the time on the host route and 23% on the command route, where fewer unrelated labels
-  trigger the extension. Such a route fails AC-02. No second set runs: the orchestrator decided this on
-  2026-11-27 under the owner's delegation (ledger
+  trigger the extension. Such a route fails AC-02. No second set runs. The workstream orchestrator decided
+  this on 2026-11-27 under the owner's delegation for this follow-up work
+  ([decision](https://github.com/michielvha/vh-adlc/issues/172#issuecomment-7226459817), ledger
   [#179](https://github.com/michielvha/vh-adlc/issues/179)), because a false failure only leaves D-17 and
   D-18 as the known losses they already are, and a second set would need a manual stop-and-count
   procedure. At the old brief's rate of 2 in 3, the same outcome comes up under 1.5% of the time on either
@@ -211,8 +216,9 @@ before the upgrade keeps the brief it loaded. No state, schema or boundary chang
       each distinct defect a finding covers, in that finding or as its own finding, and not to drop a
       secondary one. The plugin's patch version is one higher than before the change.
 - [ ] AC-02: On the enterprise case, under the brief under test, L-08 is raised at its minimum severity on the
-      host route, and L-10 at its minimum severity on the command route, each in at least 2 of 6 counted
-      first passes, or 3 of 12 when the harness extended the set.
+      host route, and L-10 at its minimum severity on the command route, each in at least 2 of the first 6
+      counted first passes, or, when the harness extended the set, in at least 3 of all 12. An extended
+      route passes on either count.
 - [ ] AC-03: None of the 59 enterprise label and route pairs that the replayed new brief raised in 6 or more of
       12 passes fails retention under the brief under test.
 - [ ] AC-04: On each route, the mean number of blocking findings per counted first pass under the brief under
@@ -227,7 +233,7 @@ before the upgrade keeps the brief it loaded. No state, schema or boundary chang
 | Criterion | Proof |
 | --- | --- |
 | AC-01 | Manual procedure: `git show origin/main:plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` contains the sentence from Design verbatim, outside any paragraph limited to one docs revision. Both plugin manifests show the patch version one above `0.33.1`, or one above whatever main holds when the bump lands. |
-| AC-02, AC-03 | `bun tests/vh-adlc/replay/run.ts run --only first-passes --routes-under-test host` and then `command`, against the case copy, with the arguments in Design. Pass: host L-08 and command L-10 at their minimum in at least 2 of 6 or 3 of 12 new runs, and none of the 59 pairs Background defines (the 75 enterprise pass rows except the 16 it names) fails retention. |
+| AC-02, AC-03 | `bun tests/vh-adlc/replay/run.ts run --only first-passes --routes-under-test host` and then `command`, against the case copy, with the arguments in Design. Pass: host L-08 and command L-10 at their minimum in at least 2 of the first 6 counted new runs, or, when the set was extended, in at least 3 of all 12 (either count passes an extended route), and none of the 59 pairs Background defines (the 75 enterprise pass rows except the 16 it names) fails retention. |
 | AC-04 | Manual procedure on the case host: for each counted first pass in the copy's `runs/new-<route>-pass-*.txt` with a `.verdicts.json` beside it, count lines starting `SEVERITY: blocking`, and take the mean per route. Pass: at most the bound in AC-04 for the number of counted passes. |
 | AC-05 | `bun tests/vh-adlc/replay/run.ts terms --case <copy> --file tests/vh-adlc/evidence/reviewer-side-points/results.md` prints pass, and the file has the four parts AC-05 names. |
 
