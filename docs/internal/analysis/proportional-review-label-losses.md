@@ -8,11 +8,11 @@ Draft, measured on 2026-11-27 against `cb1b8174` (origin/main). This covers Defe
 of [the proportional review spec](../../specs/proportional-review.md), tracked in
 [#172](https://github.com/michielvha/vh-adlc/issues/172).
 
-This draft compares the two briefs only. The private case material is out of reach: the approved label
-text, the stored first-pass records and the matcher verdicts are all in the enterprise case directory on the
-homelab host, which did not answer on 2026-11-27. The hypotheses below therefore name which kind of finding
-each change would suppress. They cannot yet say which kind L-08 and L-10 are. The conclusions come from
-primary sources read in this run: the Git history of this repository, the
+The first part of this draft compares the two briefs. The section
+[Reading the stored records](#reading-the-stored-records) then checks the hypotheses against the private
+enterprise case, read in place on the host that holds it. That section cites the case only by label ID,
+count and run number. The conclusions come from primary sources read in this run: the stored first-pass
+records, matcher verdicts and approved labels of the enterprise case, the Git history of this repository, the
 [docs comparison](https://github.com/vhco-pro/docs/compare/30c38c8dc6840a052f3f653a483ad3c5edac06c1...0fa68d68db3e65585f505e86f4850d883d6ef1d7)
 of `vhco-pro/docs`, and the public [results file](../../../tests/vh-adlc/evidence/proportional-review/results.md).
 
@@ -106,37 +106,80 @@ by Claude. The scope line cannot explain a dropped finding, because it says only
   which a reviewer reasonably judges the failure implausible. That would make the loss correct for this
   product, not a defect in the brief.
 
-## Next measurements, once the case material is back
+## Reading the stored records
 
-None of these need Codex.
+Read on 2026-11-27 from the enterprise case directory (labels approved 2026-11-22T20:27:08Z), with no
+reviewer or matcher runs and no writes to the case. The checks searched every stored first-pass record of
+each route for the defect each label names, by its wording and by its substance.
 
-1. Read the approved text of L-08 and L-10 and sort each into failure path, internal ambiguity, settled
-   trade-off or other.
-2. Read the old passes that raised each label and the new passes of the same route. Check whether a new pass
-   names the same defect under other words, which would point to a matcher miss.
-3. Rerun the matcher on the stored new-brief records for both labels.
-4. Only after the first three, check one candidate wording change on the host route for L-08, with about 6
-   Claude first passes. For L-10, check on the Codex route with 6 to 12 Codex first passes, once Codex
-   command-route reviews run on macOS ([#187](https://github.com/michielvha/vh-adlc/issues/187)) or the
-   homelab is back.
+**Both labels are failure paths.** L-08 is a failure that the design's set of values leaves without a
+mapping. L-10 is a write that a cancelled request can lose after the change has committed. Neither is a
+settled trade-off, so hypothesis 3 is ruled out. Neither touches a stated limit or a Deferred entry, so
+hypothesis 4 is ruled out too.
+
+**The old brief raised both labels as side points.** In each of the four old passes that raised L-08 on the
+host route or L-10 on the Codex route, the label's defect appears as one clause inside a wider finding about
+the same design section. No old pass gives either defect a finding of its own. The original review findings
+(R-1 F-05 and F-06 in the case) were standalone, but the replayed old brief already treated them as minor.
+
+**L-08 on the host route is a true omission.** The design section L-08 belongs to still draws findings in
+every new pass, 12 of 12, often at blocking. Not one of the 12 mentions the unmapped failure, in any words.
+A matcher rerun cannot recover a finding that does not exist, so the rerun was not needed. On the Codex
+route, the new brief still raises L-08 in 1 of 13 stored passes, where the old raised it in 1 of 3.
+
+**L-10 on the Codex route is mostly absent, and partly absorbed.**
+
+- In 2 of the 13 stored new passes, a blocking finding covers L-10's case: a client that disconnects after
+  the commit loses the record. It covers that case as one example of a wider defect, recording that
+  happens after the commit at all. The fix that finding proposes would remove L-10 too. The matcher, which
+  applies each label's Match line strictly, did not count them, because they do not name the mechanism
+  L-10 names.
+- In 2 other new passes, findings use L-10's words about context, but they concern another defect: API
+  compatibility and lock lifetime. The matcher was right to reject them.
+- The remaining 9 passes do not raise the defect.
+
+So under the new brief, the Codex reviewer folded L-10's side point into a larger blocking defect in about
+one pass in six, and dropped it otherwise.
+
+**What this means for the hypotheses.** No single rule change explains both losses:
+
+- Hypothesis 1, the conditional undefined-path rule, fits a dropped failure path. It is not confirmed, because
+  the new passes still examine the same design sections and raise other failure paths there.
+- The pattern the records show is that **the new brief keeps a wider finding's main defect and drops the
+  side points the old brief listed inside it.** Rating by consequence leads a reviewer to state one
+  consequence per finding. A secondary defect that the old brief named as an aside then has no home, because
+  the reviewer neither splits it out nor keeps it as a clause.
+- Chance remains possible for both. The old brief raised each label in only 2 of 3 passes, each time as an
+  aside, so the old rate behind it is uncertain.
+
+## Next steps
+
+1. If the owner wants the labels back: a one-sentence brief change that tells the reviewer to name each
+   distinct defect a finding covers. That means splitting a secondary defect into its own finding, or
+   listing it in the same finding, instead of dropping it when the finding is framed around one
+   consequence. Check it with 6 Claude first passes on the host route for L-08 and 6 to 12 Codex first
+   passes on the command route for L-10. The Codex route can run on the case host, which is Linux, without
+   waiting for [#187](https://github.com/michielvha/vh-adlc/issues/187).
+2. The cheaper alternative is to accept both as known losses: the old brief raised each only as an aside,
+   both stay at should-fix minimum severity, and in 2 of 13 Codex passes L-10's case is covered by a
+   blocking finding whose fix removes it.
+
 
 ## Harm and the simplest alternative
 
-The harm: on the enterprise case, one of two replay cases, the new brief misses one real should-fix defect
-on each route. The few developers who use vh-adlc could accept a spec carrying that kind of defect. It is
-not blocking-severity, and it does not go away on its own.
+The harm: on the enterprise case, one of two replay cases, the new brief stops raising one should-fix side
+point on each route. The few developers who use vh-adlc could accept a spec carrying such a secondary
+defect while the reviewer reports the main defect of the same section. It is not blocking-severity, and it
+does not go away on its own.
 
-The simplest alternative is a wording change in the reviewer brief. If the first hypothesis holds, the brief
-would state the undefined-path rule unconditionally and let the consequence rating decide only its severity.
-If the second holds, the brief would give an internal-only divergence a home, at should-fix or as an
-explicit nit. A wording change is prose, not machinery, and this analysis recommends no machinery. If the
-third hypothesis holds, the alternative is no change: the owner retires the label as describing a finding
-the feature removes on purpose.
+The simplest alternative is to record both as known losses and change nothing. The fix, if wanted, is one
+sentence of reviewer brief, which is prose, not machinery. This analysis recommends no machinery.
 
-Any wording change alters the review behaviour that other repositories' gates rely on, so it is new scope
-for its own feature document, not an edit under the completed spec.
+Any wording change alters the review behaviour that other repositories' gates rely on. It is therefore new
+scope for its own feature document, not an edit under the completed spec, and it is held behind the open
+change to the same file in [#182](https://github.com/michielvha/vh-adlc/pull/182).
 
 ## Verdict
 
-Track. Owner decisions: none yet. This waits on the enterprise case material, to tell the hypotheses
-apart. A wording fix becomes "act now" once one hypothesis is confirmed on the stored records.
+Track. The smallest owner decision: keep L-08 and L-10 as known losses, or specify the one-sentence brief
+change and spend about 6 Claude and 6 to 12 Codex first passes to check it.
