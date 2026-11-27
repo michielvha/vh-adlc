@@ -239,7 +239,11 @@ before the upgrade keeps the brief it loaded. No state, schema or boundary chang
 
 ## Tasks
 
-None yet; written once the document is planned.
+- [ ] T1 `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` on the experiment branch `exp/reviewer-side-points`, from `ef685da1` - the sentence from Design after the line-82 sentence; `git diff ef685da1 exp/reviewer-side-points` adds that sentence and nothing else (AC-02, AC-03, AC-04)
+- [ ] T2 `tests/vh-adlc/evidence/reviewer-side-points/results.md` - the host route replay on the case copy, with the arguments in Design; the file holds the brief identities, the host runs with identity and status, the host retention verdicts with L-08's count at its minimum, and the host blocking and should-fix means, and `run.ts terms` on it prints pass (AC-02, AC-03, AC-04, AC-05)
+- [ ] T3 `tests/vh-adlc/evidence/reviewer-side-points/results.md` - the command route replay on the same copy; the file adds the command runs, retention verdicts with L-10's count, and means, and states each of AC-02 to AC-04 as met or not met against its threshold; `run.ts terms` on it prints pass (AC-02, AC-03, AC-04, AC-05)
+- [ ] T4 `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` - only if T2 and T3 meet AC-02 to AC-04: the same sentence after the "Return every finding" sentence on the feature branch; the sentence matches T1's byte for byte, and `bun test tests/vh-adlc/proportionality.test.ts tests/vh-adlc/proportional-review.test.ts tests/vh-adlc/feature-native-review.test.ts --timeout 60000` passes (AC-01)
+- [ ] T5 `plugins/vh-adlc/.claude-plugin/plugin.json`, `plugins/vh-adlc/plugin.json` - the patch-version bump; both manifests show the version one above main's, and `bun test tests/vh-adlc/loop/plugin-version.test.ts --timeout 60000` passes (AC-01)
 
 ## Open Questions
 
