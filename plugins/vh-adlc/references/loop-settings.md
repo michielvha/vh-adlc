@@ -153,6 +153,16 @@ profile cannot run tests that start their own `sandbox-exec`, such as the route'
 those tests need a run outside any sandbox, and run inside one they report a single "unsandboxed run"
 failure.
 
+The reviewer CLI never inherits the controller's environment, which holds the session's credentials: it
+gets `PATH`, `HOME`, `TMPDIR`, `USER`, `LOGNAME`, `SHELL`, `LANG`, every `LC_*`, `TERM`, `CODEX_HOME` and
+the `XDG_*` base directories, when set, and nothing else. On macOS the profile also refuses reads, writes
+and renames of a fixed list of credential stores under the reviewer's home: `.ssh`, `.aws`, `.kube`,
+`.docker`, `.config/gh`, `.config/gcloud`, `.netrc` and `.git-credentials`. A `review_scratch` entry that
+equals, contains or lies inside one of those stores, or equals a store's parent, leaves the review
+pending. The macOS Keychain stays reachable, because denying it also breaks Codex's network connections,
+so a token kept there can still be read by a reviewer command; other readable files stay readable; and on
+Linux the PID namespace denies no reads, so the listed stores stay readable there.
+
 Feature reservations use the adopted remote's committed `.vh-adlc/work-ownership.yaml`,
 independent of local loop overrides or a stale feature checkout. See
 [reservation adoption](authority.md#reservation-adoption) before enabling them.
