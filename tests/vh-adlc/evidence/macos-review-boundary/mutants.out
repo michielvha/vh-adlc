@@ -1,0 +1,21 @@
+## no denied paths: 6 fail
+   - a detached writer that cleared its environment cannot write into the owning worktree after the review
+   - a late writer cannot rename the worktree's grandparent and write through the new path
+   - a late writer cannot rename the main checkout and change the linked worktree's index through it
+   - an implementation reviewer cannot write into its private clone during the review
+   - a spec reviewer cannot make the export writable and write into it during the review
+   - refs and the linked worktree's index stay unchanged
+## no parent literal denies: 2 fail
+   - a late writer cannot rename the worktree's grandparent and write through the new path
+   - a late writer cannot rename the main checkout and change the linked worktree's index through it
+## no Git-directory denies: 2 fail
+   - a late writer cannot rename the main checkout and change the linked worktree's index through it
+   - refs and the linked worktree's index stay unchanged
+## no clone deny: 1 fail
+   - an implementation reviewer cannot write into its private clone during the review
+## no export deny: 1 fail
+   - a spec reviewer cannot make the export writable and write into it during the review
+## no link-count check: 1 fail
+   - a protected file that already has a second hard link leaves the review pending before the reviewer runs
+## no boundary precheck: 1 fail
+   - a route started inside another Seatbelt sandbox stays pending and names the missing boundary

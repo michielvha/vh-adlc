@@ -47,6 +47,9 @@ function stub(body: string, reply: string) {
   return script;
 }
 
+/** setsid(2) through perl, because macOS ships no setsid binary. */
+const SETSID = `perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV or exit 127'`;
+
 const ok = (commit: string, model = "gpt-6.1-sol") => `MODEL: ${model}\nTARGET: ${commit}\n\nNO FINDINGS`;
 
 test("ignored-content exclusion is opt-in and preserves the lifecycle snapshot default", () => {
@@ -163,7 +166,7 @@ describe("reviewer processes", () => {
     // The stub exits only after the helper has left the process group, so a group kill alone misses it.
     const ready = join(realpathSync(mkdtempSync(join(tmpdir(), "vh-review-ready-"))), "detached");
     made.push(dirname(ready));
-    const body = `setsid bash -c 'echo $$ > ${ready}; sleep 1; echo late > ${marker}' </dev/null >/dev/null 2>&1 &\nwhile [ ! -s ${ready} ]; do sleep 0.05; done`;
+    const body = `${SETSID} bash -c 'echo $$ > ${ready}; sleep 1; echo late > ${marker}' </dev/null >/dev/null 2>&1 &\nwhile [ ! -s ${ready} ]; do sleep 0.05; done`;
     expect((await review(root, commit, stub(body, ok(commit)))).status).toBe("ready");
     await Bun.sleep(1_500);
     expect(existsSync(marker)).toBe(false);
@@ -260,7 +263,7 @@ describe("preservation hardening", () => {
     writeFileSync(join(root, "cache/data.bin"), "AAAA\n");
     // Since the private review clone (T49) the reviewer works in a fresh clone, so it reaches the owning worktree by path.
     const body = `cd "${root}" && cp -p cache/data.bin /tmp/vh-mtime-ref-$$ && printf 'BBBB\\n' > cache/data.bin && touch -r /tmp/vh-mtime-ref-$$ cache/data.bin; rm -f /tmp/vh-mtime-ref-$$`;
-    pending(await review(root, commit, stub(body, ok(commit))), "changed");
+    await refusedOrPending(root, review(root, commit, stub(body, ok(commit))), "changed");
   });
 
   test("a same-size rewrite of a clean tracked file that restores its modification time leaves the review pending", async () => {
@@ -271,12 +274,12 @@ describe("preservation hardening", () => {
     utimesSync(join(root, "src/app.txt"), new Date("2020-01-01T00:00:00Z"), new Date("2020-01-01T00:00:00Z"));
     git(root, "update-index", "--refresh");
     const body = `cd "${root}" && cp -p src/app.txt /tmp/vh-mtime-ref-$$ && printf 'bad\\n' > src/app.txt && touch -r /tmp/vh-mtime-ref-$$ src/app.txt; rm -f /tmp/vh-mtime-ref-$$`;
-    pending(await review(root, commit, stub(body, ok(commit))), "changed");
+    await refusedOrPending(root, review(root, commit, stub(body, ok(commit))), "changed");
   });
 
   test("a reviewer that detaches HEAD at the same commit leaves the review pending", async () => {
     const { root, commit } = repository();
-    pending(await review(root, commit, stub(`git -C "${root}" switch -q --detach HEAD`, ok(commit))), "changed");
+    await refusedOrPending(root, review(root, commit, stub(`git -C "${root}" switch -q --detach HEAD`, ok(commit))), "changed");
   });
 
   test("a chained committed symlink that escapes the export leaves the review pending", async () => {
@@ -315,7 +318,7 @@ describe("environment-clearing helpers", () => {
     const marker = join(root, "src/late.txt");
     const ready = join(realpathSync(mkdtempSync(join(tmpdir(), "vh-review-envclear-"))), "detached");
     made.push(dirname(ready));
-    const body = `setsid env -i /bin/bash -c 'echo $$ > ${ready}; sleep 1; echo late > ${marker}' </dev/null >/dev/null 2>&1 &\nwhile [ ! -s ${ready} ]; do sleep 0.05; done`;
+    const body = `${SETSID} env -i /bin/bash -c 'echo $$ > ${ready}; sleep 1; echo late > ${marker}' </dev/null >/dev/null 2>&1 &\nwhile [ ! -s ${ready} ]; do sleep 0.05; done`;
     expect((await review(root, commit, stub(body, ok(commit)))).status).toBe("ready");
     await Bun.sleep(1_500);
     expect(existsSync(marker)).toBe(false);
@@ -333,7 +336,7 @@ describe("pathnames Git quotes", () => {
   test("a reviewer rewriting an already modified file whose name Git quotes leaves the review pending", async () => {
     const { root, commit } = repository(dir => writeFileSync(join(dir, "a b.txt"), "one\n"));
     writeFileSync(join(root, "a b.txt"), "two\n");
-    pending(await review(root, commit, stub("echo three > 'a b.txt'", ok(commit))), "changed");
+    await refusedOrPending(root, review(root, commit, stub("echo three > 'a b.txt'", ok(commit))), "changed");
   });
 });
 

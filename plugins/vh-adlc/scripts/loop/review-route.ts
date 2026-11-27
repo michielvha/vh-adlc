@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { runOwnedClient } from "../triage/owned-process";
+import { pidNamespaceAvailable, runOwnedClient, seatbeltAvailable } from "../triage/owned-process";
 import { nulRecords, statusEntries } from "./git-paths";
 import { gitEnvironment, gitReadArguments, readGitWithEnvironment } from "../git-read";
 
@@ -24,7 +24,7 @@ export type ReviewRequest = {
   scratch?: string[]; timeoutMs?: number; env?: Record<string, string>;
   /** Test seam: replaces the confirmation of process cleanup. */
   cleanup?: Cleanup;
-  /** Test seam: `unavailable` simulates a host without a PID namespace boundary. */
+  /** Test seam: `unavailable` simulates a host with neither a PID namespace nor a sandbox-exec write boundary. */
   boundary?: "auto" | "unavailable";
 };
 
@@ -303,12 +303,44 @@ export function modelMatches(requested: string, reported: string): boolean {
   return !/\d/.test(requested) && reported.toLowerCase().split(/[-.]/).includes(requested.toLowerCase());
 }
 
+const NO_BOUNDARY = "no process boundary on this host keeps reviewer processes off the owning worktree after the review "
+  + "(a PID namespace through unshare on Linux, or a sandbox-exec write boundary on macOS, is required)";
+
+/**
+ * The first regular file under `root`, outside `.git` and the scratch directories, that already has a second
+ * hard link. Seatbelt checks the path a write goes through, so such a file could be changed through its
+ * other name.
+ */
+function linkedFile(root: string, scratch: string[], extra: string[]): string | undefined {
+  for (const path of extra) { try { const info = lstatSync(path); if (info.isFile() && info.nlink > 1) return path; } catch { /* absent */ } }
+  const walk = (path: string): string | undefined => {
+    for (const name of readdirSync(join(root, path))) {
+      const child = path ? `${path}/${name}` : name;
+      if (child === ".git" || underScratch(child, scratch)) continue;
+      const info = lstatSync(join(root, child));
+      if (info.isDirectory()) { const found = walk(child); if (found) return found; }
+      else if (info.isFile() && info.nlink > 1) return child;
+    }
+    return undefined;
+  };
+  return walk("");
+}
+
 export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutcome> {
   const repo = realpathSync(request.repo), scratch = (request.scratch ?? []).map(dir => dir.replace(/\/+$/, ""));
   const commit = git(repo, ["rev-parse", "--verify", `${request.commit}^{commit}`]).toString().trim();
   const work = realpathSync(mkdtempSync(join(tmpdir(), "vh-adlc-review-run-")));
   let exportDir: string | undefined, cloneDir: string | undefined;
   try {
+    const namespace = request.boundary !== "unavailable" && pidNamespaceAvailable();
+    const seatbelt = request.boundary !== "unavailable" && !namespace && seatbeltAvailable();
+    if (!namespace && !seatbelt) return { status: "pending", reason: NO_BOUNDARY };
+    const gitDir = git(repo, ["rev-parse", "--absolute-git-dir"]).toString().trim();
+    const commonDir = git(repo, ["rev-parse", "--path-format=absolute", "--git-common-dir"]).toString().trim();
+    if (seatbelt) {
+      const linked = linkedFile(repo, scratch, [join(gitDir, "index"), join(gitDir, "HEAD")]);
+      if (linked) return { status: "pending", reason: `a protected file already has a second hard link, through which a reviewer could change it after the review: ${linked}` };
+    }
     if (request.kind === "spec") {
       try { exportDir = exportCommit(repo, commit); } catch (error) { return { status: "pending", reason: (error as Error).message }; }
     } else {
@@ -328,14 +360,17 @@ export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutc
     const env = Object.fromEntries(Object.entries({ ...process.env, ...request.env }).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
     let result;
     try {
-      result = await runOwnedClient(argv, { cwd: exportDir ?? cloneDir ?? repo, env, stdout, stderr, pidNamespace: request.boundary !== "unavailable" },
+      // Under the macOS boundary no reviewer process may write what the before-and-after check judges.
+      const writeDeny = { deny: [repo, gitDir, commonDir, ...(cloneDir ? [cloneDir] : []), ...(exportDir ? [exportDir] : [])],
+        allow: [...scratch.map(dir => join(repo, dir)), ...(cloneDir ? scratch.map(dir => join(cloneDir!, dir)) : [])] };
+      result = await runOwnedClient(argv, { cwd: exportDir ?? cloneDir ?? repo, env, stdout, stderr, pidNamespace: namespace, writeDeny },
         { timeout_ms: request.timeoutMs ?? 15 * 60_000, grace_ms: 500, reap_ms: 2_000 });
     } catch (error) { return { status: "pending", reason: `the reviewer command could not start: ${(error as Error).message}` }; }
     const cleanup = request.cleanup ? await request.cleanup(result) : result;
     const raw = readFileSync(stdout, "utf8");
     const attestation = request.route.model_attestation === "codex-session" ? codexSession(raw, request.env?.HOME ?? process.env.HOME ?? homedir()) : undefined;
     const reply = attestation ? attestation.reply : raw;
-    if (result.boundary !== "pid-namespace") return { status: "pending", reason: "no process boundary on this host could confirm that every reviewer process stopped (a PID namespace through unshare is required)", reply: readFileSync(stdout, "utf8") };
+    if (result.boundary === "marker") return { status: "pending", reason: NO_BOUNDARY, reply: readFileSync(stdout, "utf8") };
     if (!cleanup.confirmed) return { status: "pending", reason: `process cleanup could not confirm every reviewer process stopped (${cleanup.survivors.join(", ") || "group"})`, reply };
     const after = snapshot(repo, scratch, "owning"), cloneAfter = cloneDir ? snapshot(cloneDir, scratch, "full") : undefined;
     const changed = [...Object.keys(before).filter(key => before[key] !== after[key]),
