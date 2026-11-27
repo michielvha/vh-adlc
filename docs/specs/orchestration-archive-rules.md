@@ -236,6 +236,7 @@ None.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-27 | R-1 | spec | `41080f61` | claude-opus-5-5 | procedural | 1 blocking, 3 should-fix, 1 nit |
+| 2026-11-27 | R-2 | spec | `b3f58301` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 1 nit |
 
 ### R-1
 
@@ -273,6 +274,29 @@ SEVERITY: nit
 WHERE: Design, Required sentences (S-36, S-58); Design, How the rules read together ("Pending and failed sessions")
 EVIDENCE: S-36 says "A sub-session ends in one of two ways", but S-58 adds a third: "A pending or failed session that the owner approves ending is archived under that approval." The old S-36 stated that exception inside the same sentence ("Apart from ... pending or failed sessions the owner approves ending"). The new S-36 leaves it out, so a reader of S-36 alone sees exactly two cases.
 PROPOSAL: Word S-36 so that it names the owner-approved ending of a pending or failed session as an exception, for example "Apart from pending or failed sessions the owner approves ending, a sub-session ends in one of two ways ...".
+
+### R-2
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Required sentences (S-56, S-36, and the paragraph on S-45 "has an approved replacement"); Design, Glossary ("Taken over"); Context, Owner summary ("or is approved to"); frontmatter goal ("takes or is approved to take")
+EVIDENCE: This revision widened Taken over in response to R-1 F-01. S-56 now reads "when another session takes, or is approved to take, a sub-session's feature over, the old session may be archived before the merge", and the glossary row reads "Another session carries a sub-session's feature on, or is approved to". Neither says who approves. The owner's answer on #180 limited the case to "when another session takes over the feature ... allowed only after the handoff is recorded". The reference lets the orchestrator decide alone on "sequencing, batch membership" (`plugins/vh-adlc/references/orchestrate.md:27`), and replacements go through the orchestrator's own admission (S-53, `orchestrate.md:174`). So an orchestrator can read its own plan to start or resume a replacement as the approval, and archive a stale or resumed session with open work before any replacement exists. That is the harm in the 2026-11-27 incident: the owner loses the sidebar entry for open work, and archiving cannot be undone. Only the Owner summary ties the approval to "the batched approval" (S-45). S-56 and the glossary row, which are what the reference carries, do not.
+PROPOSAL: Name the approver in S-56 and the glossary row, for example "or the owner has approved it to take", or limit the "approved" case to a paused session archived under S-45's batched owner approval. Change the goal and the Owner summary to the same wording.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Required sentences (S-59, S-55); Design, How the rules read together ("Cleanup listing" and "Owner abandonment"); Context, Owner summary (cleanup paragraph: "for an open one, the orchestrator asks the owner whether the work is abandoned before archiving it")
+EVIDENCE: The fix for R-1 F-02 put the decisive behavior only in Design prose and the Owner summary: "a pick of an open one is not an archive approval, so the orchestrator asks the owner whether its work is abandoned, and archives it only on that answer." The reference carries only S-59: "a picked workstream sub-session is still archived only when its work is finished or it is taken over". Work finished includes "the owner has said the work is abandoned" (S-55). No required sentence says that a pick is not such a statement, or that the orchestrator asks. The Owner abandonment bullet, which requires a dated recorded answer (`orchestrate.md:142`), is not a required sentence either. Suppose an owner in a general cleanup picks a sub-session listed as "PR open". One orchestrator reads the pick as "the owner has said the work is abandoned" and archives it. Another refuses silently. Neither asks, which is what the Owner summary promises. The incident began with this kind of request.
+PROPOSAL: Extend S-59, or add a sentence, so that the owner's pick is not a statement that the work is abandoned. For a picked open sub-session, the orchestrator asks the owner whether its work is abandoned, records the dated answer, and archives it only on that answer.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Required sentences (S-36, S-02); Design, How the rules read together ("Pending and failed sessions"); Context, Owner summary ("Pending or failed sessions the owner approves ending stay an exception, as before")
+EVIDENCE: This revision dropped S-58 ("A pending or failed session that the owner approves ending is archived under that approval"). New S-36 now only exempts these sessions: "Apart from pending or failed sessions the owner approves ending, a sub-session ends in one of two ways, and each has its own archive rule". New S-02 grants archiving "under the Close-out rules", and no Close-out rule now states how such a session is archived. Design says "S-36 keeps the exception the old S-36 opened with". That is true of the wording, but the exception now sits next to a grant that points to rules that are silent on it.
+PROPOSAL: Close S-36 with the archive rule for the exception, for example "; a pending or failed session the owner approves ending is archived under that approval".
 
 ## Sources
 
