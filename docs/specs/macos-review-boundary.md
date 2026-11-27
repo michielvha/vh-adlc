@@ -1,19 +1,25 @@
 ---
 status: draft
-status_description: "Back to draft for Codex spec review R-6: route evidence for the boundary tests, the scratch overlap check and stated limits."
+status_description: "Revised for Codex spec review R-6: route evidence for the boundary tests, the scratch overlap check and stated limits; the next Codex spec review is pending."
 issue: https://github.com/michielvha/vh-adlc/issues/187
 branch: feat/macos-review-boundary
 goal: "Spec and implementation reviews in this repository run on Codex from a Mac, with no owner step per review, and no reviewer process can change the owning worktree or the private clone once the review has been judged."
 covers:
   - plugins/vh-adlc/scripts/loop/review-route.ts
+  - plugins/vh-adlc/scripts/loop/cli.ts
+  - plugins/vh-adlc/scripts/loop/settings.ts
+  - plugins/vh-adlc/scripts/loop/pages.ts
   - plugins/vh-adlc/scripts/triage/owned-process.ts
   - plugins/vh-adlc/references/loop-settings.md
   - plugins/vh-adlc/references/review-protocol.md
   - plugins/vh-adlc/.claude-plugin/plugin.json
   - plugins/vh-adlc/plugin.json
   - .vh-adlc/loop.yaml
+  - .vh-adlc/review-evidence.yaml
   - tests/vh-adlc/loop/review-route.test.ts
   - tests/vh-adlc/loop/owned-process.test.ts
+  - tests/vh-adlc/loop/settings.test.ts
+  - tests/vh-adlc/loop/pages-stub.ts
   - tests/vh-adlc/evidence/macos-review-boundary/
 ---
 
@@ -21,16 +27,18 @@ covers:
 
 The command route that runs an external reviewer gets a macOS boundary: a Seatbelt profile that denies
 every reviewer process writes to the owning worktree, its Git directories, the private clone and the
-directories above them. The repository then commits a `.vh-adlc/loop.yaml` that sends both reviewer roles
-to Codex.
+directories above them. Before an implementation reviewer starts, the route runs the repository's declared
+evidence commands outside that profile and hands the reviewer their output, so a Codex reviewer can judge
+tests it can't run itself. The repository commits a `.vh-adlc/loop.yaml` that sends both reviewer roles to
+Codex.
 
 ## Context
 
 ### Owner summary
 
 Claude writes the specs and the code in this repository, and the owner wants Codex to review them. Two
-things stop that today. The repository has no `.vh-adlc/loop.yaml`, so both reviewer roles fall back to
-the host, which on Claude Code means Claude. And the Codex command route can't run on a Mac: it insists on
+things stopped that. The repository had no `.vh-adlc/loop.yaml`, so both reviewer roles fell back to the
+host, which on Claude Code means Claude. And the Codex command route couldn't run on a Mac: it insisted on
 a Linux PID namespace, and the homelab Linux hosts are unreachable.
 
 The PID namespace enforces one guarantee: no reviewer process may outlive the review and change the
@@ -38,43 +46,44 @@ owning worktree or the private clone after the before-and-after check has judged
 that guarantee on macOS by refusing the writes instead of killing the processes. The route wraps the
 reviewer command in `sandbox-exec` with a profile that denies writes to the paths the check judges, and to
 each directory above them, so a process can't rename a parent and write through the new path. The kernel
-applies the profile to every descendant, including one that detaches and clears its environment. On this
-Mac such a writer was refused, and so was an attempt to hand the write to launchd. Linux keeps its PID
-namespace unchanged.
+applies the profile to every descendant, including one that detaches and clears its environment. Linux
+keeps its PID namespace unchanged.
 
-The trade-offs, in plain words. Seatbelt profiles can't nest, so Codex runs with its own sandbox off
-(`-s danger-full-access`) inside the route's profile. Codex tool commands can then write anywhere outside
-the protected paths and reach the network. That includes the home directory, other repositories, Codex's
-own session log (which the model attestation reads), and user-level schedulers such as
-`~/Library/LaunchAgents`, crontab, shell startup files and `~/.gitconfig`. Something planted there could
-change the worktree later, and this feature doesn't stop that, on macOS or on Linux. The host Claude
-reviewer has the same access today through its Bash tool. The orchestrator chose this posture under the
-owner's delegation. The alternative is a profile that denies all writes except the temporary directory,
-`~/.codex` and named build caches. It would close the scheduler routes, but every toolchain an
-implementation reviewer runs would need its cache paths listed. Switching to it would be a revision of
-this document. Keeping Codex's own read-only sandbox was measured and rejected: Codex runs MCP servers outside
-it, and it stops implementation reviewers from running tests.
+Seatbelt profiles can't nest, which has two consequences. Codex runs with its own sandbox off
+(`-s danger-full-access`) inside the route's profile. And a reviewer inside the profile can't run tests that
+start their own `sandbox-exec`, such as this feature's boundary tests. For that second case the route runs
+the repository's declared evidence commands, declared in `.vh-adlc/review-evidence.yaml`, in the private clone, outside the
+profile, at the reviewed commit, before the reviewer starts. The reviewer gets their output as read-only logs and judges the tests
+from them. The reviewer itself still can't write the protected paths. In this repository the evidence
+command runs the boundary test files, which take about 45 seconds. Run inside a sandbox, those tests now
+fail once with a clear "needs an unsandboxed run" reason instead of failing one by one.
 
-The feature also fixes `pidNamespaceAvailable()`, which throws on macOS, and commits Codex routes for both
-reviewer roles with session-log model attestation. On macOS a review stays pending, naming the file, when a
-protected file already has a second hard link, because a write through that other name would get past the
-profile. One lasting limit: a Codex reviewer inside the profile
-can't run tests that start their own `sandbox-exec`. So this feature, and any later change to
-`review-route.ts` or `owned-process.ts`, gets its implementation review on the host route or on Linux.
+The trade-offs, in plain words. Codex tool commands can write anywhere outside the protected paths and
+reach the network. That includes the home directory, other repositories, Codex's own session log, and
+user-level schedulers such as `~/Library/LaunchAgents`, crontab, shell startup files and `~/.gitconfig`.
+Something planted there could change the worktree later, and this feature doesn't stop that, on macOS or on
+Linux. The host Claude reviewer has the same access today through its Bash tool. The model attestation
+reads that same session log, so it catches an accidental model mismatch but not a reviewer that forges its
+own log; the owner accepted that limit on #187. A review stays pending when a protected file already has a
+second hard link, when a scratch directory resolves onto a protected path, and when the protected tree
+changes while it is checked. Hard links on Git objects, which an ordinary local `git clone` creates, are a
+stated limit. The orchestrator chose this write posture under the owner's delegation; a deny-by-default
+profile would be a revision.
 
-Since the R-3 acceptance, the owner chose `gpt-6.2-sol` as the Codex review model on #187, so this
-revision renames it, and the second plugin manifest joins `covers`. The AC-02 proof also changed: each late-writer test now waits for the writer to finish, and the main-checkout rename case checks the linked worktree's index. Nothing else in the scope changed.
+What changed since the R-5 acceptance, all from the first Codex spec review (R-6): the route evidence and
+the loud failure inside a sandbox, replacing the earlier plan to review boundary-code changes on the host
+route; the scratch overlap check; pending outcomes for a changing tree and a profile that fails to apply;
+two stated limits; late writers released by the test after the review returns; a rerunnable script for the
+real-Codex proof; the delivery path; and three more files in `covers`.
 
-Observed so far, on this Mac: tasks T1 to T7 are built, each test watched failing first, and a committed
-mutant script shows every macOS boundary test failing against the part it guards. Four route and CLI
-tests still fail here for a reason outside this feature: the test page-cache stub writes where macOS
-doesn't read, which #182 fixes. Two smoke runs of real Codex `gpt-6.2-sol` through the route came back
-ready with the model attested, and Codex's write probe was refused inside the profile. Still planned: the
-committed `loop.yaml` (T8), one real Codex spec review and one real implementation review through
-`cli.ts review` (AC-06), and Linux CI after merge. This spec's reviews run on the host route, because the
-Codex route isn't committed yet.
+Observed so far on this Mac: T1 to T8 and T10 are built, each test watched failing first, and a committed
+mutant script shows every boundary test failing against the part it guards. `loop.yaml` is committed, and
+the first real Codex spec review through `cli.ts review` came back ready with `gpt-6.2-sol` attested and
+the worktree unchanged (R-6). Five tests in `tests/vh-adlc/loop/` fail here because their page-cache stub
+writes where macOS doesn't read, which #182 fixes. Still planned: the route evidence, the scratch and
+failure checks, the real Codex implementation review that uses the evidence, and Linux CI after merge.
 
-Acceptance authorizes implementing this on a feature branch and opening a PR. Merging still needs the
+Acceptance authorizes implementing this on the feature branch and opening a PR. Merging still needs the
 owner.
 
 ### Background
@@ -84,8 +93,10 @@ wrote the work. The owner wants Codex to review instead. Without this change tha
 review, several a day, and it doesn't fix itself. The simplest alternatives without new machinery all
 fail the goal. Running Codex reviews from Linux is out, because the homelab is unreachable. The owner
 running Codex by hand for each review was rejected by the owner. Dropping the boundary on macOS was ruled
-out, because the guarantee has to stay. The design below adds the smallest mechanism that keeps the
-guarantee: one Seatbelt profile and one committed settings file.
+out, because the guarantee has to stay. Reviewing boundary-code changes on the host route was rejected by
+the owner on #187 ("why can codex not run the review, fix that"). The design below adds the smallest
+mechanisms that keep the guarantee: one Seatbelt profile, one evidence step and one committed settings
+file.
 
 Current state, measured at `e910dfe8` on macOS 26 (Darwin 25.6.0) with Codex CLI 0.172.0:
 
@@ -112,6 +123,23 @@ Current state, measured at `e910dfe8` on macOS 26 (Darwin 25.6.0) with Codex CLI
   `model: gpt-6.2-sol` attested from the session log. An earlier spec-kind run, whose prompt put prose
   before the `MODEL:` line, stayed pending on that and reported "The write probe was refused with
   `Operation not permitted`". `git status --porcelain` was empty before and after.
+- The first stored Codex spec review (R-6) ran through `cli.ts review` at `5ae4e466`:
+  `tests/vh-adlc/evidence/macos-review-boundary/spec-review-5ae4e466/` records `ready`, `gpt-6.2-sol`,
+  exit 0 and an unchanged `git status`.
+- The boundary test files need no installed dependencies. In a fresh `git clone --no-hardlinks` of
+  `6880afc4`, outside any profile, `bun test --timeout 60000 tests/vh-adlc/loop/review-route.test.ts
+  tests/vh-adlc/loop/owned-process.test.ts` took 45 seconds: 55 pass, 5 skip, 1 fail (the page-cache
+  stub), and the clone stayed clean. Inside `sandbox-exec -p '(version 1)(allow default)(deny file-write*
+  ...)'` the same route tests gave 3 pass and 50 fail, each with a "no process boundary" or page-cache
+  pending reason.
+- Codex's `--json` stream names the thread but not the model: a `codex exec --json` run emitted only
+  `thread.started`, `turn.started`, `item.completed` and `turn.completed` events, with no model field. The
+  session log under `~/.codex/sessions` is the only record of the served model.
+- An ordinary local `git clone` shares object files with its source by hard link (R-6 F-03 measured a link
+  count of two).
+- The plugin reaches hosts through the repository's marketplaces: `.claude-plugin/marketplace.json` and
+  `.agents/plugins/marketplace.json` both point at `./plugins/vh-adlc` on the default branch.
+  `.github/workflows/release.yml` releases the Go binary on `v*.*.*` tags, not the plugin.
 - The host reviewer agent has a shell: `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md:4` grants
   `Bash` and `execute`, and disallows only `Edit` and `Write`.
 
@@ -133,13 +161,19 @@ In scope:
   denies writes to the paths the before-and-after check judges, minus `review_scratch`, and to each of
   their parent directories.
 - The route accepts that boundary in place of the PID namespace. Linux behaviour is unchanged.
-- Under that boundary, a review whose protected files already share an inode with another path stays
-  pending.
+- Under that boundary, a review stays pending when a protected file already shares an inode with another
+  path, when a `review_scratch` entry resolves onto a protected path, when the protected tree changes while
+  it is checked, and when the profile fails to apply.
+- Route evidence: commands declared in `.vh-adlc/review-evidence.yaml` that an implementation review runs
+  in the private clone, outside the reviewer's boundary, before the reviewer starts, with their logs handed
+  to the reviewer read-only.
+- The route test file fails once, with an "unsandboxed run" reason, on a process that has no boundary,
+  instead of failing test by test.
 - `pidNamespaceAvailable()` returns false when `unshare` can't be started, instead of throwing.
-- `.vh-adlc/loop.yaml` in this repository routes `spec_reviewer` and `implementation_reviewer` to Codex.
-- The command-route paragraph of `references/loop-settings.md` and the command-route item in
-  `references/review-protocol.md` (Routes) describe the macOS boundary, the Codex flag it needs and the
-  test-nesting limit.
+- `.vh-adlc/loop.yaml` in this repository routes `spec_reviewer` and `implementation_reviewer` to Codex,
+  and `.vh-adlc/review-evidence.yaml` declares the boundary test files as route evidence.
+- The command-route paragraphs of `references/loop-settings.md`, which own the details, and the
+  command-route item in `references/review-protocol.md` (Routes), which names them and links there.
 - A plugin minor version bump.
 
 Out of scope:
@@ -161,14 +195,15 @@ Not handled: a macOS reviewer process that outlives the review keeps running unt
 It can't change the protected paths, but it can write elsewhere as above. The PID namespace kills such
 processes on Linux. Killing them on macOS needs a working survivor scan, which is #186.
 
-Not handled: a reviewer under the route's profile can't start another Seatbelt sandbox, so tests that need
-`sandbox-exec` fail inside a macOS command-route implementation review. This feature, and any later change
-to `review-route.ts` or `owned-process.ts`, gets its implementation review on the host route or on a Linux
-host (R-1 F-03).
+Not handled: a reviewer that forges the Codex session log the model attestation reads. The log lives
+under `~/.codex`, which reviewer tool commands can write under posture A, on macOS and on Linux, and
+Codex's `--json` stream carries no model to check against. The attestation catches an accidental model
+mismatch, not deliberate tampering; the owner accepted this limit on #187 (R-6 F-02).
 
-Not handled: a Git file other than the index and HEAD, such as a loose ref or an object, that already
-shares an inode with a path outside the protected trees. Git doesn't create such links for refs, and an
-object file isn't part of what the check judges (R-1 F-02).
+Not handled: a Git file other than the index and HEAD, such as an object or a loose ref, that already
+shares an inode with a path outside the protected trees, as objects do after an ordinary local
+`git clone`. Changing one needs a deliberate in-place write through the other name; checking for them would
+leave every review pending for anyone with such a clone (R-1 F-02, R-6 F-03).
 
 ## Design
 
@@ -186,9 +221,10 @@ turns off both boundaries.
 exists and a one-time probe succeeds. The probe applies a profile that denies writes to a fresh temporary
 directory, tries one write there, and requires the run to exit 0 with the write refused. The probe fails
 when the process is already inside a Seatbelt sandbox, for example a host's own command sandbox, because
-`sandbox_apply` can't nest. In that case the route stays pending and the reason names the missing
-boundary. `pidNamespaceAvailable()` wraps its spawn in `try` and returns false on any spawn error. Both
-probes cache their answer per process, so tests that need a fresh answer run in a subprocess.
+`sandbox_apply` can't nest. In that case the route stays pending, before any reviewer or evidence command
+starts, and the reason names both boundaries. `pidNamespaceAvailable()` wraps its spawn in `try` and
+returns false on any spawn error. Both probes cache their answer per process, so tests that need a fresh
+answer run in a subprocess.
 
 **Profile.** The profile string holds no paths: `(version 1)(allow default)`, then
 `(deny file-write* (subpath (param "D0")) ...)` for each denied path, then
@@ -200,13 +236,13 @@ denies stop a process from renaming, removing or replacing a parent directory, w
 it write through a new path. They still allow creating and changing other entries inside those parents,
 so writes beside the worktree, such as in a sibling worktree or the temporary directory, keep working.
 Every path goes through `realpathSync` first, because Seatbelt matches resolved paths (`/tmp` resolves to
-`/private/tmp`).
+`/private/tmp`); a path that doesn't exist yet is resolved through its longest existing prefix.
 
 **What the route denies.** `runReviewRoute` passes `writeDeny` with:
 
 - deny: the owning worktree (`repo`), its Git directory (`git rev-parse --absolute-git-dir`), its common
   Git directory (`git rev-parse --path-format=absolute --git-common-dir`), the private clone for an
-  implementation review, and the export for a spec review;
+  implementation review, the export for a spec review, and the route-evidence directory;
 - allow: each `review_scratch` entry under the owning worktree and under the clone, resolved as above.
 
 These are the paths the `owning` and `full` snapshots judge (`review-route.ts:157-203`): the worktree's
@@ -215,13 +251,57 @@ branch and tag, so a reviewer can't move a ref through it either. Writes everywh
 temporary directory, Codex's `~/.codex`, and build caches. That is what lets an implementation reviewer
 run tests. Posture A in Scope records why the profile doesn't deny writes by default.
 
+**Scratch overlap.** `review_scratch` entries are validated by name (`settings.ts:70-79`) and may be
+symlinks, so an allow could resolve onto a protected path and override its deny. Under the Seatbelt
+boundary, before the reviewer starts, the route resolves every allow. If one equals a denied path, is a
+parent of one, or lies inside the Git directory or the common Git directory, the review stays pending
+with a reason naming the entry. A scratch symlink to a disjoint shared directory, such as a main
+checkout's `node_modules`, stays allowed.
+
 **Pre-existing hard links.** Seatbelt checks the path a write goes through. It refuses a new hard link to
 a protected file, but a file that already has a second name outside the protected trees can be written
 through that name. Under the Seatbelt boundary, before the reviewer starts, the route checks the link count
-of every regular file the `owning` snapshot hashes, plus the index and HEAD. If any count is above 1, the
-review stays pending with a reason naming the first such path. The private clone needs no check, because
-the route makes it with `--no-hardlinks` (`review-route.ts:317`). Under the PID namespace no reviewer
-process survives the review, so the check doesn't run there.
+of every regular file in the owning worktree outside `.git` and the scratch directories, plus the index
+and HEAD. If any count is above 1, the review stays pending with a reason naming the first such path. The
+private clone needs no check, because the route makes it with `--no-hardlinks` (`review-route.ts:317`).
+Under the PID namespace no reviewer process survives the review, so the check doesn't run there. A file
+that disappears or can't be read during the check, for example because another session deletes it, leaves
+the review pending with a reason saying the protected tree changed while it was checked and the review can
+be retried, never a thrown error.
+
+**Profile application failure.** When the Seatbelt boundary was chosen and the reviewer command exits 71
+with `sandbox_apply` in its standard error, the profile never applied and no reviewer process ran. The
+review stays pending with a reason saying the sandbox-exec write boundary could not be applied, distinct
+from a reviewer command that failed.
+
+**Route evidence.** A new optional file, `.vh-adlc/review-evidence.yaml`, holds `schema_version: 1` and a
+`commands` list of `{name, command, timeout_minutes}`: a unique lowercase name, a shell command, and an
+optional whole number of minutes, default 15. It is a file of its own, not a `loop.yaml` key, because
+`loadLoopSettings` refuses keys it doesn't know (`settings.ts:216`): a new key would make every loop
+operation in the repository fail for each host still on an older plugin, from the moment it merged. An
+older plugin never reads the new file. `settings.ts` gains `loadReviewEvidenceAt(repo, commit)`, which reads
+the file from the reviewed commit, as `loadLoopSettingsAt` reads `loop.yaml` (`cli.ts:181-184`), and
+refuses unknown keys and malformed entries, naming the field; a missing file means no evidence. `cli.ts
+review` passes the commands to `runReviewRoute` for implementation reviews only; a spec review reads a
+static export and gets none. After the owning worktree's before-snapshot and before the clone's
+before-snapshot, the route runs each command with `/bin/sh -c` in the private clone at the reviewed
+commit, through `runOwnedClient` with the PID namespace where available and no `writeDeny`, so it runs
+outside the reviewer's profile and can start its own `sandbox-exec`. Each command writes one log under a
+route-evidence directory in the run's temporary directory: a header with the name, the command, the full
+commit, the exit code, whether it timed out and its duration, then its standard output and error. The
+route appends a section to the prompt file that names each log path, says the commands ran at that commit
+in this clone outside the reviewer's sandbox before it started, and tells the reviewer to judge criteria
+whose checks need an unsandboxed run from those logs. The evidence directory is in the profile's deny
+list, so the reviewer can read the logs but not change them. A failing, timed-out or unstartable command
+is recorded in its log and the review goes on: the evidence is for the reviewer to judge. A command that
+changes the owning worktree is caught by the before-and-after check, because the owning before-snapshot is
+taken first. The evidence runs on Linux too, where it costs time but changes nothing else.
+
+**Loud failure without a boundary.** At load, `tests/vh-adlc/loop/review-route.test.ts` checks
+`pidNamespaceAvailable() || seatbeltAvailable()`. Without either, it registers one failing test whose
+message says the route tests need an unsandboxed run, because this process is inside a sandbox that can't
+nest, and points at the route evidence, and it skips every test that runs the route. The tests that don't
+run the route, such as the snapshot and reply-parsing tests, still run.
 
 **Route acceptance.** The check at `review-route.ts:338` accepts `pid-namespace` or `seatbelt`. Its
 pending reason names both boundaries ("a PID namespace through unshare on Linux, or a sandbox-exec write
@@ -245,34 +325,52 @@ roles:
     argv: [sh, -c, 'f=$1; shift; exec "$@" - < "$f"', sh, "{prompt_file}", codex, exec, -m, "{model}", -s, danger-full-access, --skip-git-repo-check, --json]
 ```
 
-The model is the one the owner chose for Codex reviews when accepting this feature (2026-11-27, #187); `codex exec -m gpt-6.2-sol --json` on codex-cli 0.172.0 served it, and its session log recorded only that model.
-`{prompt_file}` follows the `loop-settings.md:37` recommendation. `--skip-git-repo-check` is there because
-a spec review runs from the export, which has no `.git`. `-s danger-full-access` is required on macOS
-because Codex's own Seatbelt can't start inside the route's profile (measured above). The same argv runs
-on Linux, where it turns Codex's own sandbox off too. There nothing denies writes during the review: the
-PID namespace stops every reviewer process when the CLI exits, and the before-and-after check catches any
-net change to the worktree or the clone, but a write the reviewer reverts before it exits goes unseen. The
-user config stays loaded: the attestation reads the session log Codex writes under `$HOME/.codex`, and
-`-m` pins the model. The file declares no `review_scratch`. If the real implementation review in the Test
-Plan needs a scratch directory, that becomes a finding for this document.
+`.vh-adlc/review-evidence.yaml`:
 
-**Concurrency, failure and rollback.** Each review builds its own profile from its own paths, with no
-shared state, so concurrent reviews don't interact. Other sessions' processes run outside the profile, so
-their writes to the worktree's parents are unaffected. If `sandbox-exec` fails to apply, the reviewer
-never starts, and the outcome is pending with the command-start reason. A review interrupted mid-run
-leaves no state behind beyond what it leaves today. Rolling back means deleting `.vh-adlc/loop.yaml`,
-which returns both roles to the host. A plugin older than this change, reading the committed file on a
-Mac, keeps today's pending outcome, which is safe.
+```yaml
+schema_version: 1
+commands:
+  - name: review-boundary
+    command: bun test --timeout 60000 tests/vh-adlc/loop/review-route.test.ts tests/vh-adlc/loop/owned-process.test.ts
+```
 
-**Documentation.** The `loop-settings.md` paragraph at lines 136-138 becomes three statements. A command
-route runs its CLI in a PID namespace on Linux, or on macOS under a `sandbox-exec` profile that denies
-every process it starts writes to the owning worktree, its Git directories, the private clone and each of
-their parent directories, outside `review_scratch`; everything else stays writable. A Codex route on macOS
-passes `-s danger-full-access`, because Codex's own sandbox can't start inside that profile. A reviewer
-inside the profile can't run tests that start their own `sandbox-exec`, so changes to the route's boundary
-code get their implementation review on the host route or on Linux. Without either boundary the review
-stays pending. `review-protocol.md` gets one sentence in the command-route item saying the same boundary
-applies. The Instruction freshness section and `parseReply` are left alone.
+The model is the one the owner chose for Codex reviews when accepting this feature (2026-11-27, #187);
+`codex exec -m gpt-6.2-sol --json` on codex-cli 0.172.0 served it, and its session log recorded only that
+model. `{prompt_file}` follows the `loop-settings.md:37` recommendation. `--skip-git-repo-check` is there
+because a spec review runs from the export, which has no `.git`. `-s danger-full-access` is required on
+macOS because Codex's own Seatbelt can't start inside the route's profile (measured above). The same argv
+runs on Linux, where it turns Codex's own sandbox off too. There nothing denies writes during the review:
+the PID namespace stops every reviewer process when the CLI exits, and the before-and-after check catches
+any net change to the worktree or the clone, but a write the reviewer reverts before it exits goes unseen.
+The user config stays loaded: the attestation reads the session log Codex writes under `$HOME/.codex`, and
+`-m` pins the model. The file declares no `review_scratch`. The evidence command runs the two boundary
+test files, about 45 seconds per implementation review.
+
+**Delivery.** Merging publishes the plugin through the repository marketplaces, which serve
+`./plugins/vh-adlc` from the default branch; each host picks it up with its plugin update, Claude Code
+and Codex alike. Until a host runs 0.34.0, its installed plugin reads the committed `loop.yaml` and, on
+macOS, fails to start the reviewer, so reviews stay pending, which is safe; Linux hosts keep working.
+Before merge, this feature's own reviews run `cli.ts review` from the feature branch directly and record
+that, because the lifecycle skills stop on `plugin.stale` when the branch's plugin is newer than the
+installed one.
+
+**Concurrency, failure and rollback.** Each review builds its own profile and evidence directory from its
+own paths, with no shared state, so concurrent reviews don't interact. Other sessions' processes run
+outside the profile, so their writes to the worktree's parents are unaffected; a concurrent change to the
+owning worktree during the link check leaves the review pending as described. A review interrupted mid-run
+leaves no state behind beyond what it leaves today. Rolling back for future commits means deleting
+`.vh-adlc/loop.yaml`, which returns both roles to the host. A commit that already holds the Codex routes
+keeps them, because the route reads settings from the reviewed commit. An older plugin reviewing such a
+commit stays pending on macOS, and on Linux it runs the Codex review without route evidence, because it
+never reads `review-evidence.yaml`; reviewing those commits on the host route is the fallback.
+
+**Documentation.** `loop-settings.md` owns the details. Its command-route paragraphs state: the two
+boundaries and what each denies; that everything else stays writable; the pending cases; that a Codex
+route on macOS passes `-s danger-full-access` because Codex's own sandbox can't start inside the profile;
+and the route evidence file, `.vh-adlc/review-evidence.yaml`, which exists because a reviewer inside the
+profile can't run tests that start their own `sandbox-exec`. `review-protocol.md`'s command-route item names the boundary and the route
+evidence in one sentence each and links to `loop-settings.md`. The Instruction freshness section and
+`parseReply` are left alone.
 
 ## Acceptance Criteria
 
@@ -283,32 +381,50 @@ applies. The Instruction freshness section and `parseReply` are left alone.
       own session, clears its environment and writes after the reviewer has exited. Writes inside
       `review_scratch` and in the temporary directory still succeed.
 - [ ] AC-03: On a host where neither boundary can be applied, including a macOS process already inside a
-      Seatbelt sandbox, a command-route review stays pending with a reason that names the missing boundary.
+      Seatbelt sandbox, a command-route review stays pending with a reason that names the missing boundary,
+      and when the macOS profile fails to apply, the review stays pending with a reason that says so.
 - [ ] AC-04: On a host without `unshare`, `runOwnedClient` with `pidNamespace: true` and no `writeDeny`
       runs the client with the `marker` boundary instead of throwing.
-- [ ] AC-05: In this repository, `bun scripts/loop/cli.ts route` returns a `command` route with model
-      `gpt-6.2-sol` and `model_attestation: codex-session` for both `spec review` and `review`.
+- [ ] AC-05: In this repository, `bun plugins/vh-adlc/scripts/loop/cli.ts route` returns a `command` route
+      with model `gpt-6.2-sol` and `model_attestation: codex-session` for both `spec review` and `review`.
 - [ ] AC-06: On this Mac, a real Codex spec review and a real Codex implementation review through
-      `cli.ts review` come back `ready` with the served model attested from the session log. The owning
-      worktree is unchanged afterwards, and both stored record sets pass `vh-adlc review check`.
-- [ ] AC-07: `references/loop-settings.md` and `references/review-protocol.md` state the macOS boundary, the
-      `-s danger-full-access` requirement for Codex under it, what stays writable, and that boundary-code
-      changes get their implementation review on the host route or on Linux.
+      `cli.ts review` come back `ready` with the served model attested from the session log, the
+      implementation reviewer having received the route evidence. The owning worktree is unchanged
+      afterwards, both stored record sets pass `vh-adlc review check` and `vh-adlc lint`, and a committed
+      script reruns both and keeps their Codex transcripts.
+- [ ] AC-07: `references/loop-settings.md` states the macOS boundary and what it denies, what stays
+      writable, the pending cases, the `-s danger-full-access` requirement for Codex under it, and the
+      route evidence file with the reason it exists; `references/review-protocol.md` names the boundary
+      and the route evidence and links to `loop-settings.md`.
 - [ ] AC-08: On macOS, a command-route review whose owning worktree holds a protected file with a second
-      hard link stays pending, with a reason naming that file.
+      hard link stays pending, with a reason naming that file, and a protected tree that changes during that
+      check leaves the review pending with a retryable reason instead of an error.
+- [ ] AC-09: An implementation review runs each command `.vh-adlc/review-evidence.yaml` declares at the reviewed commit in
+      the private clone, outside the reviewer's boundary and before the reviewer starts. The reviewer's
+      prompt names each log, the reviewer can read the logs but not change them, and it still can't write
+      the protected paths.
+- [ ] AC-10: Run on a process without a boundary, such as inside a Seatbelt sandbox,
+      `tests/vh-adlc/loop/review-route.test.ts` reports one failure whose message says the route tests need
+      an unsandboxed run, and skips its route tests instead of failing each one.
+- [ ] AC-11: On macOS, a `review_scratch` entry that resolves to a protected path, a parent of one, or a path
+      inside the Git directory or common Git directory leaves the review pending with a reason naming the
+      entry, while a scratch symlink to a disjoint directory still works.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
 | AC-01 | `tests/vh-adlc/loop/review-route.test.ts`, run on this Mac: the existing "replies", "file-only spec reviews" and "model attestation" tests pass. Watched failing first at `e910dfe8`, where they fail with `could not start: Executable not found in $PATH: "unshare"`. |
-| AC-02 | New darwin-only tests in `review-route.test.ts`, each watched failing with the named part of the profile removed. They use a fixture of their own, so the Git-directory and parent denies are actually exercised and no test can move the shared temporary directory: a fresh `mkdtemp` directory `T`, a main checkout at `T/a/b/main`, and a linked worktree at `T/a/b/wt` (`git worktree add`) that is the owning worktree. Its Git directory (`T/a/b/main/.git/worktrees/wt`) and common Git directory (`T/a/b/main/.git`) lie outside it. Each late writer sleeps one second, tries its write, and then records that it finished in a file under the temporary directory. The test waits for that record, up to a 10-second deadline, before asserting, so a slow start on a loaded host can't fail a correct implementation. (1) Late writer: an implementation reviewer stub forks a writer with `perl -e 'POSIX::setsid(); exec env -i ...'` that writes `src/late.txt` in the owning worktree after the stub exits. The review is ready, and once the writer has finished the file doesn't exist (fails without `writeDeny`). (2) Rename routes: two late writers each rename a directory, write through the new path and rename it back. One renames the grandparent `T/a` and writes `src/late.txt`; the other renames the main checkout `T/a/b/main`, which holds the common Git directory, and appends to the linked worktree's index at `.git/worktrees/wt/index`. Each rename is refused, which the writer records in a file under `T`; `src/late.txt` doesn't exist and the index is unchanged afterwards (each fails without the parent denies). (3) Clone and export during the review: an implementation reviewer stub tries to write a file in its clone, and a spec reviewer stub tries the same in the export after `chmod u+w`. Each records the result in a file in the temporary directory. Both writes are refused and both reviews are ready (fails without the clone or export deny). (4) Scratch and temporary directory: the stub writes into a declared scratch directory and the temporary directory, and both writes land. (5) Refs and index: stubs run `git -C <owning worktree> branch x`, `git -C <owning worktree> tag -f t` and write the linked worktree's index at `T/a/b/main/.git/worktrees/wt/index`. Refs and index are unchanged afterwards (fails without the Git-directory and common-directory denies). The existing "the owning worktree is preserved" tests stay. On macOS each one asserts the worktree is unchanged afterwards, whether the outcome is pending or ready. On Linux they keep their pending expectation. |
-| AC-03 | `review-route.test.ts`: the existing `boundary: "unavailable"` test stays pending with the new reason. New darwin-only test: a subprocess started under `sandbox-exec -p '(version 1)(allow default)'` runs the route, and the review stays pending with a reason naming the boundary. |
+| AC-02 | Darwin-only tests in `review-route.test.ts`, each watched failing with the named part of the profile removed through `tests/vh-adlc/evidence/macos-review-boundary/mutants.py`. They use a fixture of their own, so the Git-directory and parent denies are actually exercised and no test can move the shared temporary directory: a fresh `mkdtemp` directory `T`, a main checkout at `T/a/b/main`, and a linked worktree at `T/a/b/wt` (`git worktree add`) that is the owning worktree. Its Git directory (`T/a/b/main/.git/worktrees/wt`) and common Git directory (`T/a/b/main/.git`) lie outside it. The fixture's Git calls clear `GIT_DIR`, `GIT_INDEX_FILE`, `GIT_WORK_TREE` and the other repository-local Git variables, and a test checks that an independently supplied `GIT_DIR` and `GIT_INDEX_FILE` are left untouched. Each late writer waits for a release file the test creates only after the route has returned `ready`, then tries its write and records that it finished; the test waits for that record up to a 10-second deadline, and the writer gives up after its own 10-second deadline. (1) Late writer: an implementation reviewer stub forks a writer with `perl -e 'POSIX::setsid(); exec env -i ...'` that writes `src/late.txt` in the owning worktree after release. Once the writer has finished the file doesn't exist (fails without `writeDeny`). (2) Rename routes: two late writers each rename a directory, write through the new path and rename it back. One renames the grandparent `T/a` and writes `src/late.txt`; the other renames the main checkout `T/a/b/main`, which holds the common Git directory, and appends to the linked worktree's index at `.git/worktrees/wt/index`. Each rename is refused, which the writer records in a file under `T`; `src/late.txt` doesn't exist and the index is unchanged afterwards (each fails without the parent denies). (3) Clone and export during the review: an implementation reviewer stub tries to write a file in its clone, and a spec reviewer stub tries the same in the export after `chmod u+w`. Each records the result in a file in the temporary directory. Both writes are refused and both reviews are ready (fails without the clone or export deny). (4) Scratch and temporary directory: the stub writes into a declared scratch directory and the temporary directory, and both writes land; with the allow rules removed the scratch write is refused while the temporary write still lands. (5) Refs and index: stubs run `git -C <owning worktree> branch x`, `git -C <owning worktree> tag -f t` and write the linked worktree's index at `T/a/b/main/.git/worktrees/wt/index`. Refs and index are unchanged afterwards (fails without the Git-directory and common-directory denies). The existing "the owning worktree is preserved" tests stay. On macOS each one asserts the worktree is unchanged afterwards, whether the outcome is pending or ready. On Linux they keep their pending expectation. |
+| AC-03 | `review-route.test.ts`: the existing `boundary: "unavailable"` test stays pending with the new reason. Darwin-only: a subprocess started under `sandbox-exec -p '(version 1)(allow default)'` runs the route, and the review stays pending with a reason naming the boundary (fails without the boundary precheck). Darwin-only: a reviewer argv whose first command exits 71 after printing `sandbox-exec: sandbox_apply: Operation not permitted` to standard error leaves the review pending with a reason saying the write boundary could not be applied, not the generic exit reason (fails without that check). |
 | AC-04 | `tests/vh-adlc/loop/owned-process.test.ts`: a subprocess with a `PATH` that holds no `unshare` imports the module fresh and calls `runOwnedClient(..., { pidNamespace: true })`. It resolves with `boundary: "marker"`. The subprocess keeps the module-level probe cache from hiding the case on Linux. Watched failing first: today the call throws `Executable not found`. |
-| AC-05 | Command: `bun plugins/vh-adlc/scripts/loop/cli.ts route --repo . --operation "spec review"` and `--operation review` print JSON with `"route":"command"`, `"model":"gpt-6.2-sol"` and `"model_attestation":"codex-session"`. Before the change both print `"route":"host"`. |
-| AC-06 | Manual procedure, recorded under `tests/vh-adlc/evidence/macos-review-boundary/`: on this Mac, run `cli.ts review --kind spec` on this document and `--kind implementation` on the feature commit with the committed `loop.yaml`. Record each JSON outcome (`ready`, attested model), `git status --porcelain` before and after (identical), and `vh-adlc review check` on the stored records (passes). The implementation review's own verdicts on AC-01 to AC-03 and AC-08 don't count toward this feature's completion: those tests need `sandbox-exec`, so the formal implementation review runs on the host route. |
-| AC-07 | Read the changed paragraphs at the implementation commit and confirm each of the four statements. `tests/vh-adlc/direct-operation-compatibility.test.ts` still passes. |
-| AC-08 | New darwin-only test in `review-route.test.ts`: the fixture hard-links a tracked file to a path in the temporary directory before the review. The review stays pending with a reason naming that file, and the reviewer stub never runs (it would create a marker file). Watched failing with the link-count check removed. |
+| AC-05 | Command: `bun plugins/vh-adlc/scripts/loop/cli.ts route --repo . --operation "spec review"` and `--operation review` print JSON with `"route":"command"`, `"model":"gpt-6.2-sol"` and `"model_attestation":"codex-session"`. Before the change both printed `"route":"host"`. |
+| AC-06 | `tests/vh-adlc/evidence/macos-review-boundary/run-review.sh <kind> <commit> <dir>`, run on this Mac for `spec` on this document and for `implementation` on the feature commit with the committed `loop.yaml`. For each it keeps the route JSON, the JSON outcome (`ready`, attested `gpt-6.2-sol`), `git status --porcelain` before and after (identical), the reply's records and the Codex session log of the run as its transcript; the implementation run's transcript shows the prompt's route-evidence section. After the records are stored, `vh-adlc review check` against the kept records and `vh-adlc lint` on the document both pass. |
+| AC-07 | Read the changed paragraphs at the implementation commit and confirm each statement AC-07 lists, in `loop-settings.md`, and the two names and the link in `review-protocol.md`. `tests/vh-adlc/direct-operation-compatibility.test.ts` still passes. |
+| AC-08 | Darwin-only tests in `review-route.test.ts`: (1) the fixture hard-links a tracked file to a path in the temporary directory before the review; the review stays pending with a reason naming that file, and the reviewer stub never runs (it would create a marker file; fails without the link-count check). (2) A unit test of the link check over a tree whose file is removed between the directory listing and the `lstat`, through a seam that removes it, returns the retryable pending reason and doesn't throw (fails without the guard). |
+| AC-09 | `review-route.test.ts`, an implementation review with one `evidence` command, on this Mac: the command runs `sandbox-exec -p '(version 1)(allow default)' /usr/bin/true` and prints the clone's `git rev-parse HEAD`; its log records exit 0 and the reviewed commit, which shows it ran at that commit outside the reviewer's profile. The reviewer stub finds the log path in its prompt, checks the log's content, tries to append to the log and to write its clone, and records each result; both writes are refused and the review is ready (fails without the evidence run, without the prompt section, or without the evidence-directory deny). A second case: a failing evidence command is recorded with its exit code and the review still reaches the reviewer. `tests/vh-adlc/loop/settings.test.ts`: `loadReviewEvidenceAt` reads the file from the given commit, not the working tree; an entry parses with a default timeout; a missing file gives no commands; and an unknown key, a missing name, a duplicate name, an empty command and a non-integer timeout are each refused, naming the field. A `loop.yaml` without the new file still loads unchanged. |
+| AC-10 | Run `/usr/bin/sandbox-exec -p '(version 1)(allow default)' bun test --timeout 60000 tests/vh-adlc/loop/review-route.test.ts` on this Mac: one failure whose message contains "needs an unsandboxed run", the route tests reported as skipped, and the non-route tests passing. Watched failing first: before the change the same run gives 50 failures with per-test pending reasons. |
+| AC-11 | Darwin-only tests in `review-route.test.ts`: a scratch entry that is a symlink to the owning worktree's root, and one that is a symlink into the common Git directory, each leave the review pending with a reason naming the entry, and the reviewer stub never runs (fails without the overlap check). A scratch entry that is a symlink to a directory outside every protected path still lets the stub write through it. |
 
 ## Tasks
 
@@ -330,7 +446,13 @@ applies. The Instruction freshness section and `parseReply` are left alone.
       Evidence: Each late writer now writes a `done` record and each late-writer test waits for it up to 10 seconds. Three consecutive runs of `bun test --timeout 60000 tests/vh-adlc/loop/review-route.test.ts` on this Mac: 52 pass, 1 fail each time. That one failure is the page-cache fixture #182 fixes. `python3 tests/vh-adlc/evidence/macos-review-boundary/mutants.py` gives the same result as before: every darwin test still fails against its part (denied paths 6, parent literal denies 2, Git-directory denies 2, clone 1, export 1, link-count check 1, boundary precheck 1).
 - [x] T8 `.vh-adlc/loop.yaml` - both reviewer roles routed to Codex with the accepted model and `model_attestation: codex-session`; the AC-05 `cli.ts route` commands print the expected JSON, where both printed `"route":"host"` before (AC-05)
       Evidence: Before: `bun plugins/vh-adlc/scripts/loop/cli.ts route --repo . --operation "spec review"` printed `{"role":"spec_reviewer","route":"host"}` and `--operation review` printed `{"role":"implementation_reviewer","route":"host"}`. After: both print `"route":"command"`, `"model":"gpt-6.2-sol"` and `"model_attestation":"codex-session"` with the Codex argv; `implement` stays `host`. `bun test --timeout 60000 tests/vh-adlc/loop/` on this Mac: 181 pass, 5 skip, 5 fail. All five fail because the page-cache stub writes where macOS does not read, which #182 fixes. `cli.ts context` reports `stale` here because it reads this repository's own `plugin.json` (0.34.0) as the running version while 0.33.0 is installed, which comes from developing the plugin inside its own repository.
-- [ ] T9 `tests/vh-adlc/evidence/macos-review-boundary/` - one real Codex spec review and one real Codex implementation review through `cli.ts review` on this Mac, each JSON outcome, `git status --porcelain` before and after, and `vh-adlc review check` on the stored records (AC-06)
+- [ ] T11 `tests/vh-adlc/loop/settings.test.ts` - `loadReviewEvidenceAt` reads `.vh-adlc/review-evidence.yaml` from the commit, applies the default timeout, gives no commands without the file, and refuses an unknown key, a missing name, a duplicate name, an empty command and a non-integer timeout, naming the field; fails because the function doesn't exist (AC-09)
+- [ ] T12 `plugins/vh-adlc/scripts/loop/settings.ts`, `plugins/vh-adlc/scripts/loop/cli.ts` - `loadReviewEvidenceAt` and passing its commands from the reviewed commit to implementation reviews; T11 passes and `tests/vh-adlc/loop/` shows no new failure (AC-09)
+- [ ] T13 `tests/vh-adlc/loop/review-route.test.ts` - the AC-09 evidence tests, the AC-11 scratch overlap tests, the AC-08 changing-tree test, the AC-03 profile-failure test, the AC-10 loud failure, late writers released after `ready`, and fixture Git calls that clear the repository-local Git variables with their check; the new tests fail on this Mac at T12 (AC-02, AC-03, AC-08, AC-09, AC-10, AC-11)
+- [ ] T14 `plugins/vh-adlc/scripts/loop/review-route.ts`, `tests/vh-adlc/evidence/macos-review-boundary/mutants.py` - the evidence run and prompt section, the evidence-directory deny, the scratch overlap check, the changing-tree guard and the profile-failure reason; `review-route.test.ts` passes on this Mac, and the mutant script, extended with the allow rules, the evidence run, the prompt section, the evidence deny, the overlap check, the tree guard and the profile-failure check, shows each test failing against its part (AC-02, AC-03, AC-08, AC-09, AC-11)
+- [ ] T15 `plugins/vh-adlc/references/loop-settings.md`, `plugins/vh-adlc/references/review-protocol.md` - the statements AC-07 lists, with `loop-settings.md` owning the details and the protocol naming the boundary and the evidence and linking there; `tests/vh-adlc/direct-operation-compatibility.test.ts` passes (AC-07)
+- [ ] T16 `.vh-adlc/review-evidence.yaml` - declare the `review-boundary` evidence command; `loadReviewEvidenceAt` reads it at the commit, and `bun plugins/vh-adlc/scripts/loop/cli.ts route` still prints the AC-05 JSON (AC-05, AC-09)
+- [ ] T17 `tests/vh-adlc/evidence/macos-review-boundary/run-review.sh` - keeps the reply's records and the run's Codex session log; run for `spec` on this document and for `implementation` on the feature commit, the records stored, then `vh-adlc review check` and `vh-adlc lint` pass (AC-06)
 
 ## Open Questions
 
