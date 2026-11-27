@@ -326,6 +326,37 @@ None.
 | 2026-11-27 | R-2 | spec | `c0f89a56` | claude-opus-5-5 | procedural | 0 blocking, 1 should-fix, 2 nits; host route |
 | 2026-11-27 | R-3 | spec | `b6f3156b` | claude-opus-5-5 | procedural | clean: 0 blocking, 0 should-fix, 1 nit (unapplied under the nit rule); host route |
 | 2026-11-27 | R-3 | spec | `b6f3156b` | n/a | n/a | accepted by owner |
+| 2026-11-27 | R-4 | spec | `b765e737` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 2 nits; full pass after the gpt-6.2-sol rename; host route |
+
+### R-4
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context (Owner summary: "Planned proof: ... Nothing has run against the change yet. This spec's reviews run on the host route, because the Codex route can't run here until the change exists."), Tasks T1 to T7 evidence lines
+EVIDENCE: At X, Tasks T1 to T7 are ticked with observed evidence: unit runs on this Mac (T2, T4, T5), the mutation runs in `tests/vh-adlc/evidence/macos-review-boundary/mutants.out` and the doc and version checks (T6, T7). I reran `bun test --timeout 60000 tests/vh-adlc/loop/review-route.test.ts tests/vh-adlc/loop/owned-process.test.ts` on this Mac: 54 pass, 5 skip, 2 fail on the first run, and 1 fail (the known `pagesStub` cache case) on the second. So the Owner summary's claim that nothing has run against the change is false at X. The convention requires the summary to "distinguish planned checks from observed proof" and to be refreshed "when scope, proof or decisions change and before asking for acceptance". The summary also says nothing about this revision, which is the reason the owner has to accept again: the model moves from gpt-6.1-sol to gpt-6.2-sol (issue #187: "the Codex review model is now `gpt-6.2-sol`, which supersedes `gpt-6.1-sol`") and `plugins/vh-adlc/plugin.json` joins `covers`. The convention asks the summary to "Explain material changes since the last accepted scope". This stale text comes from before R-3. The revision since R-3 made it wrong by recording T1 to T7 without updating the summary.
+PROPOSAL: Rewrite the validation paragraph of the Owner summary so it separates what has been observed (the T1 to T7 unit and mutation runs on this Mac, and the one macOS-only failure outside the feature) from what is still planned (T8, the AC-06 real Codex reviews, Linux CI). Add one sentence on what changed since the R-3 acceptance: the gpt-6.2-sol model the owner chose on #187, and the second manifest added to `covers`.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan row AC-02 (test (1) "one second after the stub exits ... after two seconds", test (2) "Each rename is refused, which the writer records in a file under `T`"), Tasks T5, `tests/vh-adlc/loop/review-route.test.ts:379-381` and `:418-436`
+EVIDENCE: On my first run of `bun test --timeout 60000 tests/vh-adlc/loop/review-route.test.ts tests/vh-adlc/loop/owned-process.test.ts` on this Mac at X, the darwin test "a late writer cannot rename the worktree's grandparent and write through the new path" failed after 4109 ms; it normally takes about 3.6 s. It passed when rerun alone, in three more sequential runs of the boundary tests and in two `--parallel` runs. I did not capture the assertion message. The test design leaves only a narrow timing margin. `lateWriter` forks perl, which calls setsid and execs `env -i /bin/sh -c "sleep 1; ..."`, so the one-second delay starts when the stub forks, not when it exits. The test then reads the record file with `readFileSync(rec)` after a fixed `Bun.sleep(2_000)` once the review returns, and never waits for the writer to finish. A slow perl or shell start on a loaded Mac makes the record absent, which fails a correct implementation. The Test Plan row gives a fixed two-second wait for (1) and no wait at all for the record in (2). T5's evidence ("52 pass, 1 fail", that one failure being the pages fixture) does not record this flake.
+PROPOSAL: In the AC-02 row, have each late-writer test wait for the writer's record file to appear, up to a deadline such as 10 seconds, before asserting on it and on the protected file. Keep a fixed delay only as the writer's own sleep, then update the tests to match.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan row AC-02 (test (2), Rename routes)
+EVIDENCE: The row still says both late writers "write `src/late.txt` through the new path" and that "the file doesn't exist afterwards". The implemented main-checkout test at `tests/vh-adlc/loop/review-route.test.ts:428-436` instead appends to `${main}x/.git/worktrees/wt/index` through the renamed path and asserts the index digest is unchanged, which is what R-3 F-01 proposed. The row was not updated, so it now describes a different check from the one T3 built and `mutants.out` lists under "no parent literal denies" and "no Git-directory denies". This revision changed the baseline but did not touch this row.
+PROPOSAL: Reword test (2) in the row so the main-checkout writer changes the linked worktree's index through the renamed path and the index is asserted unchanged, as the test does.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T7
+EVIDENCE: T7 names only `plugins/vh-adlc/.claude-plugin/plugin.json`, but its evidence line and commit c245b94c bump both manifests. `plugins/vh-adlc/plugin.json` now reads `"version": "0.34.0"`, and this revision adds that path to `covers`. The convention says each task "names the file it touches".
+PROPOSAL: Name both manifests in T7's task line.
 
 ### R-3
 
