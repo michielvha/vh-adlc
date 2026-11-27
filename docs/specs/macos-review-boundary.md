@@ -63,7 +63,7 @@ can't run tests that start their own `sandbox-exec`. So this feature, and any la
 `review-route.ts` or `owned-process.ts`, gets its implementation review on the host route or on Linux.
 
 Since the R-3 acceptance, the owner chose `gpt-6.2-sol` as the Codex review model on #187, so this
-revision renames it, and the second plugin manifest joins `covers`. Nothing else in the scope changed.
+revision renames it, and the second plugin manifest joins `covers`. The AC-02 proof also changed: each late-writer test now waits for the writer to finish, and the main-checkout rename case checks the linked worktree's index. Nothing else in the scope changed.
 
 Observed so far, on this Mac: tasks T1 to T7 are built, each test watched failing first, and a committed
 mutant script shows every macOS boundary test failing against the part it guards. Four route and CLI
@@ -104,6 +104,14 @@ Current state, measured at `e910dfe8` on macOS 26 (Darwin 25.6.0) with Codex CLI
   same-user child started with the marker set. A `runOwnedClient` run whose child forked a `setsid` writer
   reported `confirmed: true, survivors: []`, and the writer still wrote two seconds later. This happened
   with the marker kept and with the environment cleared. That bug is #186 and stays out of this feature.
+- Smoke runs of real Codex through the route, on 2026-11-27 at `b765e737` on `feat/macos-review-boundary`
+  (not stored reviews): a script called `runReviewRoute` with the planned argv
+  (`codex exec -m gpt-6.2-sol -s danger-full-access --skip-git-repo-check --json` through `{prompt_file}`,
+  `model_attestation: codex-session`) and a short prompt that ran `pwd`, `ls` and `touch probe-write.txt`.
+  The spec kind returned `ready` in 12 seconds and the implementation kind in 16 seconds, each with
+  `model: gpt-6.2-sol` attested from the session log. An earlier spec-kind run, whose prompt put prose
+  before the `MODEL:` line, stayed pending on that and reported "The write probe was refused with
+  `Operation not permitted`". `git status --porcelain` was empty before and after.
 - The host reviewer agent has a shell: `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md:4` grants
   `Bash` and `execute`, and disallows only `Edit` and `Write`.
 
@@ -318,6 +326,7 @@ applies. The Instruction freshness section and `parseReply` are left alone.
       Evidence: `bun test --timeout 60000 tests/vh-adlc/direct-operation-compatibility.test.ts tests/vh-adlc/loop/glossary.test.ts tests/vh-adlc/loop/settings.test.ts tests/vh-adlc/proportional-review.test.ts tests/vh-adlc/docs-drift/authority.test.ts`: 71 pass, 0 fail. `tests/vh-adlc/check.test.ts`: 77 pass, 1 fail ("a package change comes with a version change"), which T7 clears. The `loop-settings.md` paragraph states the macOS boundary, what stays writable, `-s danger-full-access` for Codex, and the host-or-Linux review for boundary code. The Routes item in `review-protocol.md` names the boundary. The Instruction freshness section and `parseReply` are untouched.
 - [x] T7 `plugins/vh-adlc/.claude-plugin/plugin.json` - minor version bump; `tests/vh-adlc/loop/plugin-version.test.ts` passes (Design)
       Evidence: Both manifests (`plugins/vh-adlc/.claude-plugin/plugin.json` and `plugins/vh-adlc/plugin.json`) moved from 0.33.0 to 0.34.0. `bun test --timeout 60000 tests/vh-adlc/check.test.ts tests/vh-adlc/loop/plugin-version.test.ts`: 86 pass, 0 fail. #139 also targets 0.34.0, so whichever merges second rebumps.
+- [ ] T10 `tests/vh-adlc/loop/review-route.test.ts` - every late writer records that it finished, and each late-writer test waits for that record, up to a 10-second deadline, before asserting; the boundary tests pass on this Mac and `tests/vh-adlc/evidence/macos-review-boundary/mutants.py` still shows each one failing against its part (AC-02, R-5 F-01)
 - [ ] T8 `.vh-adlc/loop.yaml` - both reviewer roles routed to Codex with the accepted model and `model_attestation: codex-session`; the AC-05 `cli.ts route` commands print the expected JSON, where both printed `"route":"host"` before (AC-05)
 - [ ] T9 `tests/vh-adlc/evidence/macos-review-boundary/` - one real Codex spec review and one real Codex implementation review through `cli.ts review` on this Mac, each JSON outcome, `git status --porcelain` before and after, and `vh-adlc review check` on the stored records (AC-06)
 
