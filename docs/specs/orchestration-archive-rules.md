@@ -242,6 +242,7 @@ None.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-27 | R-1 | spec | `41080f61` | claude-opus-5-5 | procedural | 1 blocking, 3 should-fix, 1 nit |
 | 2026-11-27 | R-2 | spec | `b3f58301` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 1 nit |
+| 2026-11-27 | R-3 | spec | `53c00e17` | claude-opus-5-5 | procedural | 0 blocking, 1 should-fix, 1 nit |
 
 ### R-1
 
@@ -302,6 +303,22 @@ SEVERITY: nit
 WHERE: Design, Required sentences (S-36, S-02); Design, How the rules read together ("Pending and failed sessions"); Context, Owner summary ("Pending or failed sessions the owner approves ending stay an exception, as before")
 EVIDENCE: This revision dropped S-58 ("A pending or failed session that the owner approves ending is archived under that approval"). New S-36 now only exempts these sessions: "Apart from pending or failed sessions the owner approves ending, a sub-session ends in one of two ways, and each has its own archive rule". New S-02 grants archiving "under the Close-out rules", and no Close-out rule now states how such a session is archived. Design says "S-36 keeps the exception the old S-36 opened with". That is true of the wording, but the exception now sits next to a grant that points to rules that are silent on it.
 PROPOSAL: Close S-36 with the archive rule for the exception, for example "; a pending or failed session the owner approves ending is archived under that approval".
+
+### R-3
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Required sentences (S-59, with S-56 and S-36); Design, Glossary ("Taken over": "The old session's work stays open until its work item is merged"); Design, How the rules read together ("Cleanup listing": "a pick of an open one is not an archive approval, so the orchestrator asks the owner whether its work is abandoned"); Context, Owner summary (cleanup paragraph: "for an open one, the orchestrator asks the owner, records the dated answer, and archives it only if the answer is that the work is abandoned")
+EVIDENCE: This revision extended S-59 in response to R-2 F-02. S-59 now reads "a picked workstream sub-session is still archived only when its work is finished or it is taken over, and the pick is not a statement that its work is abandoned: for a picked sub-session whose work is open, ask the owner whether it is abandoned, record the dated answer, and archive it only on that answer." The glossary row for Taken over says the old session's work "stays open until its work item is merged", and S-56 lets a taken-over session be archived "before the merge". So a taken-over sub-session that the owner picks in a general cleanup is both archivable under the first clause of S-59 and S-56, and an open-work sub-session that the second clause of S-59 lets the orchestrator archive "only on that answer". The honest answer for a session whose feature a replacement carries on is "not abandoned", so a literal reader can never archive it from the cleanup list, though S-56 allows it without any pick. Another reader applies S-56 and archives it. The harm statement names this exact situation ("whenever an orchestrator cleans up after an environment loss or a replacement"), so two careful implementers would behave in ways the owner notices: one asks a misleading abandonment question and keeps the session, the other archives it.
+PROPOSAL: Limit the abandonment question in S-59 to a picked sub-session whose work is open and that is not taken over (for example "for a picked sub-session whose work is open and that no other session has taken over"), and word the Cleanup listing bullet and the Owner summary to match.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Required sentences (paragraph after the list: "A paused session S-45 archives has the owner's batched approval of its replacement"); Context, Owner summary ("A paused session archived under the owner's batched approval before its replacement starts counts as taken over"); frontmatter goal ("or the owner has approved its replacement")
+EVIDENCE: This revision changed the paragraph from "has an approved replacement" to "has the owner's batched approval of its replacement". S-45 is an approval of archiving, not of replacement: "Archiving paused sessions, and a replaced stale orchestrator, needs the owner's approval, asked for in one batch" (`plugins/vh-adlc/references/orchestrate.md:168`). Replacing paused sessions is the orchestrator's step under S-30 ("replace the paused sessions once, when the release they wait for has landed", `orchestrate.md:160`), and the owner's part is the handoff "in its own session" after the replacement starts (`orchestrate.md:164`). The Owner summary itself says "the orchestrator's own plan to replace a session is not that approval". S-36 already states outright that "a paused session archived before its replacement starts is taken over", so the S-45 case does not depend on this claim and nothing built changes, but the paragraph misstates what S-45 approves.
+PROPOSAL: Say the paused session S-45 archives is taken over because S-36 says so and its archive has the owner's batched approval, rather than calling that approval an approval of its replacement.
 
 ## Sources
 
