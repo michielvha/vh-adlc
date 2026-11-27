@@ -642,3 +642,35 @@ describe("fixture Git calls", () => {
     expect(contentDigest(join(outer, ".git/index"))).toBe(index);
   });
 });
+
+// AC-12: the reviewer runs the candidate's tests with network access, so it must not inherit the controller's
+// environment, which holds the session's credentials.
+const ENV_ALLOWED = new Set(["PATH", "HOME", "TMPDIR", "USER", "LOGNAME", "SHELL", "LANG", "TERM", "CODEX_HOME",
+  "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_RUNTIME_DIR"]);
+/** What the route adds (the owned-process marker) and what the stub's own bash sets. */
+const ENV_ADDED = new Set(["VH_ADLC_OWNED_PROCESS", "PWD", "OLDPWD", "SHLVL", "_"]);
+
+describe("the reviewer's environment", () => {
+  routed("only allowlisted variables and request.env reach the reviewer", async () => {
+    const { root, commit } = repository();
+    const rec = recordFile();
+    const standIns = { VH_REVIEW_SENTINEL: "leak", GH_TOKEN: "ghp_standin", GIT_DIR: join(root, ".git"), SSH_AUTH_SOCK: "/tmp/vh-standin.sock" };
+    const saved = Object.fromEntries(Object.keys(standIns).map(name => [name, process.env[name]]));
+    Object.assign(process.env, standIns);
+    let outcome: ReviewOutcome;
+    try {
+      outcome = await runReviewRoute({ repo: root, commit, kind: "implementation", document: "docs/specs/feature.md",
+        route: { model: "gpt-6.1-sol", argv: [stub(`env > ${rec}`, ok(commit)), "{prompt_file}"] }, prompt: "p", scratch: [],
+        timeoutMs: 10_000, env: { VH_PASSED: "yes" } });
+    } finally {
+      for (const [name, value] of Object.entries(saved)) if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
+    expect(outcome.status).toBe("ready");
+    const names = readFileSync(rec, "utf8").split("\n").filter(Boolean).map(line => line.slice(0, line.indexOf("=")));
+    const unexpected = names.filter(name => !ENV_ALLOWED.has(name) && !name.startsWith("LC_") && !ENV_ADDED.has(name) && name !== "VH_PASSED");
+    expect(unexpected).toEqual([]);
+    expect(names).toContain("PATH");
+    expect(names).toContain("HOME");
+    expect(names).toContain("VH_PASSED");
+  });
+});
