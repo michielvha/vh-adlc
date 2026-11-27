@@ -386,6 +386,7 @@ None.
 | 2026-11-15 | R-2 | spec | `b34ba95382ee1ceb78d0c6c2ac5d751dc65b0ff3` | claude-opus-5-5 | procedural | One blocking, sixteen should-fix and three nit findings |
 | 2026-11-15 | R-3 | spec | `09de0c3e2a106f48ae3f72e8859362a9193cc308` | claude-opus-5-5 | procedural | One blocking, ten should-fix and three nit findings |
 | 2026-11-15 | R-4 | spec | `fc1b66539fc6b13d92d6473230911e8fbaf31691` | claude-opus-5-5 | procedural | Eleven should-fix and three nit findings |
+| 2026-11-27 | R-5 | spec | `4f465f0348baea0bba3fbea1c5c6752f6510686a` | claude-opus-5-5 | procedural | Three should-fix and four nit findings |
 
 ### R-1
 
@@ -835,6 +836,57 @@ SEVERITY: nit
 WHERE: Design, Extraction and redaction ("it includes a file from `subagents/` or `tool-results/` only when an included turn references it"); Terminology (Session)
 EVIDENCE: The main transcript `0443e578-6437-5521-b63e-27f043a5ac80.jsonl` refers to its subagents only as `agentId: a6d6fbd72502c1fd7`, never by the file name `subagents/agent-a6d6fbd72502c1fd7.jsonl`. Tool-results files are named by path. "References" is not defined for subagents.
 PROPOSAL: Say that an `agentId` in an included turn references `subagents/agent-<id>.jsonl`.
+
+### R-5
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Session and report folder ("An absent folder is a first run"); Design, Report and save ("`save` creates the folder if needed, writes the report to `.<random>.tmp` in it, links that file"); Design, Effects and failure; Owner summary ("Reports are saved, redacted, in a per-user folder"); AC-06; Test Plan row AC-06
+EVIDENCE: Redaction is pattern-based, so a secret of a shape the list does not name stays in the saved report. Examples are a Google `AIza...` key, an `npm_...` token or a bare hex API key that has no key name. The document gives no mode for the folder or the report files. With a 022 umask, a folder `save` creates under `$HOME/.local/state/vh-adlc/retro/` and its reports are readable by other local accounts wherever the home directory is traversable. The product profile puts the user's credentials at stake. The plugin's own scripts already use owner-only modes for saved artifacts: `writeFileSync(..., { flag: "wx", mode: 0o600 })` at `plugins/vh-adlc/scripts/triage/cli.ts:50` and `mkdirSync(output,{recursive:true,mode:0o700})` at `plugins/vh-adlc/scripts/triage/controller-recovery.ts:18`. AC-06 checks only the patterns and the planted secrets, so it passes a world-readable report.
+PROPOSAL: Have `save` create the report folders with mode 0700 and write the temporary file with mode 0600, created exclusively, before linking it. Add the modes to the AC-06 `bun test` row.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Session and report folder ("notes the file name each earlier run's `save` printed"); Design, History ("The skill passes the file names of reports saved earlier in this conversation as `--exclude`"); Terminology (Recurring candidate, "where that report was not saved earlier in this conversation"); Scope, Out of scope ("anything compaction removed from the context"); AC-07
+EVIDENCE: The only thing that ties an earlier same-conversation report to this session is the file name `save` printed, and the design relies on it staying in the model's context. Here is a plausible sequence in the long sessions the Background names as the harm: retro runs and saves, work goes on, compaction summarises the earlier turns, and retro runs again. Now the file name may be gone while the summary still describes the same mistakes. The earlier report is then not excluded, so every candidate it raised becomes `recurring` and moves up a level, or becomes `fix-not-held` and high, even though nothing recurred. The Out of scope line excludes reviewing what compaction removed. It does not state this consequence, which inflates severities, and the Owner summary does not mention it. The AC-07 variant keeps the earlier run's `save` output intact, so it cannot show the case.
+PROPOSAL: Either add a Scope line `Not handled: an earlier retro report from this conversation whose file name compaction removed counts as history, ...` and mention it in the Owner summary, or have the skill ask the owner which reports to exclude when its context shows a compaction summary that mentions an earlier retro run but no saved file name.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Scope (last bullet, "fixture conversations resumable on Claude Code and on Codex"); Fixture table paragraphs ("Each recorded run resumes a fixture conversation in an isolated host profile"); Fixture table row P4 ("printing a multi-megabyte result"); Test Plan rows AC-02, AC-03, AC-04, AC-05 and AC-07
+EVIDENCE: The document never says how the fixture conversations are produced. They could be hand-written transcripts in each host's format, or recorded once by scripted live sessions and then copied into the isolated profile. It also does not say how a resume finds them. Claude Code files sessions under `<config>/projects/<encoded working directory>/` (for example this host's `~/.claude/projects/-Users-michielvh-code-vh-adlc/`), and Codex keeps rollouts under `CODEX_HOME/sessions/`. The harness creates a fresh profile (`plugins/vh-adlc/scripts/triage/controller-clients.ts:5-6`, `:18`, `:20`), and the fixture repository's path changes on every run, so each transcript has to be placed and rewritten for that path. P4 plants a multi-megabyte tool result. The hosts truncate large tool output before it reaches the model's context, so a fixture that stores the full output either cannot be resumed or gets compacted. A fixture that stores the truncated form has to show the size in the way the host would. Two careful implementers would build fixtures that behave differently, and only one would let the AC-02 and AC-07 runs execute as the document intends.
+PROPOSAL: Say how each host's fixture conversation is made and installed: its source format, where it goes in the isolated profile, and how the fixture repository path is substituted. State that P4's output appears in the fixture exactly as the host records an oversized result, with its size visible.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Background (package checker bullet, "Both discovery tests assert nineteen skills"); Scope (Registration, "both discovery tests at twenty skills")
+EVIDENCE: Only `tests/vh-adlc/triage/discovery.test.ts:13` asserts a count (`toHaveLength(19)`). `tests/vh-adlc/maintenance/discovery.test.ts:12` asserts only `toContain("vh-adlc-maintenance")`, and `grep -n '19\|nineteen' tests/vh-adlc/maintenance/discovery.test.ts` finds no count. The claim was carried over from earlier revisions (R-1 F-09 cited a `toHaveLength(16)` there).
+PROPOSAL: Say that the triage discovery test asserts the skill count, and drop the maintenance test from the count change, or keep it in covers only for a reason that is stated.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary ("Four of its findings were about transcript parsing and no longer apply now that parsing is out")
+EVIDENCE: At least five R-4 findings concern transcript reading and no longer apply: F-02 (session variables), F-03 (run boundaries in transcript records), F-04 (transcript cwd values), F-08 (digest budget) and F-14 (subagent references). F-06 and F-12 were about the `.work/` folder, which this revision also removed.
+PROPOSAL: Correct the count, or list which R-4 findings were dropped and which were applied.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Analysis ("the always-loaded user-level instruction and memory index files in full. They are ... `<CODEX_HOME>/AGENTS.md` and `<CODEX_HOME>/memories/` on Codex CLI")
+EVIDENCE: `<CODEX_HOME>/memories/` is a directory, not an index file. On this host, `ls ~/.codex/memories` shows `MEMORY.md`, `memory_summary.md` and `extensions`. "Read in full" does not say whether that means one index file, every file in the directory, or the directory tree.
+PROPOSAL: Name the Codex memory file or files that are read in full, and treat the rest like Claude Code's linked memory notes, which are searched by subject.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: Context, Owner summary (report folder paragraph); Scope ("Not handled: a moved or renamed main checkout starts a new report folder")
+EVIDENCE: The Owner summary describes the folder as "one folder per repository, shared by all its worktrees". It does not say that moving or renaming the main checkout starts a fresh folder, which loses the recurrence history the Background gives as one of the two reasons for the machinery.
+PROPOSAL: Add one sentence to the Owner summary stating the moved-checkout limit.
 
 ## Sources
 
