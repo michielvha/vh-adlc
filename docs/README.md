@@ -18,6 +18,7 @@
 - [Compatibility](reference/compatibility.md): tested hosts, plugin versions, and review limits.
 - [CLI](reference/cli.md): binary commands, JSON output, and exit codes.
 - [Marketplace](reference/marketplace.md): vhco-tools plugins and where to install them.
+- [vh-adlc vs BMAD-METHOD](comparisons/vh-adlc-vs-bmad-method.md): architecture, gate enforcement, and workflow trade-offs compared.
 
 ## Security
 
