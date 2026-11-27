@@ -342,6 +342,7 @@ None.
 | 2026-11-27 | R-3 | spec | `ed52406` | claude-opus-5-5 | procedural | 1 blocking, 1 should-fix, 1 nit; revision follows |
 | 2026-11-27 | R-4 | spec | `45cad2a` | claude-opus-5-5 | procedural | 2 nits, both in Context; applied outside the baseline |
 | 2026-11-27 | R-4 | spec | `45cad2a` | n/a | n/a | accepted by owner |
+| 2026-11-27 | R-5 | implementation | `8c79b67` | claude-opus-5-5 | procedural | All eight criteria met |
 
 ### R-1
 
@@ -504,3 +505,39 @@ SEVERITY: nit
 WHERE: Context (Owner summary, fifth paragraph, "The third found that two extra pointers would have broken a pinned skill-body test")
 EVIDENCE: R-3 F-01 named only the `skills/vh-adlc-spec/SKILL.md:164` pointer as breaking the pinned body test. The other dropped pointer, at `references/loop.md:42`, is in a file no body test pins. The tests that read loop.md (check.test.ts:312,382,388, proportional-review.test.ts:226, proportionality.test.ts:13, loop/glossary.test.ts:19) check for phrases, not a whole body. The R-3 revision added this sentence.
 PROPOSAL: Say that R-3 found the spec skill pointer would have broken a pinned skill-body test, and that both extra pointers are now dropped because the read rule already decides which version operations hold.
+
+### R-5
+
+TARGET: 8c79b67757712adfb1dab3fd3eeb068b8f2da8b4
+
+CRITERION: AC-01 In a clone whose listed instruction file and project procedure are behind origin's default branch tip and unchanged locally, `context` reports both as `stale`, and `git show` of each `read` value prints the tip's content.
+VERDICT: met
+EVIDENCE: `PATH=gnubin:$PATH bun test tests/vh-adlc/loop/context-freshness.test.ts tests/vh-adlc/loop/glossary.test.ts tests/vh-adlc/loop/plugin-version.test.ts --timeout 60000` at 8c79b67 on macOS: 33 pass, 0 fail; context-freshness.test.ts alone: 23 pass, 0 fail. The test "stale, current and edited files each report their state and the version to read" asserts AGENTS.md and agents/procedure.md as `stale` with `read` `<tip>:<path>`, and `git show` of each prints "rules v2" and "procedure v2". I read classify() in plugins/vh-adlc/scripts/loop/freshness.ts:68-74 and it matches the States table. Limitation: a local bare repository serves as origin, so no network remote was used.
+
+CRITERION: AC-02 A listed file equal to the tip reports `current` with its path. A listed file the current branch changed since it left the tip, committed or uncommitted, reports `edited` with its path, even when the tip also differs.
+VERDICT: met
+EVIDENCE: Same run at 8c79b67, 23 pass, 0 fail in context-freshness.test.ts. The same test asserts a.md is `current` with `read` "a.md". b.md (edit committed) and c.md (edit not committed), both of which the tip also advanced, are `edited` with their paths. The order of `files` equals `read`. Limitation: local bare origin.
+
+CRITERION: AC-03 When the local settings file is behind the tip, `freshness.settings` is `stale` and the reading list and lenses are the tip's, including a file the tip added that the clone lacks, which reports `stale`.
+VERDICT: met
+EVIDENCE: Same run at 8c79b67, all pass. "stale local settings take the reading list and lenses from the tip" asserts settings `stale` with read `<tip>:.vh-adlc/loop.yaml`, `read` ["AGENTS.md","e.md"], e.md `stale` with `<tip>:e.md` although the clone lacks it, and the tip's lens and lensText. "tip settings that fail to load" asserts the local list and a `schema_version` error. I checked the code path in contextReport, plugins/vh-adlc/scripts/loop/procedure.ts:16-29. Limitation: local bare origin.
+
+CRITERION: AC-04 When the local settings are kept and the tip deleted a listed file the clone left unchanged, that file reports `removed` with a null `read`.
+VERDICT: met
+EVIDENCE: Same run at 8c79b67, all pass. In "a listed file the tip deleted reads as removed while this branch keeps its own settings", the clone commits an edit to its own settings, so they read as `edited` and are kept. Origin deletes d.md and drops it from its settings. The test asserts d.md as {state "removed", read null}. Limitation: local bare origin.
+
+CRITERION: AC-05 Without a usable origin or tip (no remote, an unresolvable default branch, a failing fetch, a held ref lock, or no merge base with the tip), `context` exits 0, keeps the local reading list, reports every entry `unverified` with a reason naming the cause, and its other fields are unchanged.
+VERDICT: met
+EVIDENCE: Same run at 8c79b67, all pass. Five tests cover the five causes: no remote, a missing origin path with no origin/HEAD and no flag (reason names --default-branch), the same path with the flag (reason names a failed fetch), a held refs/remotes/origin/main.lock with origin ahead (failed fetch), and an orphan root commit that carries the settings and listed files (missing merge base). Each exits 0 and has a non-empty list in which every entry is `unverified` with read equal to its path. Each test also checks that settings are `unverified` and that read, lenses and lensText equal loopContext(loadLoopSettings(clone)). `plugin` still comes from the same pluginStatus call (procedure.ts:28), and plugin-version.test.ts passed in the same run. Limitation: the 30-second timeout path was not exercised. Inspection shows it falls into the same failed-fetch branch (freshness.ts:46-47).
+
+CRITERION: AC-06 After `context` runs in a clone behind the tip, `HEAD`, the current branch, the index, the working tree and every ref except `refs/remotes/origin/<branch>` are unchanged.
+VERDICT: met
+EVIDENCE: Same run at 8c79b67, all pass. "only origin's tracking ref for the default branch moves" snapshots rev-parse HEAD, symbolic-ref HEAD, status --porcelain=v2 (with an untracked file present), write-tree and for-each-ref (symbolic refs compared by target) before and after, against an origin that holds a new tag. Only refs/remotes/origin/main differs, it now sits at origin's tip, and `git tag --list` is empty. The code fetches with `--no-tags` and the single explicit refspec `+refs/heads/<branch>:refs/remotes/origin/<branch>` (freshness.ts:46). Limitation: local bare origin.
+
+CRITERION: AC-07 The seven SDD skills, the orchestrate skill, `references/loop.md` and `references/loop-settings.md` direct operations to pass the default branch to `context` and read each listed file at its reported version; `references/loop-settings.md` states that the conventions revision stays the one resolved from the checkout; and the loop glossary defines Instruction freshness.
+VERDICT: met
+EVIDENCE: Same run at 8c79b67, all pass. The pointer test passes for all eight SKILL.md files and references/loop.md. The rule test passes for the Instruction freshness section of references/loop-settings.md (the --default-branch, git show <read> and conventions sentences), and the must-pass and must-fail pattern tests pass. glossary.test.ts passes with the "Instruction freshness" row. I read the diff from merge base 2f12dfa: each of the nine pointers is the planned sentence, and loop-settings.md:146-175 holds the table and the three rule bullets. `bun test tests/vh-adlc/check.test.ts tests/vh-adlc/direct-operation-compatibility.test.ts tests/vh-adlc/proportional-review.test.ts --timeout 60000` at 8c79b67 gave 115 pass, 0 fail, so the pinned skill bodies and phrases still hold.
+
+CRITERION: AC-08 In a clone with no `origin/HEAD`, `context` reports a verified tip both with `--default-branch` and, through `git ls-remote`, without it.
+VERDICT: met
+EVIDENCE: Same run at 8c79b67, all pass. "a clone without origin/HEAD still verifies" deletes the ref with `git symbolic-ref --delete refs/remotes/origin/HEAD`, then runs `context` with `--default-branch main` and again with no flag. Both runs report `freshness.tip` equal to origin's tip, with no file entry and no settings entry `unverified`. The ls-remote fallback is at freshness.ts:38-43. Limitation: local bare origin. My extra scratch-repository probes (no settings anywhere, a tip that adds the settings file, an invalid branch name) were refused by the host's worktree sandbox and were not observed.
