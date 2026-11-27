@@ -27,8 +27,9 @@ Before dispatching, read the reviewer role's route:
   `review pending`, followed by its `reason`, with the raw `reply` in the handoff. A reviewer that cannot
   read a page from the cache, after its own `knowledge` call for that revision where it can make one,
   replies `PAGE NOT CACHED: <page>` instead of records and never reads it from a local clone. The
-  command route detects that line in any light formatting; the command route returns that as `pending`, and a host dispatch stores nothing either
-  and reports `review pending` with that page.
+  command route looks for that line as the first line after the header lines, allowing list or quote
+  markers, emphasis, backticks and trailing text, and returns `pending`. A host dispatch also stores
+  nothing and reports `review pending` with that page.
 
 For a spec review, both routes take its scope from one computation:
 `bun scripts/loop/cli.ts review-scope --repo <dir> --document <doc> --commit <X>` prints the previous spec

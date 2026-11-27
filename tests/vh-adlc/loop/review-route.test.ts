@@ -365,7 +365,11 @@ describe("reply bytes", () => {
       ["MODEL: m\nTARGET: abcdef1\n\nPAGE NOT CACHED: README.md.\n", "README.md"], ["MODEL: m\nTARGET: abcdef1\n\nPAGE NOT CACHED: `guides/a.md`\n", "guides/a.md"],
       ["MODEL: m\nTARGET: abcdef1\n\n- **PAGE NOT CACHED:** \"README.md\"\n", "README.md"], ["MODEL: m\nTARGET: abcdef1\n\n> PAGE NOT CACHED:\n", "unnamed"]] as const)
       expect([reply, parseReply(reply)]).toEqual([reply, { error: `the reviewer stopped: page not cached: ${page}` }]);
-    // A record that only mentions the marker inside its text is still a record.
-    expect(parseReply("MODEL: m\nTARGET: abcdef1\n\nFINDING: F-01\nEVIDENCE: the reviewer prompt says PAGE NOT CACHED: README.md\n")).toMatchObject({ model: "m" });
+    // Only the first line after the header lines can stop the review: a record that quotes the marker,
+    // inside a line or on a continuation line of its own, is still a record.
+    for (const reply of ["MODEL: m\nTARGET: abcdef1\n\nFINDING: F-01\nEVIDENCE: the reviewer prompt says PAGE NOT CACHED: README.md\n",
+      "MODEL: m\nTARGET: abcdef1\n\nFINDING: F-01\nEVIDENCE: the agent file prints\n- `PAGE NOT CACHED: README.md` (backticked)\n",
+      "MODEL: m\nTARGET: abcdef1\n\nFINDING: F-01\nEVIDENCE: quoted:\n  PAGE NOT CACHED: <page>\n"])
+      expect([reply, parseReply(reply)]).toMatchObject([reply, { model: "m", target: "abcdef1" }]);
   });
 });

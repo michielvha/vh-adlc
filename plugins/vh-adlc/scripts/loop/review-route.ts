@@ -240,11 +240,12 @@ export function removeExport(dir: string) {
 /** Splits a reply into its two header lines and the records after them. */
 export function parseReply(reply: string): { model: string; target: string; records: string } | { error: string } {
   // A reviewer that cannot read a convention page from the cache stops on its own line; that is a pending
-  // review for the dispatcher, never a record, whatever header lines came before it. The line is matched
-  // leniently (list or quote markers, emphasis, backticks, trailing text), so a stop never passes as records.
-  for (const text of reply.split(/\r?\n/)) {
-    const stop = /^PAGE NOT CACHED:[*_`'"\s]*(.*)$/.exec(text.replace(/^[\s>*+\-\d.)`'"_]*/, ""));
-    if (!stop) continue;
+  // review for the dispatcher, never a record, whatever header lines came before it. Only the first line
+  // after the header lines that are present counts, so a record that quotes the marker stays a record. That
+  // line is matched leniently (list or quote markers, emphasis, backticks, trailing text).
+  const first = reply.split(/\r?\n/).map(text => text.trim()).filter(Boolean).find(text => !/^(?:MODEL|TARGET): /.test(text)) ?? "";
+  const stop = /^PAGE NOT CACHED:[*_`'"\s]*(.*)$/.exec(first.replace(/^[\s>*+\-\d.)`'"_]*/, ""));
+  if (stop) {
     const page = /[A-Za-z0-9_\/-][A-Za-z0-9._\/-]*/.exec(stop[1]!)?.[0]?.replace(/\.+$/, "");
     return { error: `the reviewer stopped: page not cached: ${page || "unnamed"}` };
   }
