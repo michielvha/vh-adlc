@@ -783,25 +783,25 @@ None.
 
 ## Deferred
 
-- D-01: State and size the combined chance that a correct implementation fails some label across many labels. From: R-5 F-01, deferred at acceptance. Verdict: pending.
-- D-02: Have a scoped pass re-raise a previous blocking or should-fix finding the revision left unaddressed. From: R-5 F-02, deferred at acceptance. Verdict: pending.
-- D-03: Give the author's side of the stated limit rule a home in the spec skill and a proof. From: R-5 F-03, deferred at acceptance. Verdict: pending.
-- D-04: Hide the brief, commits and run order from the label matcher. From: R-5 F-04, deferred at acceptance. Verdict: pending.
-- D-05: Script the author as well as the reviewer in the harness test, with no model call. From: R-5 F-05, deferred at acceptance. Verdict: pending.
-- D-06: Hold each user guide only to the glossary terms it describes. From: R-5 F-06, deferred at acceptance. Verdict: pending.
-- D-07: A full pass for a repository without its own pin after a plugin upgrade moves its docs revision. From: R-3 F-07, stated limit. Verdict: pending.
-- D-08: A per-route check on average labels raised per run. From: owner cut on 2026-11-22. Verdict: pending.
-- D-09: Owner-list triage in operations other than the spec skill. From: owner cut on 2026-11-22. Verdict: pending.
-- D-10: Safe concurrent follow-up reviews on one feature. From: R-8 F-02, stated limit. Verdict: pending.
-- D-11: While a follow-up docs PR is open, let its branch decide which entries are pending, so resume and ship do not repeat the review. From: R-9 F-01, deferred at acceptance. Verdict: pending.
-- D-12: Name the `references/authority.md` wording for the follow-up review's temporary worktree and its writer-handoff exception. From: R-9 F-02, deferred at acceptance. Verdict: pending.
-- D-13: Ask one approval for the docs branch, push and PR even when every entry is a drop or every filing is declined. From: R-9 F-03, deferred at acceptance. Verdict: pending.
-- D-14: Run the private-terms check on newly returned implementation review records before storing them. From: R-9 F-04, deferred at acceptance. Verdict: pending.
-- D-15: Count the Open Questions the author raises in the replay loops. From: owner cut on 2026-11-23. Verdict: pending.
-- D-16: A set stored before T25 that two launches wrote. From: R-15 F-01, stated limit. Verdict: pending.
-- D-17: Find why the new brief's Claude host reviewer no longer raises enterprise label L-08 (minimum severity should-fix), and restore it. From: owner cut on 2026-11-24. Verdict: pending.
-- D-18: Find why the new brief's Codex command reviewer no longer raises enterprise label L-10 (minimum severity should-fix), and restore it. From: owner cut on 2026-11-24. Verdict: pending.
-- D-19: Find why the Codex reviewer raises as many blocking findings per round under the new brief as under the old on the enterprise case, and finish that new loop when Codex usage returns. From: owner cut on 2026-11-24. Verdict: pending.
+- D-01: State and size the combined chance that a correct implementation fails some label across many labels. From: R-5 F-01, deferred at acceptance. Verdict: drop, the replay harness is an evaluation tool no user of the merged review runs, and the #172 analysis states this chance where it matters.
+- D-02: Have a scoped pass re-raise a previous blocking or should-fix finding the revision left unaddressed. From: R-5 F-02, deferred at acceptance. Verdict: follow-up [#196](https://github.com/michielvha/vh-adlc/issues/196).
+- D-03: Give the author's side of the stated limit rule a home in the spec skill and a proof. From: R-5 F-03, deferred at acceptance. Verdict: drop, the merged spec skill states the author's side of stated limits and every stated limit goes through review, which the S17 limit scenarios exercise.
+- D-04: Hide the brief, commits and run order from the label matcher. From: R-5 F-04, deferred at acceptance. Verdict: drop, it concerns only the replay harness.
+- D-05: Script the author as well as the reviewer in the harness test, with no model call. From: R-5 F-05, deferred at acceptance. Verdict: drop, it concerns only the replay harness.
+- D-06: Hold each user guide only to the glossary terms it describes. From: R-5 F-06, deferred at acceptance. Verdict: drop, it is a rule of this feature's own glossary criterion, met at R-30, which no user of the merged feature meets.
+- D-07: A full pass for a repository without its own pin after a plugin upgrade moves its docs revision. From: R-3 F-07, stated limit. Verdict: follow-up [#197](https://github.com/michielvha/vh-adlc/issues/197).
+- D-08: A per-route check on average labels raised per run. From: owner cut on 2026-11-22. Verdict: drop, it is a replay harness metric.
+- D-09: Owner-list triage in operations other than the spec skill. From: owner cut on 2026-11-22. Verdict: follow-up, not filed (owner declined).
+- D-10: Safe concurrent follow-up reviews on one feature. From: R-8 F-02, stated limit. Verdict: drop, the merged ship skill states this limit as accepted.
+- D-11: While a follow-up docs PR is open, let its branch decide which entries are pending, so resume and ship do not repeat the review. From: R-9 F-01, deferred at acceptance. Verdict: follow-up [#198](https://github.com/michielvha/vh-adlc/issues/198).
+- D-12: Name the `references/authority.md` wording for the follow-up review's temporary worktree and its writer-handoff exception. From: R-9 F-02, deferred at acceptance. Verdict: drop, the merged `references/authority.md` names both in its action table and its Preservation section.
+- D-13: Ask one approval for the docs branch, push and PR even when every entry is a drop or every filing is declined. From: R-9 F-03, deferred at acceptance. Verdict: follow-up [#199](https://github.com/michielvha/vh-adlc/issues/199).
+- D-14: Run the private-terms check on newly returned implementation review records before storing them. From: R-9 F-04, deferred at acceptance. Verdict: drop, it applies only to replay case material, and this feature's records are stored.
+- D-15: Count the Open Questions the author raises in the replay loops. From: owner cut on 2026-11-23. Verdict: drop, it is a replay harness metric.
+- D-16: A set stored before T25 that two launches wrote. From: R-15 F-01, stated limit. Verdict: drop, a one-time harness condition the owner-accepted launch record already settles.
+- D-17: Find why the new brief's Claude host reviewer no longer raises enterprise label L-08 (minimum severity should-fix), and restore it. From: owner cut on 2026-11-24. Verdict: follow-up [#172](https://github.com/michielvha/vh-adlc/issues/172).
+- D-18: Find why the new brief's Codex command reviewer no longer raises enterprise label L-10 (minimum severity should-fix), and restore it. From: owner cut on 2026-11-24. Verdict: follow-up [#172](https://github.com/michielvha/vh-adlc/issues/172).
+- D-19: Find why the Codex reviewer raises as many blocking findings per round under the new brief as under the old on the enterprise case, and finish that new loop when Codex usage returns. From: owner cut on 2026-11-24. Verdict: follow-up [#172](https://github.com/michielvha/vh-adlc/issues/172).
 
 ## Review Log
 
