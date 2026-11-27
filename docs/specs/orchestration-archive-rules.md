@@ -1,7 +1,8 @@
 ---
-status: planned
-status_description: "Accepted by the owner at R-4 (0ae4eab6); ready for tasks and implementation."
+status: in-progress
+status_description: "Claimed for implementation on feat/orchestration-archive-rules; no task done yet."
 issue: https://github.com/michielvha/vh-adlc/issues/180
+branch: feat/orchestration-archive-rules
 goal: "An orchestrator archives a sub-session only when the forge shows its work finished, or when another session takes its feature over, or the owner has approved its replacement, and its worktree is kept, and archives nothing outside its workstream that the owner has not picked."
 covers:
   - plugins/vh-adlc/references/orchestrate.md
