@@ -400,7 +400,17 @@ The fixture user-level memory file holds one planted secret, which the conversat
 
 ## Tasks
 
-None yet; written once the document is planned.
+- [ ] T1 `tests/vh-adlc/retro/folder.test.ts` - `folder` from two worktrees, from a bare clone's two worktrees and from two same-named repositories; fails because `scripts/retro/cli.ts` does not exist (AC-09)
+- [ ] T2 `plugins/vh-adlc/scripts/retro/cli.ts`, `plugins/vh-adlc/scripts/retro/folder.ts` - the `folder` command with the state root, name and common-directory hash; T1 passes (AC-09)
+- [ ] T3 `tests/vh-adlc/retro/save.test.ts` - redaction of every listed shape and key form, the near-misses and the marker surviving, saving twice leaving the text unchanged, folder 0700 and report 0600 under umask 022, refusal of an unparseable, `format: 2`, missing-field or unlisted-token block with the folder unchanged; fails because `save` does not exist (AC-06, AC-08)
+- [ ] T4 `plugins/vh-adlc/references/retro.md`, `plugins/vh-adlc/scripts/retro/` - the report format and secret patterns, and `save` (redact, validate, exclusive temporary file, link to a free name, print the name and text, print the redacted report when it cannot write); T3 passes (AC-06, AC-08)
+- [ ] T5 `tests/vh-adlc/retro/history.test.ts` - `--exclude` listing and dropping same-conversation reports, skipping newer and malformed blocks by name, ignoring dot-named files, an empty or absent folder, each candidate returned with its report's file name, and a report written by `save` read back with every candidate; fails because `history` does not exist (AC-07, AC-08)
+- [ ] T6 `plugins/vh-adlc/scripts/retro/` - the `history` command; T5 passes (AC-07, AC-08)
+- [ ] T7 `tests/vh-adlc/check.test.ts`, `tests/vh-adlc/triage/discovery.test.ts` - `retro` as a content operation, in triage discovery's exclusion list, twenty skills, and "twenty skills" and "six content operations" in the guides; fails because the skill and the page changes do not exist (AC-01)
+- [ ] T8 `plugins/vh-adlc/skills/vh-adlc-retro/SKILL.md`, `plugins/vh-adlc/references/lifecycle.md`, `plugins/vh-adlc/references/loop.md`, `docs/get-started/installation.md`, `docs/user-guides/workflows.md`, `docs/reference/compatibility.md`, `docs/reference/marketplace.md`, `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json`, `.agents/plugins/marketplace.json`, `.claude-plugin/marketplace.json` - the skill, intake row, unpinned entry, pages, Codex write-access row and version bumps; T7 and `bun test tests/vh-adlc` pass (AC-01)
+- [ ] T9 `tests/vh-adlc/retro/install.test.ts` - installing each host's fixture makes a Git repository whose commits and files match the conversation, and writes the filled session where that host looks for it, the Claude Code folder encoded from the copy's real path; fails because the fixtures and install script do not exist (AC-02, AC-07)
+- [ ] T10 `tests/vh-adlc/retro/` - the fixture repository, first-run and second-run conversation templates for both hosts started from real recorded sessions, isolated profiles with the user-level files and planted secret, seeded reports, the install script and `checklist.md`; T9 passes (AC-02, AC-03, AC-04, AC-05, AC-06, AC-07)
+- [ ] T11 `tests/vh-adlc/retro/runs/` - recorded runs on Claude Code and Codex: the three intake prompts, the first run and the second run, each graded by a fresh read-only subagent against `checklist.md`, with the AC-06 searches and before-and-after comparisons; every item passes on both hosts (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07)
 
 ## Open Questions
 
