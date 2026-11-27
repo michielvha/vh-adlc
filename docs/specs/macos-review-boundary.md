@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised for Codex spec review R-8: the recorded run is committed into the reviewed commit, and Git storage with a second hard link leaves a review pending. The next Codex spec review is pending."
+status_description: "Revised for Codex spec review R-9: the Git-storage link check is reverted and the recorded run is pinned to the reviewed code. The owner-directed gating spec pass on the host route is pending."
 issue: https://github.com/michielvha/vh-adlc/issues/187
 branch: feat/macos-review-boundary
 goal: "Spec and implementation reviews in this repository run on Codex from a Mac, with no owner step per review, and no reviewer process can change the owning worktree or the private clone once the review has been judged."
@@ -52,8 +52,8 @@ keeps its PID namespace unchanged.
 Seatbelt profiles can't nest, which has two consequences. Codex runs with its own sandbox off
 (`-s danger-full-access`) inside the route's profile. And a reviewer inside the profile can't run tests that
 start their own `sandbox-exec`, such as this feature's boundary tests. For this feature the owner directed
-the simplest answer on #187: the implementer runs those tests on this Mac outside any sandbox, at the exact
-reviewed commit, and records the command, the commit, the exit code and the output in a file committed
+the simplest answer on #187: the implementer runs those tests on this Mac outside any sandbox, at the code
+being reviewed, and records the command, the commit, the exit code and the output in a file committed
 into the commit the review targets. The Codex implementation reviewer reviews the code and judges those
 criteria from that recorded run, in place of the
 review protocol's rule against judging stored results. Run inside a sandbox, the route tests now fail once
@@ -67,14 +67,14 @@ Linux. The host Claude reviewer has the same access today through its Bash tool.
 reads that same session log, so it catches an accidental model mismatch but not a reviewer that forges its
 own log; the owner accepted that limit on #187. A review stays pending when a protected file already has a
 second hard link, when a scratch directory resolves onto a protected path, and when the protected tree
-changes while it is checked. That includes Git objects and refs, which an ordinary local `git clone`
-hard-links; the pending reason says to repack or to reclone with `--no-hardlinks`. The orchestrator chose this write posture under the owner's delegation; a deny-by-default
+changes while it is checked. Hard links on Git objects, which an ordinary local `git clone` creates, are a
+stated limit. The orchestrator chose this write posture under the owner's delegation; a deny-by-default
 profile would be a revision.
 
 What changed since the R-5 acceptance, from the Codex spec reviews R-6 and R-7 and the owner's answers on
 #187: the recorded unsandboxed run of the boundary tests and the loud failure inside a sandbox, replacing
 the earlier plan to review boundary-code changes on the host route; the scratch overlap check; a pending
-outcome when the protected tree changes during the link check; a link check on Git storage; the session-log stated limit; late writers released by
+outcome when the protected tree changes during the link check; two stated limits; late writers released by
 the test after the review returns; a script for the real-Codex proof that fails closed; the delivery path;
 and the files that decide routing, the reviewer's instructions and publication in `covers`.
 
@@ -169,11 +169,11 @@ In scope:
   denies writes to the paths the before-and-after check judges, minus `review_scratch`, and to each of
   their parent directories.
 - The route accepts that boundary in place of the PID namespace. Linux behaviour is unchanged.
-- Under that boundary, a review stays pending when a protected file, Git object or ref already shares an
-  inode with another path, when a `review_scratch` entry resolves onto a protected path, and when the
-  protected tree changes while it is checked.
+- Under that boundary, a review stays pending when a protected file already shares an inode with another
+  path, when a `review_scratch` entry resolves onto a protected path, and when the protected tree changes
+  while it is checked.
 - For this feature's implementation review, an owner-directed recorded run: the implementer runs the
-  boundary test files on this Mac outside any sandbox at the exact reviewed commit and records it, and the
+  boundary test files on this Mac outside any sandbox at the code being reviewed and records it, and the
   Codex reviewer judges the darwin-only criteria from that record.
 - The route test file fails once, with an "unsandboxed run" reason, on a process that has no boundary,
   instead of failing test by test.
@@ -210,6 +210,11 @@ Not handled: a reviewer that forges the Codex session log the model attestation 
 under `~/.codex`, which reviewer tool commands can write under posture A, on macOS and on Linux, and
 Codex's `--json` stream carries no model to check against. The attestation catches an accidental model
 mismatch, not deliberate tampering; the owner accepted this limit on #187 (R-6 F-02).
+
+Not handled: a Git file other than the index and HEAD, such as an object or a loose ref, that already
+shares an inode with a path outside the protected trees, as objects do after an ordinary local
+`git clone`. Changing one needs a deliberate in-place write through the other name; checking for them would
+leave every review pending for anyone with such a clone (R-1 F-02, R-6 F-03).
 
 ## Design
 
@@ -271,12 +276,8 @@ paths.
 **Pre-existing hard links.** Seatbelt checks the path a write goes through. It refuses a new hard link to
 a protected file, but a file that already has a second name outside the protected trees can be written
 through that name. Under the Seatbelt boundary, before the reviewer starts, the route checks the link count
-of every regular file in the owning worktree outside `.git` and the scratch directories, the index and
-HEAD, and every regular file under the common Git directory's `objects` and `refs`, plus `packed-refs`. If
-any count is above 1, the review stays pending with a reason naming the first such path. For a Git file the
-reason also says what to do: an ordinary local `git clone` shares object files by hard link, so run
-`git repack -a -d` in this repository or reclone with `git clone --no-hardlinks`, then retry. In this
-repository the Git part of the walk took about a second over 373 objects and found no linked file. The
+of every regular file in the owning worktree outside `.git` and the scratch directories, plus the index
+and HEAD. If any count is above 1, the review stays pending with a reason naming the first such path. The
 private clone needs no check, because the route makes it with `--no-hardlinks` (`review-route.ts:317`).
 Under the PID namespace no reviewer process survives the review, so the check doesn't run there. A file
 that disappears or can't be read during the check, for example because another session deletes it, leaves
@@ -335,8 +336,11 @@ commit, its exit code and its complete output go into one record file under
 evidence line names it. The record is committed on top of the code commit, and the implementation review
 targets that later commit, so the record is in the reviewer's private clone. Between the code commit and
 the reviewed commit only the feature document and the evidence directory may change; the record names the
-code commit, and `git diff --name-only <code commit> <reviewed commit>` in the clone shows that. The Codex
-reviewer judges AC-01 to AC-03, AC-08, AC-10 and AC-11 from the record while reviewing the code.
+code commit, and `git diff --name-only <code commit> <reviewed commit>` in the clone shows that. The owner's
+"exact reviewed commit" means this code commit, whose tree the reviewed commit carries unchanged apart from
+the document and the evidence (orchestrator under the owner's delegation, #187: "run it on the Mac at the
+code that's being reviewed"). The Codex reviewer judges AC-01 to AC-03, AC-08, AC-10 and AC-11 from the
+record while reviewing the code.
 
 **Delivery.** Merging publishes the plugin through the repository marketplaces, which serve
 `./plugins/vh-adlc` from the default branch; each host picks it up with its plugin update, Claude Code
@@ -381,19 +385,16 @@ sentence and links to `loop-settings.md`. The Instruction freshness section and
       with model `gpt-6.2-sol` and `model_attestation: codex-session` for both `spec review` and `review`.
 - [ ] AC-06: On this Mac, a real Codex spec review and a real Codex implementation review through
       `cli.ts review` come back `ready` with the served model attested from the session log, the
-      implementation review naming the recorded unsandboxed run. The owning worktree is unchanged
-      afterwards, both stored record sets pass `vh-adlc review check` and `vh-adlc lint`, and a committed
-      script reruns both, fails unless the outcome is `ready` and the worktree is unchanged, and keeps their
-      Codex transcripts.
+      implementation reviewer having read the recorded unsandboxed run, and the owning worktree is unchanged
+      afterwards. A committed script reruns both, fails unless the outcome is `ready` and the worktree is
+      unchanged, and keeps their Codex transcripts.
 - [ ] AC-07: `references/loop-settings.md` states the macOS boundary and what it denies, what stays
       writable, the pending cases, the `-s danger-full-access` requirement for Codex under it, and that tests
       starting their own `sandbox-exec` need a run outside any sandbox; `references/review-protocol.md` names
       the boundary and links to `loop-settings.md`.
 - [ ] AC-08: On macOS, a command-route review whose owning worktree holds a protected file with a second
-      hard link, or whose common Git directory holds an object or ref with one, stays pending with a reason
-      naming that file, and for a Git file saying to repack or to reclone with `--no-hardlinks`. A protected
-      tree that changes during that check leaves the review pending with a retryable reason instead of an
-      error.
+      hard link stays pending, with a reason naming that file, and a protected tree that changes during that
+      check leaves the review pending with a retryable reason instead of an error.
 - [ ] AC-10: Run on a process without a boundary, such as inside a Seatbelt sandbox,
       `tests/vh-adlc/loop/review-route.test.ts` reports one failure whose message says the route tests need
       an unsandboxed run, and skips its route tests instead of failing each one.
@@ -411,10 +412,10 @@ sentence and links to `loop-settings.md`. The Instruction freshness section and
 | AC-03 | `review-route.test.ts`: the existing `boundary: "unavailable"` test stays pending with the new reason. Darwin-only: a subprocess started under `sandbox-exec -p '(version 1)(allow default)'` runs the route, and the review stays pending with a reason naming the boundary (fails without the boundary precheck). |
 | AC-04 | `tests/vh-adlc/loop/owned-process.test.ts`: a subprocess with a `PATH` that holds no `unshare` imports the module fresh and calls `runOwnedClient(..., { pidNamespace: true })`. It resolves with `boundary: "marker"`. The subprocess keeps the module-level probe cache from hiding the case on Linux. Watched failing first: today the call throws `Executable not found`. |
 | AC-05 | Command: `bun plugins/vh-adlc/scripts/loop/cli.ts route --repo . --operation "spec review"` and `--operation review` print JSON with `"route":"command"`, `"model":"gpt-6.2-sol"` and `"model_attestation":"codex-session"`. Before the change both printed `"route":"host"`. |
-| AC-06 | `tests/vh-adlc/evidence/macos-review-boundary/run-review.sh <kind> <commit> <dir>`, run on this Mac for `spec` on this document and for `implementation` on the commit that holds the recorded run, with the committed `loop.yaml`. For each it keeps the route JSON read at that commit, the JSON outcome (`ready`, attested `gpt-6.2-sol`), `git status --porcelain` and the refs before and after (identical), the reply's records and the Codex session log of the run's thread as its transcript, and it exits nonzero unless the outcome is `ready` for that commit and nothing changed. The implementation run's transcript shows the reviewer reading the recorded run in its clone. After the records are stored, `vh-adlc review check` against the kept records and `vh-adlc lint` on the document both pass. |
+| AC-06 | `tests/vh-adlc/evidence/macos-review-boundary/run-review.sh <kind> <commit> <dir>`, run on this Mac for `spec` on this document and for `implementation` on the commit that holds the recorded run, with the committed `loop.yaml`. For each it keeps the route JSON read at that commit, the JSON outcome (`ready`, attested `gpt-6.2-sol`), `git status --porcelain` and the refs before and after (identical), the reply's records and the Codex session log of the run's thread as its transcript, and it exits nonzero unless the outcome is `ready` for that commit and nothing changed. The implementation run's transcript shows the reviewer reading the recorded run in its clone. The implementation review judges AC-06 from the spec review's kept artifacts and from its own dispatch, which the route only reaches with a `ready` outcome. Storing each record set and running `vh-adlc review check` against the kept records and `vh-adlc lint` on the document are the implementer's evidence after the review, recorded on T22, not part of what the review itself must observe. |
 | AC-07 | Read the changed paragraphs at the implementation commit and confirm each statement AC-07 lists, in `loop-settings.md`, and the name and the link in `review-protocol.md`. `tests/vh-adlc/direct-operation-compatibility.test.ts` still passes. |
-| AC-08 | Darwin-only tests in `review-route.test.ts`: (1) the fixture hard-links a tracked file to a path in the temporary directory before the review; the review stays pending with a reason naming that file, and the reviewer stub never runs (it would create a marker file; fails without the link-count check). (1b) An ordinary local `git clone` of the linked-worktree fixture's main checkout shares its object files; a review of the owning worktree then stays pending with a reason naming an object path and containing `git repack -a -d` and `--no-hardlinks`, and the stub never runs (fails without the Git-storage part of the check). (2) A unit test of the link check over a tree whose file is removed between the directory listing and the `lstat`, through a seam that removes it, returns the retryable pending reason and doesn't throw (fails without the guard). |
-| AC-10 | Run `/usr/bin/sandbox-exec -p '(version 1)(allow default)' bun test --timeout 60000 tests/vh-adlc/loop/review-route.test.ts` on this Mac, as part of the recorded run: one failure whose message contains "needs an unsandboxed run", the route tests reported as skipped, and the non-route tests passing. Watched failing first: before the change the same run gives 50 failures with per-test pending reasons. |
+| AC-08 | Darwin-only tests in `review-route.test.ts`: (1) the fixture hard-links a tracked file to a path in the temporary directory before the review; the review stays pending with a reason naming that file, and the reviewer stub never runs (it would create a marker file; fails without the link-count check). (2) A unit test of the link check over a tree whose file is removed between the directory listing and the `lstat`, through a seam that removes it, returns the retryable pending reason and doesn't throw (fails without the guard). |
+| AC-10 | Run `/usr/bin/sandbox-exec -p '(version 1)(allow default)' bun test --timeout 60000 tests/vh-adlc/loop/review-route.test.ts` on this Mac, as part of the recorded run: one failure whose message contains "unsandboxed run" (must pass: "The route tests need an unsandboxed run: this process is inside a Seatbelt sandbox, which cannot nest"; must fail: "no process boundary on this host" and a run with no failure), the route tests reported as skipped, and the non-route tests passing. Watched failing first: before the change the same run gives 50 failures with per-test pending reasons. |
 | AC-11 | Darwin-only tests in `review-route.test.ts`: a scratch entry that is a symlink to the owning worktree's root, one that is a symlink into the common Git directory, and one that is a symlink to the worktree's tracked `src` directory each leave the review pending with a reason naming the entry, and the reviewer stub never runs (fails without the overlap check). A real scratch directory and a scratch entry that is a symlink to a directory outside every protected path still let the stub write through them. |
 
 ## Tasks
@@ -437,8 +438,8 @@ sentence and links to `loop-settings.md`. The Instruction freshness section and
       Evidence: Each late writer now writes a `done` record and each late-writer test waits for it up to 10 seconds. Three consecutive runs of `bun test --timeout 60000 tests/vh-adlc/loop/review-route.test.ts` on this Mac: 52 pass, 1 fail each time. That one failure is the page-cache fixture #182 fixes. `python3 tests/vh-adlc/evidence/macos-review-boundary/mutants.py` gives the same result as before: every darwin test still fails against its part (denied paths 6, parent literal denies 2, Git-directory denies 2, clone 1, export 1, link-count check 1, boundary precheck 1).
 - [x] T8 `.vh-adlc/loop.yaml` - both reviewer roles routed to Codex with the accepted model and `model_attestation: codex-session`; the AC-05 `cli.ts route` commands print the expected JSON, where both printed `"route":"host"` before (AC-05)
       Evidence: Before: `bun plugins/vh-adlc/scripts/loop/cli.ts route --repo . --operation "spec review"` printed `{"role":"spec_reviewer","route":"host"}` and `--operation review` printed `{"role":"implementation_reviewer","route":"host"}`. After: both print `"route":"command"`, `"model":"gpt-6.2-sol"` and `"model_attestation":"codex-session"` with the Codex argv; `implement` stays `host`. `bun test --timeout 60000 tests/vh-adlc/loop/` on this Mac: 181 pass, 5 skip, 5 fail. All five fail because the page-cache stub writes where macOS does not read, which #182 fixes. `cli.ts context` reports `stale` here because it reads this repository's own `plugin.json` (0.34.0) as the running version while 0.33.0 is installed, which comes from developing the plugin inside its own repository.
-- [ ] T18 `tests/vh-adlc/loop/review-route.test.ts` - the AC-11 scratch overlap tests (root, Git storage and tracked-descendant symlinks refused; real and disjoint scratch allowed), the AC-08 Git-storage hard-link and changing-tree tests, the AC-10 loud failure, late writers released only after `ready`, and fixture Git calls that clear the repository-local Git variables with their check; the new tests fail on this Mac at T8 (AC-02, AC-08, AC-10, AC-11)
-- [ ] T19 `plugins/vh-adlc/scripts/loop/review-route.ts`, `plugins/vh-adlc/scripts/triage/owned-process.ts`, `tests/vh-adlc/evidence/macos-review-boundary/mutants.py` - the scratch overlap check with the profile built from the validated paths, the Git-storage link check with its repack-or-reclone reason, and the changing-tree guard; `review-route.test.ts` passes on this Mac apart from the page-cache stub, and the mutant script, extended with the allow rules, the overlap check, the Git-storage link check and the tree guard, shows each test failing against its part (AC-02, AC-08, AC-11)
+- [ ] T18 `tests/vh-adlc/loop/review-route.test.ts` - the AC-11 scratch overlap tests (root, Git storage and tracked-descendant symlinks refused; real and disjoint scratch allowed), the AC-08 changing-tree test, the AC-10 loud failure, late writers released only after `ready`, and fixture Git calls that clear the repository-local Git variables with their check; the new tests fail on this Mac at T8 (AC-02, AC-08, AC-10, AC-11)
+- [ ] T19 `plugins/vh-adlc/scripts/loop/review-route.ts`, `plugins/vh-adlc/scripts/triage/owned-process.ts`, `tests/vh-adlc/evidence/macos-review-boundary/mutants.py` - the scratch overlap check with the profile built from the validated paths, and the changing-tree guard; `review-route.test.ts` passes on this Mac apart from the page-cache stub, and the mutant script, extended with the allow rules, the overlap check and the tree guard, shows each test failing against its part (AC-02, AC-08, AC-11)
 - [ ] T20 `plugins/vh-adlc/references/loop-settings.md`, `plugins/vh-adlc/references/review-protocol.md` - the statements AC-07 lists, replacing the host-route sentence; `tests/vh-adlc/direct-operation-compatibility.test.ts` passes (AC-07)
 - [ ] T21 `tests/vh-adlc/evidence/macos-review-boundary/run-review.sh` - reads the route at the commit, compares status and refs before and after, keeps the records and the run's Codex session log, and exits nonzero unless the outcome is `ready` for that commit and nothing changed; a run against a commit with no command route exits nonzero (AC-06)
 - [ ] T22 `tests/vh-adlc/evidence/macos-review-boundary/recorded-run/` - once #182 has reached the branch, the owner-directed recorded run on this Mac outside any sandbox, in a fresh clone of the code commit: the boundary test files, the AC-10 sandboxed invocation and the mutant script, each with command, commit, exit code and output, committed on top of the code commit; then `run-review.sh` for `spec` on this document and for `implementation` on the commit that holds the record, the records stored, and `vh-adlc review check` and `vh-adlc lint` passing (AC-01, AC-02, AC-03, AC-06, AC-08, AC-10, AC-11)
