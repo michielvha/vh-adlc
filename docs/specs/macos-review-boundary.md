@@ -524,6 +524,30 @@ None.
 | 2026-11-27 | R-15 | implementation | `b8c1a07f` | gpt-6.2-sol | procedural | diagnostic AC-06 proof run on the final route code through the Codex command route (ready, attested, worktree unchanged); AC-02, AC-08 and AC-11 not met on new edge cases, AC-06 not verified |
 | 2026-11-27 | R-16 | implementation | `e274ff17` | gpt-6.2-sol | procedural | diagnostic AC-06 proof run on the final code (C3 `5168340e`) through the Codex command route: ready, attested, worktree unchanged; its artifacts are the AC-06 proof for the formal review |
 | 2026-11-27 | R-17 | implementation | `bc5cf01c` | gpt-6.2-sol | procedural | formal Codex implementation review: AC-01, AC-03, AC-04, AC-05, AC-07 and AC-10 met; AC-02, AC-06, AC-08 and AC-11 not met on edge cases, to be residualised by the orchestrator's decision |
+| 2026-11-27 | R-18 | spec | `6282c941` | claude-opus-5-5 | procedural | 1 blocking, 1 should-fix, 1 nit; host route, owner-directed drift re-review after #182 merged covered files; held for the owner on the reviewer environment |
+
+### R-18
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Scope (the "Not handled: writes outside the protected paths" posture A line), Design (Codex route; What the route denies), Context (Owner summary, trade-offs paragraph)
+EVIDENCE: `plugins/vh-adlc/scripts/loop/review-route.ts:416` builds the reviewer's environment as `{ ...process.env, ...request.env }` and passes it to `runOwnedClient` at line 420. `owned-process.ts:171` spawns with that environment plus only the marker. The line comes from 2aed641a (2026-11-13), so it predates this feature. This feature makes it live for this repository by committing the Codex `loop.yaml`. The pinned `conventions/coding.md:95-97` says "A process that runs user-supplied code gets an explicit allowlisted environment, never the parent's environment, which holds the platform's credentials". An implementation reviewer runs the candidate commit's tests, and the committed route gives it network access. R-17 F-05 (blocking) raised this, and so did R-16 F-04. The document never answers it. Its stated limit, posture A, covers writes outside the protected paths and network reach, but says nothing about the inherited environment or about reading credentials. The only answer is on issue #195 ("F-05 ... falls under posture A, which the owner accepted, so it isn't a residual"), and that is not in the document. The product profile lists the user's credentials as at stake, and exposing a credential is in the always-blocking class. `impl_review_clean` reads only the criterion records, so after a clean spec pass `vh-adlc next` would move on to ship with this finding still open in the latest implementation review.
+PROPOSAL: In Design, specify an allowlisted environment for the reviewer process: PATH, HOME, TMPDIR, LANG, CODEX_HOME and whatever else Codex needs to start and to write the session log the attestation reads. Add a criterion with a sentinel-variable test showing reviewer commands cannot see other controller variables. If the owner prefers to keep the inherited environment, that is a security-posture choice that goes against the repository's coding convention, so raise it as an Open Question and do not leave it to the #195 comment.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context (Owner summary: the "Observed so far on this Mac" and "Still planned" paragraph, and the trade-offs paragraph)
+EVIDENCE: At X the summary still says "T1 to T8 and T10 are built", that five loop tests fail because of the page-cache stub "which #182 fixes; the recorded run needs #182 merged first", and "Still planned: the scratch and tree checks, the single clear failure inside a sandbox, the runner that fails closed, the recorded unsandboxed run, the real Codex implementation proof run and the formal implementation review". The rest of the document disagrees. #182 is merged at 6c031566, and T19 evidence reports 208 pass and 0 fail. Every task through T27 is ticked. The recorded run is at 5168340e, R-16 and R-17 are stored, and AC-02, AC-06, AC-08 and AC-11 are unticked with residuals on #195 after R-17 returned not met. The summary mentions none of this: the four residualised criteria, R-17's two blocking findings (F-01, the alternate index changed by the route's clone, and F-05, the inherited environment), or the decision on #195 that F-05 falls under posture A. `conventions/feature-documents.md` (Owner summary in Context) requires the summary to be refreshed "when scope, proof or decisions change" and to tell planned checks apart from observed proof.
+PROPOSAL: Refresh the Owner summary to give the observed state at X: what R-17 met, the four criteria residualised to #195 with the edge case behind each, how R-17 F-05 is handled (see F-01), and that #182 is merged. Remove the "Still planned" items that are done.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: frontmatter (`status_description`)
+EVIDENCE: `status_description: "Being implemented on feat/macos-review-boundary; T18 to T22 remain, the recorded run after #182."` At X every task, T18 to T27 included, is ticked, #182 is merged, and the only remaining steps are this drift re-review and shipping with four residuals.
+PROPOSAL: Update the line to the current state, for example that all tasks are done, AC-02, AC-06, AC-08 and AC-11 are residualised on #195, and the feature waits for the drift spec review and merge.
 
 ### R-17
 
