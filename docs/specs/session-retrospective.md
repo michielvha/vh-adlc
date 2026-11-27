@@ -411,6 +411,7 @@ None.
 | 2026-11-15 | R-3 | spec | `09de0c3e2a106f48ae3f72e8859362a9193cc308` | claude-opus-5-5 | procedural | One blocking, ten should-fix and three nit findings |
 | 2026-11-15 | R-4 | spec | `fc1b66539fc6b13d92d6473230911e8fbaf31691` | claude-opus-5-5 | procedural | Eleven should-fix and three nit findings |
 | 2026-11-27 | R-5 | spec | `4f465f0348baea0bba3fbea1c5c6752f6510686a` | claude-opus-5-5 | procedural | Three should-fix and four nit findings |
+| 2026-11-27 | R-6 | spec | `f2fc74e65fddcfb902229042385ba973d2c8d2a8` | claude-opus-5-5 | procedural | One blocking, two should-fix and one nit finding |
 
 ### R-1
 
@@ -911,6 +912,36 @@ SEVERITY: nit
 WHERE: Context, Owner summary (report folder paragraph); Scope ("Not handled: a moved or renamed main checkout starts a new report folder")
 EVIDENCE: The Owner summary describes the folder as "one folder per repository, shared by all its worktrees". It does not say that moving or renaming the main checkout starts a fresh folder, which loses the recurrence history the Background gives as one of the two reasons for the machinery.
 PROPOSAL: Add one sentence to the Owner summary stating the moved-checkout limit.
+
+### R-6
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Context, Background (resume bullet, "Claude Code keeps a session as `<config>/projects/<working directory with / and . as ->/<id>.jsonl`"); Acceptance Criteria, Fixture table paragraph ("writes the result where the host looks for it: under `<CLAUDE_CONFIG_DIR>/projects/<encoded path>/`"); Test Plan rows AC-02, AC-03, AC-04, AC-05 and AC-07 (recorded runs on Claude Code)
+EVIDENCE: This revision added the encoding rule, and it is false for the directory the install script will most likely copy the fixture into. On this Mac, `echo $TMPDIR` prints `/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/` and `realpath $TMPDIR` prints `/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T`. `ls ~/.claude/projects` shows sessions started there filed as `-private-var-folders-sm-8hfqw9-97pgfmhlfs2t7k66c0000gn-T-tmp-b4oI9g8ZQO-work`. Claude Code encodes the resolved real path, so `/var` becomes `/private/var`, and it turns the underscore into `-` as well, not only `/` and `.`. An install script that follows the stated rule writes the template to `-var-folders-sm-8hfqw9_97pgfmhlfs2t7k66c0000gn-T-...`. `claude --print --resume <id>` then cannot find the session, so the Claude Code recorded runs that prove AC-02 to AC-05 and AC-07 cannot run as written.
+PROPOSAL: State the encoding as observed: take the real path of the working directory and replace every character that is not an ASCII letter or digit with `-`. Have the install script compute the folder from the real path of the fresh fixture copy, and cite the `ls ~/.claude/projects` output.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Scope ("Not handled: when compaction has removed the file name ... each such candidate names the earlier report, so the owner can see where it came from (R-5 F-02)"); Design, History (`recurs` holds "earlier keys, possibly empty"; "it records that key under `recurs` and adopts its slug"); Design, Report and save ("Per candidate the report gives ... its history"); AC-07 ("citing the seeded report"); Test Plan row AC-07 ("`recurs` citing the seeded key"); Context, Owner summary (compaction sentence)
+EVIDENCE: This revision added the stated limit, and its mitigation rests on each recurring candidate naming the earlier report. Nothing in the Design makes that happen. `recurs` holds keys of the form `<category>:<home class>:<slug>`, and because the new candidate adopts the earlier slug, the key is identical in every report that raised the problem, so it identifies no report. The Design does not say whether `history` returns the source file name with each candidate, and the report's "its history" is not defined. The AC-07 checklist item checks only "`recurs` citing the seeded key". An implementation that shows only the key passes every proof, and then the owner has no way to spot a false recurrence that compaction caused, which is the safeguard the limit promises.
+PROPOSAL: Have `history` return each candidate with the file name of its report, and have the report name that file for every `recurring` or `fix-not-held` candidate. Add "names the seeded report's file" to the AC-07 checklist item.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, Fixture table paragraphs ("The fixture repository has a lint configuration ... and a project procedure file"; "the install script copies the fixture repository to a fresh directory"); Fixture table rows P1, P2 and P7; Scope (last bullet, "a fixture repository ... with the script that installs them"); Test Plan row AC-06 ("compare `git status --porcelain` ... of the fixture repository")
+EVIDENCE: A fixture repository kept under `tests/vh-adlc/retro/` cannot carry its own committed `.git`, and a plain copy is not a Git repository. Yet `folder --repo` runs `git rev-parse --git-common-dir` (Design, Session and report folder), the AC-06 check runs `git status --porcelain`, and the skill "reads every file it cites, to give the line" (Design, Analysis). The document never says that the install script makes the copy a Git repository, or that its files and history match what the conversation claims. That means the committed banned call (P1), the committed duplicate helper (P7) and the generated file P2 edits, left unedited because the edit was caught. One implementer gives the copy a single commit holding none of that, and another reproduces the conversation's commits. The skill then cites lines that do not exist, or sees a history that contradicts the transcript, and the AC-02 and AC-05 grading can differ between the two.
+PROPOSAL: State that the install script initialises the copy as a Git repository whose working tree and commits match the planted conversation: P1's call and P7's duplicate committed at known lines, P2's generated file present and unedited. Add the fixture repository's expected files to the fixture paragraph.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Context, Owner summary ("that report counts as history, and its candidates can show as recurring"); Scope (second Not handled line, "can show as recurring or as fixes that did not hold")
+EVIDENCE: The summary sentence was added in this revision for R-5 F-02. It leaves out what the Scope line states: such candidates can also become fixes that did not hold, which Design, Severity and order always rates high.
+PROPOSAL: Change the summary to "can show as recurring, or as fixes that did not hold and rated high".
 
 ## Sources
 
