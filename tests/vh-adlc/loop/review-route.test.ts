@@ -358,8 +358,13 @@ describe("reply bytes", () => {
   });
   test("a reviewer that stops on a page outside the cache gives no records to store, with or without its header lines", async () => {
     const { parseReply } = await import("../../../plugins/vh-adlc/scripts/loop/review-route");
-    for (const reply of ["MODEL: m\nTARGET: abcdef1\n\nPAGE NOT CACHED: README.md\n", "PAGE NOT CACHED: conventions/go.md\r\n", "MODEL: m\nPAGE NOT CACHED: README.md"])
-      expect([reply, parseReply(reply)]).toEqual([reply, { error: `the reviewer stopped: page not cached: ${/PAGE NOT CACHED: (\S+)/.exec(reply)![1]}` }]);
+    for (const [reply, page] of [["MODEL: m\nTARGET: abcdef1\n\nPAGE NOT CACHED: README.md\n", "README.md"], ["PAGE NOT CACHED: conventions/go.md\r\n", "conventions/go.md"],
+      ["MODEL: m\nPAGE NOT CACHED: README.md", "README.md"],
+      // A model may format the stop line a little differently; each variant still stops the review.
+      ["MODEL: m\nTARGET: abcdef1\n\n`PAGE NOT CACHED: README.md`\n", "README.md"], ["MODEL: m\nTARGET: abcdef1\n\nPAGE NOT CACHED: README.md (absent from the cache)\n", "README.md"],
+      ["MODEL: m\nTARGET: abcdef1\n\nPAGE NOT CACHED: README.md.\n", "README.md"], ["MODEL: m\nTARGET: abcdef1\n\nPAGE NOT CACHED: `guides/a.md`\n", "guides/a.md"],
+      ["MODEL: m\nTARGET: abcdef1\n\n- **PAGE NOT CACHED:** \"README.md\"\n", "README.md"], ["MODEL: m\nTARGET: abcdef1\n\n> PAGE NOT CACHED:\n", "unnamed"]] as const)
+      expect([reply, parseReply(reply)]).toEqual([reply, { error: `the reviewer stopped: page not cached: ${page}` }]);
     // A record that only mentions the marker inside its text is still a record.
     expect(parseReply("MODEL: m\nTARGET: abcdef1\n\nFINDING: F-01\nEVIDENCE: the reviewer prompt says PAGE NOT CACHED: README.md\n")).toMatchObject({ model: "m" });
   });

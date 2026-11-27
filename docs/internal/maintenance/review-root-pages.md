@@ -28,8 +28,8 @@ Proposed change:
 
 1. `reviewPages` keeps the convention-path pattern for both `AGENTS.md` files. From the docs revision's `AGENTS.md` it also takes relative Markdown link targets ending in `.md`, anchor and query removed. A target with a scheme, an absolute path or a path that leaves the repository is skipped. For each root page that file links (no directory, other than `AGENTS.md`), it reads the cached page and adds the pages that page links, one level deep. Links in the reviewed repository's `AGENTS.md` name that repository's own files, so they are not requested.
 2. `cacheReviewPages` fetches in up to three rounds: base pages, then pages from the docs `AGENTS.md`, then pages from the root pages it links.
-3. The reviewer reads conventions only from the cache. On an unreadable page it replies with the single line `PAGE NOT CACHED: <page>` after any header lines the dispatch asks for.
-4. `parseReply` turns a reply that contains that line on its own into an error, so `runReviewRoute` returns `pending` with reason `the reviewer stopped: page not cached: <page>`.
+3. The reviewer reads conventions only from the cache. It may fill the cache with its own `knowledge --page <page>` call when the result names the given revision, as the agent file already allows it to run `knowledge`. If the page is still unreadable, it replies with the single line `PAGE NOT CACHED: <page>` after any header lines the dispatch asks for.
+4. `parseReply` turns a reply with a line that starts with `PAGE NOT CACHED:` into an error, so `runReviewRoute` returns `pending` with reason `the reviewer stopped: page not cached: <page>`. It ignores leading list or quote markers, emphasis, backticks and quotes, and trailing text. The page is the first path-like token without trailing dots, or `unnamed` when there is none. A stop line in slightly different formatting therefore never passes as records (R-1 F-01).
 5. `review-protocol.md` Routes documents both rules.
 6. Test support: the pages stub writes to the cache directory the CLI reads on the current platform, under `HOME/Library/Caches` on macOS. Before this change every stub-backed caching test failed on macOS because the stub wrote only under `XDG_CACHE_HOME`.
 
@@ -55,9 +55,44 @@ Before the `parseReply` change, the new `reply bytes` case failed. A reply carry
 
 `go vet ./...` passes. `go test ./...` fails only in `internal/clean` (Unix socket path length) and the `cmd/vh-adlc` clean and env tests (`TestEnvPointsGoTestAtTheRoot`, `TestEnvShFailurePrintsNothing`, `TestCleanAndEnvIgnorePin`, `TestGoldenCleanAndEnv`), the known macOS-only failures. No Go file changed.
 
+After R-1:
+
+- F-01: the `reply bytes` case gained the backticked, trailing-text, trailing-dot, backticked-page, list-and-emphasis and page-less variants. It failed on the exact-line parser, where the backticked form parsed as records, and passes with the lenient one. The case where a record only mentions the marker inside an `EVIDENCE` line still parses as records.
+- F-02: the README fixture now gives `conventions/go.md` (linked from `README.md`) and `conventions/coding.md` (a nested page linked from `AGENTS.md`) a further link each, and asserts that neither `conventions/deep.md` nor `guides/nested.md` gets requested. Two mutations made the test fail as expected: following links from every page `AGENTS.md` links requested `guides/nested.md`, and following a second level requested `conventions/deep.md`. Both mutations were reverted and the test passes.
+- F-03: the agent file and the protocol now say the reviewer may fill the cache with its own `knowledge` call for the given revision before it stops.
+
 Not yet run: the full plugin checker, and the Linux-only dispatch tests, which need Linux CI.
 
 ## Reviews
+
+### R-1
+
+Target: `5f4d93993732df5fbdf6d1c899c830c0a743ccee`
+Model: claude-opus-5-5
+Isolation: procedural
+
+```text
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: plugins/vh-adlc/scripts/loop/review-route.ts parseReply (line 244); plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md (Rules, cache paragraph); plugins/vh-adlc/references/review-protocol.md (Routes); docs/internal/maintenance/review-root-pages.md (Proposed change step 4)
+EVIDENCE: The stop is only detected when a line matches exactly `/^PAGE NOT CACHED: (\S+)\r?$/m`, and runReviewRoute returns `ready` with whatever follows the header lines without checking the record format (review-route.ts lines 350 to 360). I ran parseReply on four close variants of the reply. "`PAGE NOT CACHED: README.md`" (the backticked form the agent file prints) parsed as records: {"model":"m","target":"abcdef1","records":"`PAGE NOT CACHED: README.md`\n"}. "PAGE NOT CACHED: README.md (absent from the cache)" also parsed as records. "PAGE NOT CACHED: README.md." and "PAGE NOT CACHED: `README.md`" were caught, but the reason then carries the punctuation. A model reviewer that formats the stop line a little differently gets a `ready` result, and the protocol tells the dispatcher to store `records` under `### R-<n>` before it runs `review check`. That stores a non-record in the Review Log, the same kind of false stored result issue #142 describes. The marker fails open, not closed.
+PROPOSAL: Detect the marker leniently (for example, a line whose text after stripping backticks, quotes and leading list markers starts with `PAGE NOT CACHED:`, page taken as the first path-like token), or have runReviewRoute return pending when the records do not start with `FINDING:`, `CRITERION:` or `NO FINDINGS`. Add the backticked and trailing-text variants to the `reply bytes` test.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: tests/vh-adlc/loop/pages.test.ts; tests/vh-adlc/loop/cli.test.ts ("a docs revision whose AGENTS.md routes through README.md ..."); plugins/vh-adlc/scripts/loop/pages.ts reviewPages; plugins/vh-adlc/references/review-protocol.md (Routes, "one level deep")
+EVIDENCE: Both tests pass at the target (`bun test tests/vh-adlc/loop/pages.test.ts`: 2 pass; `-t "reply bytes"` in review-route.test.ts: 2 pass). Run against the task base pages.ts in a scratch copy, the README case fails because README.md, conventions/go.md and examples/static/README.md are missing, so the regression proof holds. No fixture checks the documented depth bound or the root-only rule, though. None of the linked pages (conventions/go.md, examples/static/README.md, guides/a.md) links further, so an implementation that recursed without limit, or followed links from nested pages, would pass every test. The protocol now promises "one level deep", and the bound matters because every extra link is one more page that can break every review at the revision.
+PROPOSAL: In the README fixture, give conventions/go.md a link to a further page (for example `[x](conventions/deep.md)`), and give a nested page linked from AGENTS.md a link too, then assert that neither is requested.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md (Rules, "Read only that cache ... If a page cannot be read there, stop"); plugins/vh-adlc/references/review-protocol.md (Routes, "a host dispatch stores nothing either")
+EVIDENCE: The new rule now covers host-route reviews too. Before this change, a host reviewer that could not read a page returned a stored finding; now the review stays pending. A host dispatch pre-caches only the pages its skill names (vh-adlc-review SKILL.md Start step 1: feature-documents.md, delivery.md, humanize-prose.md). Nothing caches README.md or the pages routed from it. The same agent file lets the reviewer run `vh-adlc knowledge`, which writes into that cache, but the new text does not say whether the reviewer may fetch a missing page that way before it stops. Two reviewers could read the rule differently: one fetches the page and continues, the other stops pending. Both outcomes are safe. This is clarity, not eligibility: issue #142's done-when asks for the stop rule without limiting it to the command route, and I judge the change an eligible restoration of the existing "uncached page leaves the review pending" contract.
+PROPOSAL: State in one clause whether a reviewer may run `vh-adlc knowledge --page <page>` to fill the cache before it replies `PAGE NOT CACHED`, or say that only the dispatcher caches.
+```
 
 ## State
 

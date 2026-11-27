@@ -25,8 +25,9 @@ Before dispatching, read the reviewer role's route:
   under `### R-<n>` with a Review Log row naming its `model` and isolation `procedural`, then run
   `review check` against the same text. On `pending`, store nothing and report a line that starts with
   `review pending`, followed by its `reason`, with the raw `reply` in the handoff. A reviewer that cannot
-  read a page from the cache replies `PAGE NOT CACHED: <page>` instead of records and never reads it from
-  a local clone; the command route returns that as `pending`, and a host dispatch stores nothing either
+  read a page from the cache, after its own `knowledge` call for that revision where it can make one,
+  replies `PAGE NOT CACHED: <page>` instead of records and never reads it from a local clone. The
+  command route detects that line in any light formatting; the command route returns that as `pending`, and a host dispatch stores nothing either
   and reports `review pending` with that page.
 
 For a spec review, both routes take its scope from one computation:

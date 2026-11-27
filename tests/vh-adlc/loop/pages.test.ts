@@ -34,7 +34,9 @@ console.log(JSON.stringify(cacheReviewPages(JSON.parse(process.env.INPUT))));`],
 test("a docs AGENTS.md that routes through README.md caches README.md and every page README.md links", () => {
   const stub = pagesStub("abc", { pages: {
     "AGENTS.md": "1. Read [README.md](README.md) and follow its task route.\n2. Read [coding](conventions/coding.md).\n",
-    "README.md": "For Go, read [Go](conventions/go.md) and the [example](examples/static/README.md#setup).\nSee [the site](https://example.com/x.md), [mail](mailto:a@example.invalid) and [the agents](AGENTS.md).\n" } });
+    "README.md": "For Go, read [Go](conventions/go.md) and the [example](examples/static/README.md#setup).\nSee [the site](https://example.com/x.md), [mail](mailto:a@example.invalid) and [the agents](AGENTS.md).\n",
+    // One level only: a page README.md links, and a nested page AGENTS.md links, route nothing further.
+    "conventions/go.md": "See [deeper](conventions/deep.md).\n", "conventions/coding.md": "See [nested](guides/nested.md).\n" } });
   const { root, commit } = repo("Specs live in [the specs](docs/specs/f.md). Read conventions/testing.md.\n");
   const result = cached(stub, root, commit);
   expect(result).toEqual({ pages: ["AGENTS.md", "README.md", "conventions/coding.md", "conventions/feature-documents.md", "conventions/go.md",
@@ -43,6 +45,8 @@ test("a docs AGENTS.md that routes through README.md caches README.md and every 
   const requested = readFileSync(stub.log, "utf8");
   expect(requested).not.toContain("docs/specs/f.md");
   expect(requested).not.toContain("example.com");
+  expect(requested).not.toContain("conventions/deep.md");
+  expect(requested).not.toContain("guides/nested.md");
 });
 
 test("a link that leaves the docs repository is not requested", () => {
