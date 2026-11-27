@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Back to draft for the owner's review-model rename to gpt-6.2-sol, revised for R-4; T1 to T7 are done."
+status: planned
+status_description: "Accepted again at R-5 with gpt-6.2-sol; re-entering implementation on feat/macos-review-boundary."
 issue: https://github.com/michielvha/vh-adlc/issues/187
 branch: feat/macos-review-boundary
 goal: "Spec and implementation reviews in this repository run on Codex from a Mac, with no owner step per review, and no reviewer process can change the owning worktree or the private clone once the review has been judged."
@@ -344,6 +344,7 @@ None.
 | 2026-11-27 | R-3 | spec | `b6f3156b` | n/a | n/a | accepted by owner |
 | 2026-11-27 | R-4 | spec | `b765e737` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 2 nits; full pass after the gpt-6.2-sol rename; host route |
 | 2026-11-27 | R-5 | spec | `58342e95` | claude-opus-5-5 | procedural | clean: 0 blocking, 1 should-fix and 2 nits, all outside the normative baseline (Tasks, Context); host route |
+| 2026-11-27 | R-5 | spec | `58342e95` | n/a | n/a | accepted by owner |
 
 ### R-5
 
