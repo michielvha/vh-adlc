@@ -20,30 +20,35 @@ proportional review lost.
 
 The proportional review feature made spec reviews rate findings by consequence for the product. On the
 enterprise replay case, that cost two real should-fix defects: label L-08 on the Claude route and L-10 on
-the Codex route. Reading the stored review records showed why. The old reviewer only ever raised these
-defects as a clause inside a wider finding. The new reviewer still writes the wider finding, but frames it
-around one consequence and drops the clause.
+the Codex route. The stored review records point to a likely cause. The old reviewer only ever raised these
+defects as a clause inside a wider finding. The new reviewer still writes the wider finding, framed around
+one consequence, and in most passes the clause is gone. Chance is not ruled out; the replay tests the
+cause.
 
 This feature adds one sentence to the reviewer brief: when a finding covers several distinct defects, name
 each of them, in the same finding or as separate findings, and drop none. Nothing else in the brief, the
 conventions or the binary changes. The plugin's patch version goes up with it.
 
 The check is a replay of first-pass spec reviews on the enterprise case, on the case host. The brief under
-test is the replayed new brief plus the sentence and nothing else, so the result measures the sentence
-alone. It runs on a copy of the case directory, so the stored results stay untouched. It costs about 6
-Claude passes and 6 Codex passes, plus 6 more of either where a label still fails and the harness asks for
-confirmation passes. Pass conditions:
+test is the replayed new brief plus the sentence and nothing else, so the replay measures the sentence on
+that brief. The shipped brief has had other edits since, which no replay covers. The replay runs on a copy
+of the case directory, so the stored results stay untouched. It costs 6 counted passes per route, or 12
+when any label still fails after 6, which is likely on the Claude route. Executions that fail add more.
+Pass conditions:
 
-- L-08 passes retention on the Claude route and L-10 on the Codex route.
-- No label the new brief retained is lost.
-- Blocking findings per pass rise by at most one on average on each route, so the change does not undo
-  what proportional review gained.
+- L-08 is raised at its minimum severity on the Claude route, and L-10 on the Codex route, in at least 2 of
+  6 passes, or 3 of 12. A single hit could be chance.
+- No label the new brief raised reliably, in 6 or more of 12 passes, is lost. The 16 label and route pairs
+  it raised less often are reported but do not decide the result, because they could miss by chance alone.
+- The mean of blocking findings per pass stays within the new brief's normal spread on each route, so the
+  change does not undo what proportional review gained.
 
 If the replay fails, the sentence does not ship. The owner then keeps both labels as known losses, which is
 the alternative this feature has to beat.
 
 Acceptance authorizes the brief edit, the patch-version bump, the replay on the case host and publishing
-counts-only results. Merging the PR needs the owner. Nothing has been reviewed or run yet.
+counts-only results. Merging the PR needs the owner. Nothing has run yet. The first spec review found that
+the pass conditions could fail or pass by chance; they now use thresholds set from the measured spread.
 
 ### Background
 
@@ -68,6 +73,8 @@ host, citing the case only by label ID and count
   defect. The other passes do not raise it.
 - The analysis rules out two other explanations. The plausible-choice rule does not apply, because neither
   label is a settled trade-off. The stated-limit rule does not apply, because the document at X' has none.
+- Chance is not ruled out. The old brief raised each label in only 2 of 3 passes, so its true rate is
+  uncertain. The records point to dropped side points as the likely cause, and the replay tests it.
 
 The simplest alternative without machinery is to accept both losses and change nothing. One sentence of
 brief is prose, not machinery, and it beats that alternative only if the replay shows the labels come back
@@ -81,12 +88,20 @@ the way to its main point.
 Measured on the stored counted first passes of the enterprise case (counts of `SEVERITY:` lines, run on the
 case host on 2026-11-27):
 
-| Brief | Route | Counted passes | Blocking per pass, mean | Should-fix per pass, mean |
-| --- | --- | --- | --- | --- |
-| old | host | 3 | 3.33 | 23.33 |
-| old | command | 3 | 16.33 | 16.00 |
-| new | host | 12 | 5.67 | 16.25 |
-| new | command | 12 | 21.25 | 10.58 |
+| Brief | Route | Counted passes | Blocking per pass, mean | Blocking, standard deviation | Should-fix per pass, mean |
+| --- | --- | --- | --- | --- | --- |
+| old | host | 3 | 3.33 | not used | 23.33 |
+| old | command | 3 | 16.33 | not used | 16.00 |
+| new | host | 12 | 5.67 | 1.44 | 16.25 |
+| new | command | 12 | 21.25 | 3.41 | 10.58 |
+
+Of the 75 enterprise label and route pairs that pass retention under the new brief, 59 were raised at the
+severity the retention rule tests in 6 or more of 12 passes. The rule tests the minimum severity when the
+old brief raised the label at its minimum in 2 or more passes, and any severity otherwise
+(`tests/vh-adlc/replay/run.ts:268-270`). The other 16 were raised in 0 to 5 of 12. These are command L-15,
+L-18, L-41 and L-43, and host L-02, L-09, L-10, L-15, L-18, L-20, L-24, L-32, L-34, L-35, L-39 and L-41
+(`tests/vh-adlc/evidence/proportional-review/results.md`, enterprise retention table). For a pair raised in 6
+of 12, the chance of 0 in 12 is under 0.1%. For host L-41, raised in 2 of 12, it is about 11%.
 
 ## Scope
 
@@ -100,8 +115,8 @@ In scope:
 
 Out of scope:
 
-- The small-application case. The owner set the replay budget at about 6 Claude and 6 to 12 Codex passes,
-  and the small-application case lost no label.
+- The small-application case. It lost no label, and the replay budget is up to 12 counted passes per route
+  on the enterprise case.
 - Full replay loops, and the rounds bar of the proportional review. First passes are where both losses
   were measured. Finishing the enterprise Codex loop stays under D-19.
 - Any change to `conventions/feature-documents.md` in `vhco-pro/docs`, to severity rules or to the binary.
@@ -124,9 +139,12 @@ already found.
 is plugin commit `ef685da1` with the sentence added in the same place, and docs `0fa68d68`. That is the
 replayed new brief, at the commit its 12 counted first passes per route used
 (`tests/vh-adlc/evidence/proportional-review/results.md:9`). The commit is an experiment, kept on a branch
-`exp/reviewer-side-points` that is never merged. The shipped change is the same sentence on the default
-branch, where the paragraph around it has since been reworded (`57b33e73`). The tasks will check that both
-commits carry the sentence byte for byte.
+`exp/reviewer-side-points` that is never merged. The shipped change is the same sentence in the same
+paragraph on the default branch. That paragraph is unchanged since `ef685da1`, but the brief around it is
+not. `57b33e73` rewords the two paragraphs before it, `ee8e6c82` and `ea11072b` change the page-cache rule
+in the Rules section, and the default branch runs under docs pin `e79eaa6a`, not `0fa68d68`. The replay
+measures the sentence on the `ef685da1` brief. The shipped combination is not replayed. The tasks will
+check that both commits carry the sentence byte for byte.
 
 **The replay.** It uses `tests/vh-adlc/replay/run.ts` unchanged:
 
@@ -141,13 +159,22 @@ commits carry the sentence byte for byte.
 - The route settings are the case's `routes.json` unchanged. The Codex route runs
   `@openai/codex@0.170.0` through `npm exec` inside `unshare`, with `gpt-6.2-sol` and medium reasoning
   effort, as every earlier Codex replay run did. The Claude route runs `claude-opus-5-5`.
-- The harness counts 6 new-brief first passes per route, and 6 more where a label fails, its existing rule
-  (`run.ts:48`, `run.ts:258-275`). It refuses a run whose route or model differs from the settings.
-- AC-03 uses the harness's retention rule as it stands, so a label can fail by chance. The analysis puts
-  that chance at under 1% per label. Of the 79 label and route pairs the new brief retained, it raised 46
-  at their minimum in 9 or more of 12 passes (`tests/vh-adlc/evidence/proportional-review/results.md`,
-  retention table). A failure under AC-03
-  counts as a failure. It is not rerun to get a pass.
+- The harness counts 6 new-brief first passes per route, and extends the set to 12 when any label fails
+  retention after 6 (`run.ts:48`, `run.ts:578`). A run that reports another route or model is recorded as
+  not counted and replaced, up to the harness's limit of three runs per needed pass (`run.ts:227-236`).
+- AC-02 asks for 2 hits in 6 or 3 in 12, not the single hit the harness's retention rule accepts
+  (`run.ts:268-270`). The old brief raised each label in 2 of 3 passes. At a leftover rate of 5% per pass,
+  a single hit in 12 passes would happen about 46% of the time, while 3 in 12 would happen about 2% of
+  the time.
+- AC-03 checks only the 59 pairs the new brief raised in 6 or more of 12 passes, listed by complement in the
+  Background. For each of them a chance failure is under 0.1%. Eight of the 16 lower-rate pairs can fail
+  at all under the rule, and a sentence with no effect would make at least one of those eight fail about 16%
+  of the time, so all 16 are reported only.
+- AC-04's bound is the new brief's mean plus two standard errors of the difference between two means:
+  mean + 2 × sd × √(1/n + 1/12), with the Background's standard deviation and n the number of counted
+  passes under the brief under test. With 6 passes: host 7.11, command 24.66. With 12: host 6.85, command
+  24.03. A sentence with no effect exceeds it about 2% of the time.
+- A failure under any criterion counts as a failure. It is not rerun to get a pass.
 
 The harness's `--results` file goes to scratch first. Before anything is committed, the private-terms check
 runs on it (`run.ts terms --case <copy> --file <results>`). Only counts and run identities are copied to
@@ -169,13 +196,14 @@ before the upgrade keeps the brief it loaded. No state, schema or boundary chang
 - [ ] AC-01: The reviewer brief on the default branch tells the reviewer, under every docs revision, to name
       each distinct defect a finding covers, in that finding or as its own finding, and not to drop a
       secondary one. The plugin's patch version is one higher than before the change.
-- [ ] AC-02: On the enterprise case, under the brief under test, L-08 passes retention on the host route and
-      L-10 passes retention on the command route.
-- [ ] AC-03: No enterprise label that passes retention under the replayed new brief fails retention under the
-      brief under test, on either route.
+- [ ] AC-02: On the enterprise case, under the brief under test, L-08 is raised at its minimum severity on the
+      host route, and L-10 at its minimum severity on the command route, each in at least 2 of 6 counted
+      first passes, or 3 of 12 when the set was extended.
+- [ ] AC-03: None of the 59 enterprise label and route pairs that the replayed new brief raised in 6 or more of
+      12 passes fails retention under the brief under test.
 - [ ] AC-04: On each route, the mean number of blocking findings per counted first pass under the brief under
-      test is at most one more than the replayed new brief's: 6.67 on the host route and 22.25 on the command
-      route.
+      test is within the bound Design gives: host 7.11 and command 24.66 with 6 passes, host 6.85 and
+      command 24.03 with 12.
 - [ ] AC-05: `tests/vh-adlc/evidence/reviewer-side-points/results.md` holds the brief identities, every run's
       identity and status, the retention verdicts and the blocking and should-fix means. The private-terms
       check passes on it.
@@ -184,9 +212,9 @@ before the upgrade keeps the brief it loaded. No state, schema or boundary chang
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | Manual procedure: `git show origin/main:plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` contains the sentence from Design verbatim, outside any paragraph limited to one docs revision. Both plugin manifests show the patch version one above `0.33.1`, or one above whatever main holds when T2 lands. |
-| AC-02, AC-03 | `bun tests/vh-adlc/replay/run.ts run --only first-passes --routes-under-test host` and then `command`, against the case copy, with the arguments in Design. Pass: the results file's retention table shows `pass` for host L-08 and command L-10, and no label `fail` that `tests/vh-adlc/evidence/proportional-review/results.md` shows as `pass` on the same route. |
-| AC-04 | Manual procedure on the case host: for each counted first pass in the copy's `runs/new-<route>-pass-*.txt` with a `.verdicts.json` beside it, count lines starting `SEVERITY: blocking`, and take the mean per route. Pass: host at most 6.67, command at most 22.25. |
+| AC-01 | Manual procedure: `git show origin/main:plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` contains the sentence from Design verbatim, outside any paragraph limited to one docs revision. Both plugin manifests show the patch version one above `0.33.1`, or one above whatever main holds when the bump lands. |
+| AC-02, AC-03 | `bun tests/vh-adlc/replay/run.ts run --only first-passes --routes-under-test host` and then `command`, against the case copy, with the arguments in Design. Pass: the results file's retention table shows host L-08 and command L-10 at their minimum in at least 2 of 6 or 3 of 12 new runs, and none of the 59 pairs named in Background shows `fail`. |
+| AC-04 | Manual procedure on the case host: for each counted first pass in the copy's `runs/new-<route>-pass-*.txt` with a `.verdicts.json` beside it, count lines starting `SEVERITY: blocking`, and take the mean per route. Pass: at most the bound in AC-04 for the number of counted passes. |
 | AC-05 | `bun tests/vh-adlc/replay/run.ts terms --case <copy> --file tests/vh-adlc/evidence/reviewer-side-points/results.md` prints pass, and the file has the four parts AC-05 names. |
 
 ## Tasks
