@@ -590,6 +590,30 @@ None.
 | 2026-11-27 | R-18 | spec | `6282c941` | claude-opus-5-5 | procedural | 1 blocking, 1 should-fix, 1 nit; host route, owner-directed drift re-review after #182 merged covered files; held for the owner on the reviewer environment |
 | 2026-11-27 | R-19 | spec | `29fc0f7c` | claude-opus-5-5 | procedural | 2 blocking, 3 should-fix; host route; convergence trigger fired (R-18 had 1 blocking), held for the owner on credential stores |
 | 2026-11-27 | R-20 | spec | `4a90e8cb` | claude-opus-5-5 | procedural | 1 blocking, 4 should-fix; host route, owner-directed |
+| 2026-11-27 | R-21 | spec | `bfeba473` | claude-opus-5-5 | procedural | 1 blocking, 2 should-fix; host route; convergence trigger fired (R-20 had 1 blocking), held for the owner |
+
+### R-21
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design (Credential read denies; Profile: "A later Seatbelt rule overrides an earlier one, so the allows carve the scratch directories out of the denies"; Scratch overlap), Acceptance Criteria (AC-13), Test Plan (AC-13), Tasks (T32)
+EVIDENCE: The new store write denies and store parent literal denies are what stop the rename bypass, but the Design never says where they go relative to the `(allow file-write* (subpath (param "A0")))` scratch allows, which the Profile paragraph puts last so they override earlier denies. The scratch overlap check (Design; `scratchOverlap` at `review-route.ts:363-370`) only refuses an allow that touches the worktree, Git directories, clone or export, and it explicitly allows "a symlink to a directory disjoint from every denied path". `review_scratch` comes from the reviewed commit (`cli.ts:181-182`, `cli.ts:196`), and the allows include entries under the private clone, which holds the candidate's committed symlinks (`review-route.ts:402-404`). So a candidate commit that declares `review_scratch: [cache]` and commits `cache -> <home>/.ssh` (or `-> <home>/.config`) passes the overlap check and gets a write allow over the store. I measured this on this Mac with a profile file holding `(deny file-read* (subpath R0) (literal R1))(deny file-write* (subpath R0) (literal R1) (literal P0) (literal P1) (literal P2))`, R0 a fake `home/.ssh`. Without an allow: `cat` of the key, `mv home/.ssh`, `mv home/.netrc`, `mv home` and `mv home/.ssh/id_test /private/tmp/r21m/out` all gave "Operation not permitted", while `touch home/new` and `cat home/notes.txt` worked, which confirms the Design's rename claim. With `(allow file-write* (subpath A0))` appended, A0 = `home/.ssh`: `cat` of the key was still refused, but `mv home/.ssh/id_test /private/tmp/r21m/out && cat /private/tmp/r21m/out` printed SECRET and exited 0. An implementer who appends the new rules before the allows, which is what the Profile paragraph's ordering suggests, builds a read deny that a candidate's tests can get past, and the AC-13 test never declares a scratch entry, so it passes on that build. Reaching a credential is in the always-blocking class. This traces to the change this revision made (the store and parent write denies).
+PROPOSAL: In Design, put the credential rules (read denies, store write denies and their parent literal denies) after the scratch allows so no allow can override them, and also have the scratch overlap check refuse an allow that equals, contains or lies inside a store or a store's parent. Add an AC-13 test case with a scratch symlink to the fake home's `.ssh` that must leave the review pending or keep the move refused, and give it a mutant.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan (AC-13, part (2)), Acceptance Criteria (AC-13: "directly or by renaming a store or a directory above it"), Design (Credential read denies: "subpath for the directories, literal for the two files"), Tasks (T31, T32)
+EVIDENCE: Part (2) renames only `.ssh` (a directory store) and `.config` (a parent). No case renames a file store, although R-20 F-01 measured `mv home/.netrc home/n2 && cat home/n2` as a bypass. The "store write denies" mutant removes every store write deny at once, so the `.ssh` case catches it. An implementation that writes the store denies only for the six directories and leaves out the literal write deny on `.netrc` and `.git-credentials` passes every listed check, and `mv ~/.netrc ~/n2 && cat ~/n2` still reads the file. In the same way, an implementation that adds a literal deny only on each store's direct parent passes, because no case renames the fake home itself.
+PROPOSAL: Add to part (2) a rename of `.netrc` and a rename of the fake home itself, each followed by a read through the new path, and require all of them to be refused.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Credential read denies: "a `literal` write on every parent directory of a store up to `/` ... still lets the reviewer create and change other files beside the stores"; "each resolved through its longest existing prefix")
+EVIDENCE: The stores are resolved through their longest existing prefix, so they can name paths that do not exist, and the Design puts a literal write deny on every parent of each store. When `~/.config` does not exist, `~/.config` itself gets a literal deny. I measured `/usr/bin/sandbox-exec -p '(version 1)(allow default)(deny file-write* (literal (param "P")) (subpath (param "S")))' -D P=<home>/.config -D S=<home>/.config/gh mkdir -p <home>/.config/other`: it exited 1 with "mkdir: <home>/.config: Operation not permitted". On a Mac without `~/.config`, any reviewer command or candidate test that creates a file under `~/.config/<tool>` fails, contrary to the Design's claim that writes beside the stores keep working. A parent that does not exist can't be renamed to expose anything, because the store under it stays write-denied.
+PROPOSAL: Say in Design that the parent literal denies cover only the existing parent directories of each store, and add a test case or measurement where `.config` is absent and a write to `.config/other` succeeds while `.config/gh` stays refused.
 
 ### R-20
 
