@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised for spec review R-3; waiting for the next spec review."
+status_description: "Spec review R-4 is clean; waiting for the owner's acceptance."
 issue: https://github.com/michielvha/vh-adlc/issues/180
 goal: "An orchestrator archives a sub-session only when the forge shows its work finished, or when another session takes its feature over, or the owner has approved its replacement, and its worktree is kept, and archives nothing outside its workstream that the owner has not picked."
 covers:
@@ -58,8 +58,9 @@ No decisions are open. Spec review R-1 found that paused sessions archived befor
 starts fell outside both rules and lost the worktree safeguard; the revision after it closed that gap.
 Spec reviews R-2 and R-3 found no blocking issue; the revisions after them name the owner as the
 approver of a replacement, put the cleanup question into a required sentence, and keep that question
-away from sessions that have been taken over. A new review has not run yet, and
-nothing in this document has been executed. Acceptance authorizes building the rule and test changes
+away from sessions that have been taken over. Spec review R-4 at `0ae4eab6` is clean, with one
+wording nit left as is. These are spec reviews only: no test in the Test Plan has run, because the
+implementation does not exist yet. Acceptance authorizes building the rule and test changes
 on a feature branch. Merging and releasing still need the owner.
 
 ### Background
@@ -246,6 +247,7 @@ None.
 | 2026-11-27 | R-1 | spec | `41080f61` | claude-opus-5-5 | procedural | 1 blocking, 3 should-fix, 1 nit |
 | 2026-11-27 | R-2 | spec | `b3f58301` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 1 nit |
 | 2026-11-27 | R-3 | spec | `53c00e17` | claude-opus-5-5 | procedural | 0 blocking, 1 should-fix, 1 nit |
+| 2026-11-27 | R-4 | spec | `0ae4eab6` | claude-opus-5-5 | procedural | clean: 0 blocking, 0 should-fix, 1 nit left unapplied under the nit rule |
 
 ### R-1
 
@@ -322,6 +324,15 @@ SEVERITY: nit
 WHERE: Design, Required sentences (paragraph after the list: "A paused session S-45 archives has the owner's batched approval of its replacement"); Context, Owner summary ("A paused session archived under the owner's batched approval before its replacement starts counts as taken over"); frontmatter goal ("or the owner has approved its replacement")
 EVIDENCE: This revision changed the paragraph from "has an approved replacement" to "has the owner's batched approval of its replacement". S-45 is an approval of archiving, not of replacement: "Archiving paused sessions, and a replaced stale orchestrator, needs the owner's approval, asked for in one batch" (`plugins/vh-adlc/references/orchestrate.md:168`). Replacing paused sessions is the orchestrator's step under S-30 ("replace the paused sessions once, when the release they wait for has landed", `orchestrate.md:160`), and the owner's part is the handoff "in its own session" after the replacement starts (`orchestrate.md:164`). The Owner summary itself says "the orchestrator's own plan to replace a session is not that approval". S-36 already states outright that "a paused session archived before its replacement starts is taken over", so the S-45 case does not depend on this claim and nothing built changes, but the paragraph misstates what S-45 approves.
 PROPOSAL: Say the paused session S-45 archives is taken over because S-36 says so and its archive has the owner's batched approval, rather than calling that approval an approval of its replacement.
+
+### R-4
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Required sentences (S-59: "for a picked sub-session whose work is open and that no other session has taken over"); Design, How the rules read together ("Cleanup listing": "a pick of an open one that nobody has taken over"); Context, Owner summary (cleanup paragraph: "for an open one that nobody has taken over"); Design, Glossary ("Taken over": "or the owner has approved one to")
+EVIDENCE: This revision added the "not taken over" condition in response to R-3 F-01. The glossary term Taken over, and S-56 and S-36, also count as taken over a session whose replacement the owner has approved but has not started yet: "Another session carries a sub-session's feature on, or the owner has approved one to". S-59 and the two prose places word the condition as "no other session has taken over" and "nobody has taken over". Read literally, that phrasing leaves out the approved-but-not-started case. So if the owner picks such a session in a general cleanup, one reader asks the abandonment question and another archives it under S-56. The path is rare: a general cleanup that falls while a replacement is approved but not yet started. The harm is one misleading question, so this is a nit.
+PROPOSAL: Use the glossary term itself in S-59, for example "for a picked sub-session whose work is open and that is not taken over", and use the same wording in the Cleanup listing bullet and the Owner summary.
 
 ## Sources
 
