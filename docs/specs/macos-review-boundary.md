@@ -10,6 +10,7 @@ covers:
   - plugins/vh-adlc/references/loop-settings.md
   - plugins/vh-adlc/references/review-protocol.md
   - plugins/vh-adlc/.claude-plugin/plugin.json
+  - plugins/vh-adlc/plugin.json
   - .vh-adlc/loop.yaml
   - tests/vh-adlc/loop/review-route.test.ts
   - tests/vh-adlc/loop/owned-process.test.ts
@@ -219,17 +220,17 @@ schema_version: 1
 roles:
   spec_reviewer:
     route: command
-    model: gpt-6.1-sol
+    model: gpt-6.2-sol
     model_attestation: codex-session
     argv: [sh, -c, 'f=$1; shift; exec "$@" - < "$f"', sh, "{prompt_file}", codex, exec, -m, "{model}", -s, danger-full-access, --skip-git-repo-check, --json]
   implementation_reviewer:
     route: command
-    model: gpt-6.1-sol
+    model: gpt-6.2-sol
     model_attestation: codex-session
     argv: [sh, -c, 'f=$1; shift; exec "$@" - < "$f"', sh, "{prompt_file}", codex, exec, -m, "{model}", -s, danger-full-access, --skip-git-repo-check, --json]
 ```
 
-The model is the owner's Codex default (`model = "gpt-6.1-sol"` in `~/.codex/config.toml`).
+The model is the one the owner chose for Codex reviews when accepting this feature (2026-11-27, #187); `codex exec -m gpt-6.2-sol --json` on codex-cli 0.172.0 served it, and its session log recorded only that model.
 `{prompt_file}` follows the `loop-settings.md:37` recommendation. `--skip-git-repo-check` is there because
 a spec review runs from the export, which has no `.git`. `-s danger-full-access` is required on macOS
 because Codex's own Seatbelt can't start inside the route's profile (measured above). The same argv runs
@@ -271,7 +272,7 @@ applies. The Instruction freshness section and `parseReply` are left alone.
 - [ ] AC-04: On a host without `unshare`, `runOwnedClient` with `pidNamespace: true` and no `writeDeny`
       runs the client with the `marker` boundary instead of throwing.
 - [ ] AC-05: In this repository, `bun scripts/loop/cli.ts route` returns a `command` route with model
-      `gpt-6.1-sol` and `model_attestation: codex-session` for both `spec review` and `review`.
+      `gpt-6.2-sol` and `model_attestation: codex-session` for both `spec review` and `review`.
 - [ ] AC-06: On this Mac, a real Codex spec review and a real Codex implementation review through
       `cli.ts review` come back `ready` with the served model attested from the session log. The owning
       worktree is unchanged afterwards, and both stored record sets pass `vh-adlc review check`.
@@ -289,7 +290,7 @@ applies. The Instruction freshness section and `parseReply` are left alone.
 | AC-02 | New darwin-only tests in `review-route.test.ts`, each watched failing with the named part of the profile removed. They use a fixture of their own, so the Git-directory and parent denies are actually exercised and no test can move the shared temporary directory: a fresh `mkdtemp` directory `T`, a main checkout at `T/a/b/main`, and a linked worktree at `T/a/b/wt` (`git worktree add`) that is the owning worktree. Its Git directory (`T/a/b/main/.git/worktrees/wt`) and common Git directory (`T/a/b/main/.git`) lie outside it. (1) Late writer: an implementation reviewer stub forks a writer with `perl -e 'POSIX::setsid(); exec env -i ...'` that writes `src/late.txt` in the owning worktree one second after the stub exits. The review is ready, and after two seconds the file doesn't exist (fails without `writeDeny`). (2) Rename routes: two late writers each rename a directory, write `src/late.txt` through the new path and rename it back. One renames the grandparent `T/a`; the other renames the main checkout `T/a/b/main`, which holds the common Git directory. Each rename is refused, which the writer records in a file under `T`, and the file doesn't exist afterwards (each fails without the parent denies). (3) Clone and export during the review: an implementation reviewer stub tries to write a file in its clone, and a spec reviewer stub tries the same in the export after `chmod u+w`. Each records the result in a file in the temporary directory. Both writes are refused and both reviews are ready (fails without the clone or export deny). (4) Scratch and temporary directory: the stub writes into a declared scratch directory and the temporary directory, and both writes land. (5) Refs and index: stubs run `git -C <owning worktree> branch x`, `git -C <owning worktree> tag -f t` and write the linked worktree's index at `T/a/b/main/.git/worktrees/wt/index`. Refs and index are unchanged afterwards (fails without the Git-directory and common-directory denies). The existing "the owning worktree is preserved" tests stay. On macOS each one asserts the worktree is unchanged afterwards, whether the outcome is pending or ready. On Linux they keep their pending expectation. |
 | AC-03 | `review-route.test.ts`: the existing `boundary: "unavailable"` test stays pending with the new reason. New darwin-only test: a subprocess started under `sandbox-exec -p '(version 1)(allow default)'` runs the route, and the review stays pending with a reason naming the boundary. |
 | AC-04 | `tests/vh-adlc/loop/owned-process.test.ts`: a subprocess with a `PATH` that holds no `unshare` imports the module fresh and calls `runOwnedClient(..., { pidNamespace: true })`. It resolves with `boundary: "marker"`. The subprocess keeps the module-level probe cache from hiding the case on Linux. Watched failing first: today the call throws `Executable not found`. |
-| AC-05 | Command: `bun plugins/vh-adlc/scripts/loop/cli.ts route --repo . --operation "spec review"` and `--operation review` print JSON with `"route":"command"`, `"model":"gpt-6.1-sol"` and `"model_attestation":"codex-session"`. Before the change both print `"route":"host"`. |
+| AC-05 | Command: `bun plugins/vh-adlc/scripts/loop/cli.ts route --repo . --operation "spec review"` and `--operation review` print JSON with `"route":"command"`, `"model":"gpt-6.2-sol"` and `"model_attestation":"codex-session"`. Before the change both print `"route":"host"`. |
 | AC-06 | Manual procedure, recorded under `tests/vh-adlc/evidence/macos-review-boundary/`: on this Mac, run `cli.ts review --kind spec` on this document and `--kind implementation` on the feature commit with the committed `loop.yaml`. Record each JSON outcome (`ready`, attested model), `git status --porcelain` before and after (identical), and `vh-adlc review check` on the stored records (passes). The implementation review's own verdicts on AC-01 to AC-03 and AC-08 don't count toward this feature's completion: those tests need `sandbox-exec`, so the formal implementation review runs on the host route. |
 | AC-07 | Read the changed paragraphs at the implementation commit and confirm each of the four statements. `tests/vh-adlc/direct-operation-compatibility.test.ts` still passes. |
 | AC-08 | New darwin-only test in `review-route.test.ts`: the fixture hard-links a tracked file to a path in the temporary directory before the review. The review stays pending with a reason naming that file, and the reviewer stub never runs (it would create a marker file). Watched failing with the link-count check removed. |
