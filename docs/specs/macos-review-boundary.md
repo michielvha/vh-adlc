@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Spec review R-3 is clean; waiting for owner acceptance."
+status: planned
+status_description: "Accepted at R-3 with posture A; tasks next. The review model moves to gpt-6.2-sol through a revision before loop.yaml is committed."
 issue: https://github.com/michielvha/vh-adlc/issues/187
 goal: "Spec and implementation reviews in this repository run on Codex from a Mac, with no owner step per review, and no reviewer process can change the owning worktree or the private clone once the review has been judged."
 covers:
@@ -308,6 +308,7 @@ None.
 | 2026-11-27 | R-1 | spec | `7248ba28` | claude-opus-5-5 | procedural | 1 blocking, 4 should-fix, 4 nits; host route, because the Codex command route cannot run on macOS until this feature exists |
 | 2026-11-27 | R-2 | spec | `c0f89a56` | claude-opus-5-5 | procedural | 0 blocking, 1 should-fix, 2 nits; host route |
 | 2026-11-27 | R-3 | spec | `b6f3156b` | claude-opus-5-5 | procedural | clean: 0 blocking, 0 should-fix, 1 nit (unapplied under the nit rule); host route |
+| 2026-11-27 | R-3 | spec | `b6f3156b` | n/a | n/a | accepted by owner |
 
 ### R-3
 
