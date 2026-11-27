@@ -268,6 +268,7 @@ function writerFixture(id: string, project: string, write: (path: string, conten
     if (id === "visual-rendered") write("AGENTS.md", agentsMd(`A preview of article.md is served at ${preview().url}; it re-reads the file on every request.
 The site's themes are light and dark, chosen by prefers-color-scheme.
 For rendered checks, a browser driver is installed outside this project: require playwright-core from ${playwrightDir()}/node_modules/playwright-core and launch chromium with executablePath ${headlessShell()}. Do not install anything.
+Image files appear only inside the image markup above; do not link to an image file anywhere else in an article.
 `));
     write("notes.md", notesFor(long ? "a founder story about moving our payments ledger to Keelson and why every plan gets a review. Keep this sentence exactly as written: \"" + SPAN + "\"" : "a short post of about 400 words on why nobody approves their own change.", QUOTABLE, long ? 1200 : 300, long ? 1 : 7) + (long ? `\nThe screen the notes describe: Keelson's plan review for payments-ledger, listing what a change will create, update and destroy, with an Approve button.\n` : ""));
     const renderer = id === "visual-rendered" ? "A renderer is available: AGENTS.md names the preview and the browser driver." : "No renderer is available.";
