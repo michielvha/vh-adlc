@@ -2,10 +2,10 @@
 issue: https://github.com/michielvha/vh-adlc/issues/172
 ---
 
-# Analysis: why the proportional review brief lost enterprise labels L-08 and L-10
+# Analysis: proportional review follow-ups on the enterprise case (L-08, L-10 and the Codex loop)
 
-Draft, measured on 2026-11-27 against `cb1b8174` (origin/main). This covers Deferred entries D-17 and D-18
-of [the proportional review spec](../../specs/proportional-review.md), tracked in
+Draft, measured on 2026-11-27 against `cb1b8174` (origin/main). This covers Deferred entries D-17, D-18 and
+D-19 of [the proportional review spec](../../specs/proportional-review.md), tracked in
 [#172](https://github.com/michielvha/vh-adlc/issues/172).
 
 The first part of this draft compares the two briefs. The section
@@ -165,6 +165,72 @@ one pass in six, and dropped it otherwise.
    blocking finding whose fix removes it.
 
 
+## D-19: why the Codex loop keeps raising blocking findings
+
+Deferred entry D-19 asks why the Codex reviewer raises as many blocking findings per round under the new
+brief as under the old on the enterprise case. Read on 2026-11-27 from the stored first passes and from the
+paused loop's kept clone, with no resume and no reviewer runs. Cited by count only.
+
+**The new brief raises more blocking findings from the first pass.** Mean blocking findings per counted
+first pass:
+
+| Route | Old brief | New brief |
+| --- | --- | --- |
+| Codex (command) | 16.33 | 21.25 |
+| Claude (host) | 3.33 | 5.67 |
+
+The new brief raised more blocking findings on both routes, about 30% more on Codex. On the same document
+with the same brief, Codex rates about four times as many findings blocking as Claude does. The share of
+blocking findings that cite an always-blocking class (authorization, credentials, tenant isolation, data
+loss) rose only a little, from 47% to 54% on Codex. So the always-blocking check that the owner allowed
+during the replay is part of the rise, not all of it.
+
+**The loop's blocking count falls slowly, then levels off.** Over 25 rounds it fell from 21 to about 10, and
+it stayed between 9 and 13 from round 11 to round 25. Converging needs a round with none.
+
+**The author answers blocking findings by adding text.** The document body grew from 602 lines to 3400,
+5.6 times its first size. The Claude loop grew from 602 to 1017 lines and reached a clean pass in 8 rounds.
+From round 14 on, each Codex round changed only 2 to 5% of the body, yet about 10 blocking findings came
+back each time. In late rounds, 3 to 8 of them hit a section that the previous round had also flagged
+blocking. Over 25 rounds, the author answered about 340 blocking findings with only 4 stated limits and 4
+Deferred entries.
+
+**Scoped re-review cannot shrink this.** A scoped pass still reports blocking findings anywhere in the
+document. Only should-fix and nit findings stay inside the diff, and on Codex, should-fix findings fell from
+13 to 2 or 3 per round while blocking stayed near 10. Blocking findings alone decide whether a loop
+converges, so the scope rule cut the findings that do not hold a loop open and left the ones that do.
+
+**Not measured.** The brief asks the reviewer to say when a finding traces to a change the previous revision
+made. None of the 342 blocking findings in rounds 2 to 25 uses wording to that effect. Either Codex does
+not follow that instruction or the search missed its wording, so this draft draws no conclusion from it.
+The old-brief Codex loop stored no documents, so its rounds cannot be compared one by one.
+
+**Diagnosis.** Codex rates blocking much more liberally than Claude, and the new brief raised its blocking
+rate further. Every blocking finding falls outside the scope rule. The scripted author answers each one with
+more mechanism rather than a stated limit, so the document keeps offering new surface. Together, these
+hold the loop at about 10 blocking findings per round.
+
+**Real-use harm.** In real use, the convergence trigger asks the owner a proportionality question whenever a
+pass has at least as many blocking findings as the one before. The replay's scripted owner always answered
+that question with "keep going". A real owner would narrow or park the feature, so the harm is owner time
+and Codex usage, not a document accepted with defects.
+
+**Recommendation for now: candidate 3.** It changes no rules and costs no Codex usage. Candidates 1
+and 2 stay unchecked until a loop can test them.
+
+**Candidates, cheapest first:**
+
+1. Make the reviewer name, in each blocking finding's `EVIDENCE`, which blocking condition of the
+   resolved convention it meets. A finding that meets none is rated should-fix. This targets the Codex
+   calibration gap and is one sentence of brief.
+2. Have the author consider a stated limit, or a question to the owner, before adding mechanism for a
+   blocking finding in a section that drew one the round before. This is spec-skill prose.
+3. Prefer the Claude host route for spec review of large documents. This changes no rules and is the
+   simplest alternative.
+
+Checking fix 1 or fix 2 needs a new enterprise Codex loop, 15 to 60 reviews, which the owner has parked for
+now.
+
 ## Harm and the simplest alternative
 
 The harm: on the enterprise case, one of two replay cases, the new brief stops raising one should-fix side
@@ -183,3 +249,5 @@ change to the same file in [#182](https://github.com/michielvha/vh-adlc/pull/182
 
 Track. The smallest owner decision: keep L-08 and L-10 as known losses, or specify the one-sentence brief
 change and spend about 6 Claude and 6 to 12 Codex first passes to check it.
+
+D-19: track. Prefer the Claude host route for spec review of large documents for now. Calibration and author-side fixes wait until a new enterprise Codex loop can check them.
