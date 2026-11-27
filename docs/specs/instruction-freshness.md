@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Being implemented on fix/instruction-freshness, task by task."
+status: complete
+status_description: "All eight criteria met in implementation review R-5; shipped for owner merge."
 issue: https://github.com/michielvha/vh-adlc/issues/139
 branch: fix/instruction-freshness
 goal: "SDD operations read the repository's listed instruction files and project procedure as they stand at the default branch tip, even from a checkout that is behind it."
