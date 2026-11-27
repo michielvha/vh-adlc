@@ -512,6 +512,84 @@ None.
 | 2026-11-27 | R-14 | implementation | `c55aa45a` | gpt-6.2-sol | procedural | diagnostic AC-06 proof run through the Codex command route (ready, attested, worktree unchanged); AC-02, AC-08 and AC-11 not met, AC-06 not verified, 4 findings fixed after |
 | 2026-11-27 | R-15 | implementation | `b8c1a07f` | gpt-6.2-sol | procedural | diagnostic AC-06 proof run on the final route code through the Codex command route (ready, attested, worktree unchanged); AC-02, AC-08 and AC-11 not met on new edge cases, AC-06 not verified |
 | 2026-11-27 | R-16 | implementation | `e274ff17` | gpt-6.2-sol | procedural | diagnostic AC-06 proof run on the final code (C3 `5168340e`) through the Codex command route: ready, attested, worktree unchanged; its artifacts are the AC-06 proof for the formal review |
+| 2026-11-27 | R-17 | implementation | `bc5cf01c` | gpt-6.2-sol | procedural | formal Codex implementation review: AC-01, AC-03, AC-04, AC-05, AC-07 and AC-10 met; AC-02, AC-06, AC-08 and AC-11 not met on edge cases, to be residualised by the orchestrator's decision |
+
+### R-17
+
+CRITERION: AC-01 On macOS, a command-route review whose reply passes every existing check comes back `ready`.
+VERDICT: met
+EVIDENCE: I checked that the changes from `5168340e` to the target are limited to the feature document and permitted evidence files. The owner-directed unsandboxed run recorded 69 passes, five owned-process skips and zero failures. I inspected the matching-reply, file-only spec and model-attestation tests and confirmed that they assert `ready`. This session cannot start a nested Seatbelt profile.
+
+CRITERION: AC-02 On macOS, no reviewer process can change the owning worktree (files, ignored files, index, HEAD, refs) or the private clone outside `review_scratch`, during or after the review, either through their own paths or by renaming a parent directory. This includes a descendant that detaches into its own session, clears its environment and writes after the reviewer has exited. Writes inside `review_scratch` and in the temporary directory still succeed.
+VERDICT: not met
+EVIDENCE: The matching unsandboxed record covers the listed late writes, renames, clone and export writes, and scratch writes. In a disposable repository, the same clone command used by the route replaced a staged entry in the owner's active alternate index. The route does this before its baseline snapshot and omits the alternate index from its deny paths. I observed the index change during clone preparation.
+
+CRITERION: AC-03 On a host where neither boundary can be applied, including a macOS process already inside a Seatbelt sandbox, a command-route review stays pending with a reason that names the missing boundary.
+VERDICT: met
+EVIDENCE: In this macOS session, `/usr/bin/sandbox-exec` exited 71 with `sandbox_apply: Operation not permitted`. At the target I called `runReviewRoute` with automatic boundary detection and with the unavailable-boundary seam. Both returned `pending` and named the PID namespace and `sandbox-exec` write boundary. The owner-directed run also covers the explicit nested Seatbelt case.
+
+CRITERION: AC-04 On a host without `unshare`, `runOwnedClient` with `pidNamespace: true` and no `writeDeny` runs the client with the `marker` boundary instead of throwing.
+VERDICT: met
+EVIDENCE: The targeted `without unshare` test passed at the target, asserting `boundary: "marker"` and client exit code 0. I used an empty `ps` stub because this session forbids spawning the real `ps`. The matching unsandboxed run covers the test with the real scanner.
+
+CRITERION: AC-05 In this repository, `bun plugins/vh-adlc/scripts/loop/cli.ts route` returns a `command` route with model `gpt-6.2-sol` and `model_attestation: codex-session` for both `spec review` and `review`.
+VERDICT: met
+EVIDENCE: I ran both `cli.ts route` commands at the target. The `spec_reviewer` and `implementation_reviewer` results each reported `command`, `gpt-6.2-sol` and `codex-session`.
+
+CRITERION: AC-06 On this Mac, real Codex spec reviews through `cli.ts review` are stored with outcome `ready`, the served model attested from the session log and `git status` unchanged (R-6 to R-9). A real Codex implementation review through the final route code comes back `ready` the same way, its reviewer having read the recorded unsandboxed run, with the owning worktree's status and refs unchanged. The committed script that ran it fails unless the outcome is `ready` for that commit and nothing changed, and keeps the run's Codex transcript.
+VERDICT: not met
+EVIDENCE: I parsed the four spec outcomes and the implementation outcome for `e274ff17`. All five reported `ready` and attested `gpt-6.2-sol`. I compared the paired state files byte for byte, checked that the code matches the target, and confirmed that the implementation transcript contains the successful read of `record-5168340e.md`. The runner's state check misses changes to the contents of a file that is already modified, as I confirmed with its `state()` function in a disposable repository. Its controller clone also runs before the first measurement and uses the same Git command that changed the active alternate index in the AC-02 fixture.
+
+CRITERION: AC-07 `references/loop-settings.md` states the macOS boundary and what it denies, what stays writable, the pending cases, the `-s danger-full-access` requirement for Codex under it, and that tests starting their own `sandbox-exec` need a run outside any sandbox; `references/review-protocol.md` names the boundary and links to `loop-settings.md`.
+VERDICT: met
+EVIDENCE: I checked `loop-settings.md:136-154` and `review-protocol.md:20-24` at the target against each required statement and the link. The direct-operation compatibility, glossary and settings tests reported 36 passes and zero failures.
+
+CRITERION: AC-08 On macOS, a command-route review whose owning worktree holds a protected file with a second hard link stays pending, with a reason naming that file, and a protected file that disappears or can't be read during that check leaves the review pending with a retryable reason instead of an error.
+VERDICT: not met
+EVIDENCE: The matching unsandboxed run covers a hard-linked tracked file and the retry for a file removed after directory listing. I called the target's `protectedLinkCheck` with a fixture that removed an existing HEAD after the index check. It returned `{}`. A separate fixture with a hard-linked alternate index returned `{}` for the paths the route checks and named the linked file when given the active index path.
+
+CRITERION: AC-10 Run on a process without a boundary, such as inside a Seatbelt sandbox, `tests/vh-adlc/loop/review-route.test.ts` reports one failure whose message says the route tests need an unsandboxed run, and skips its route tests instead of failing each one.
+VERDICT: met
+EVIDENCE: At the target, `bun test --timeout 60000 tests/vh-adlc/loop/review-route.test.ts` reported eight passes, 58 skips and one failure containing `The route tests need an unsandboxed run`. The explicit Seatbelt invocation in the matching run reports the same counts and message.
+
+CRITERION: AC-11 On macOS, a `review_scratch` entry that resolves to a protected path, a parent of one, or a path inside the Git directory or common Git directory, or a symlink to a path inside a denied path, leaves the review pending with a reason naming the entry, while a real scratch directory and a scratch symlink to a disjoint directory still work.
+VERDICT: not met
+EVIDENCE: The matching unsandboxed run covers the existing overlap and writable-scratch fixtures. I tested the target's `resolvedPath()` with a scratch symlink to a missing file under a protected directory. It returned the declared scratch path. At `review-route.ts:363-368`, that result passes the overlap check as though the entry were an ordinary scratch directory. I observed the path resolution directly. This session could not run the resulting profile.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: AC-02, AC-06, AC-08, Design (What the route denies, Pre-existing hard links, The AC-06 proof runs), `plugins/vh-adlc/scripts/loop/review-route.ts:382-419`, `tests/vh-adlc/evidence/macos-review-boundary/run-review.sh:18-36`
+EVIDENCE: In a disposable repository, `git rev-parse --git-path index` resolved `GIT_INDEX_FILE` outside both Git metadata directories. The clone command exited 0 and replaced the staged entry in that index with the committed entry. Both the route and the proof runner clone before measuring the owner's state. The route's deny and link-check inputs also omit the active index.
+PROPOSAL: Clear repository-local Git variables for private clone operations. Protect and measure the owner's active index, or refuse unsupported index overrides before either clone starts. Verify that a staged alternate index survives byte for byte.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: AC-08, Scope (third In scope bullet), Design (Pre-existing hard links, Concurrency, failure and rollback), Test Plan AC-08, `plugins/vh-adlc/scripts/loop/review-route.ts:329-338,383-387`
+EVIDENCE: I removed an existing HEAD while `protectedLinkCheck` advanced from the index to HEAD. The function returned `{}` because it ignores all metadata `ENOENT` errors. The route needs a `changed` result to leave the review pending with a retry reason.
+PROPOSAL: Distinguish metadata that was absent at the start from metadata that vanishes during the check. Exercise the latter case through the route's pending outcome.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: AC-11, Scope (third In scope bullet), Design (Scratch overlap), Test Plan AC-11, `plugins/vh-adlc/scripts/triage/owned-process.ts:60-65`, `plugins/vh-adlc/scripts/loop/review-route.ts:363-368,402-407`
+EVIDENCE: A disposable scratch symlink pointed to a missing path inside the protected tree. The resolver returned the symlink's declared pathname, and the overlap condition treats those equal paths as an ordinary scratch entry. The route therefore omits the promised pending reason.
+PROPOSAL: Distinguish a missing scratch directory from a symlink whose destination cannot be resolved. Leave the review pending with the entry's name when containment cannot be established.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: AC-06, Design (The AC-06 proof runs), Test Plan AC-06, `tests/vh-adlc/evidence/macos-review-boundary/run-review.sh:22-31,53`
+EVIDENCE: In a disposable repository I ran the runner's `state()` function before and after changing the contents of an already-modified tracked file. The snapshots were byte-identical. The runner's comparison cannot establish its unchanged-state claim for that file.
+PROPOSAL: Measure the contents covered by the unchanged-state claim and take the first measurement before preparing the controller clone. Add a check with an already-dirty file whose contents change while its porcelain status stays the same.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: blocking
+WHERE: Design (Codex route), `plugins/vh-adlc/scripts/loop/review-route.ts:416-421`, `plugins/vh-adlc/scripts/triage/owned-process.ts:171-173`, `conventions/coding.md` (Inputs and safety)
+EVIDENCE: The route passes the full controller environment to the reviewer process. The pinned coding convention requires an explicit allowlist for a process that runs user-supplied code. An exported controller credential is consequently available to reviewer tool commands, which have network access under the committed Codex route.
+PROPOSAL: Pass an explicit environment allowlist for reviewer startup and attestation. Verify with a harmless sentinel that reviewer commands cannot see unapproved controller variables.
 
 ### R-16
 
