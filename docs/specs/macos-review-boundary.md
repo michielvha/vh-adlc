@@ -477,6 +477,30 @@ None.
 | 2026-11-27 | R-8 | spec | `cc7bb1ac` | gpt-6.2-sol | procedural | 6 blocking, 8 should-fix; Codex command route; F-05 and F-06 re-raise owner-accepted limits; held for the owner |
 | 2026-11-27 | R-9 | spec | `34633957` | gpt-6.2-sol | procedural | 9 blocking, 8 should-fix; Codex command route; convergence trigger fired again (R-8 had 6 blocking); held for the owner |
 | 2026-11-27 | R-10 | spec | `7fd292bb` | claude-opus-5-5 | procedural | 1 blocking, 4 should-fix, 2 nits; host route, owner-directed gating pass on #187 because the convergence trigger fired twice (R-7, R-9) on Codex findings that re-raise owner decisions; Codex stays the route for every other review |
+| 2026-11-27 | R-11 | spec | `6af33856` | claude-opus-5-5 | procedural | clean: 0 blocking, 2 should-fix, 1 nit; host route, the owner-directed gating pass continued |
+
+### R-11
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (The AC-06 proof run; Recorded unsandboxed run, the allowed delta), Test Plan AC-06, Tasks T22
+EVIDENCE: Design at X, lines 352-355, says the proof run "runs once on that commit", its artifacts "go into an `implementation-proof-<commit>` directory and are committed. The formal implementation review then runs on that commit". T22 says the same: "the `implementation` proof run on the commit that holds the record, with both runs' artifacts committed; then the formal Codex implementation review on that commit". In both places "that commit" reads as the commit the proof run targeted. That commit cannot hold the proof artifacts, because they are committed after it. The implementation reviewer works in a private clone of its target (`review-protocol.md:17-18`), so a formal review at that commit has nothing in its clone to judge AC-06 from. The allowed delta at lines 343-344 lists `implementation-proof-*`, which suggests the author meant the later commit that adds the artifacts, but no sentence says so. One implementer would target the record commit and get `not verified` for AC-06; another would target the artifact commit. This text was added in this revision for R-10 F-01.
+PROPOSAL: Say that the formal implementation review targets the commit that adds the `implementation-proof-<commit>` directory (and the spec run's artifacts), and that the directory name gives the proof run's target. Use the same wording in Design, the Test Plan AC-06 row and T22.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (The AC-06 proof run), Test Plan AC-06, Tasks T22
+EVIDENCE: Design lines 353-356 say of the proof run: "Its records are not stored ... its records [the formal review's] are the ones stored". The Test Plan AC-06 row now reads "Storing the formal review's records", where the previous revision said "Storing each record set", so this revision also leaves the AC-06 spec run's records unstored. Both runs go through `cli.ts review` and come back `ready`. `plugins/vh-adlc/references/review-protocol.md:23-25` at X requires: "On `ready`, store its `records` under `### R-<n>` with a Review Log row ... On `pending`, store nothing". The convention also asks for "One table row per review pass" (feature-documents.md, Review log). The owner's exception on #187 (comment 7220327075) covers judging the darwin criteria from the recorded run. It does not cover dropping review passes. Storing the spec run has its own effect that the document doesn't mention: a Codex spec review stored during implementation becomes the latest spec review, and `spec_review_clean` is a `complete` gate, so a blocking finding there stops completion. Recent Codex passes R-6 to R-9 each had 5 to 9 blocking findings. The orchestrator's comment 7220697331 also says "No more Codex spec rounds".
+PROPOSAL: Either store both runs per the protocol and state in Design that the stored spec run becomes the latest spec review and gates `complete`, or record an owner decision that exempts the two AC-06 runs from storage, citing it, while keeping their replies in the committed artifacts.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Concurrency, failure and rollback), Tasks T18 and T19
+EVIDENCE: This revision narrowed AC-08, Scope and the Owner summary to "a protected file disappears or can't be read during the link check" (R-10 F-04). The R-10 F-04 WHERE named the Concurrency paragraph, but lines 367-368 still say "a concurrent change to the owning worktree during the link check leaves the review pending as described". That covers additions, which the walk does not detect. T18 ("the AC-08 changing-tree test") and T19 ("the changing-tree guard", "the tree guard") keep the older term. This traces to the partial application of R-10 F-04 in this revision.
+PROPOSAL: Change the Concurrency sentence to say that a protected file another session removes or makes unreadable during the link check leaves the review pending with a retryable reason. Rename the T18 and T19 items to the disappearing-file guard.
 
 ### R-10
 
