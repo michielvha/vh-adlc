@@ -5,10 +5,10 @@ Native Codex CLI 0.172.0 scenarios on macOS 26.6.2 (arm64) against the installed
 fingerprint is `54d08e7bf77819259ec73d4f9e11a651f9ad372a00d6cdc5f53ec9dd3c30a8fc`; the engineering pin is
 `e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a`. The driver is `tests/vh-adlc/blog/run.ts`.
 
-Nine of the ten visual scenarios pass. `visual-rendered` has not run: inside Codex's
-macOS sandbox Chromium cannot register its Mach port (`bootstrap_check_in ...
-Permission denied (1100)`), so the scenario's preflight stops it here, and it needs
-a Linux host with Codex signed in.
+All ten visual scenarios pass. Nine ran on this Mac. `visual-rendered` ran on a
+Linux host, because inside Codex's macOS sandbox Chromium cannot register its Mach
+port (`bootstrap_check_in ... Permission denied (1100)`) and the scenario's
+preflight stops it there.
 
 | Scenario | Result | Raw event SHA-256 |
 | --- | --- | --- |
@@ -27,6 +27,22 @@ a Linux host with Codex signed in.
 wrote `Rendered checks: unverified on desktop and phone ...` without the comma the
 fixed line requires. The rerun above, in `/tmp/bvr-t10run.4eOy/final3-backport`, passed
 against the same package.
+
+`visual-rendered` ran on Ubuntu 24.04.5 (x86_64) with codex-cli 0.172.0 and the
+host's Playwright `chromium_headless_shell-1248`, from `f4b06826`, whose
+`plugins/vh-adlc` is byte-identical to `7b892f74` (`git diff 7b892f74 f4b06826 --
+plugins/vh-adlc` is empty). Its payload fingerprint there is
+`e3c7c31151321f02ba398f0d05da8f415444997e9a5c01a918da5a8d0cc4fa74`; the fingerprint
+also covers file modes, which differ between the two hosts. It passed, raw events
+`48159ca4ccd3e60e72d593650063cafc2562d28f9cf000e5ca5015694f0b7574`, with beacons
+for the final article in light and dark at desktop and phone widths and the handoff
+line `Rendered checks: desktop light: pass; desktop dark: pass; phone light: small
+screenshot labels, with plan details in the caption; phone dark: small screenshot
+labels, with plan details in the caption.` An earlier run from `c22b9166`, raw
+events `13cab4dcacb5f192f4189424cdc88141f5d2d86fba78f6744044341148bb7dd4`, failed
+the stray-image check: as a phone repair it linked the screenshot at full size
+outside its figure. `f4b06826` states in that fixture's `AGENTS.md` that image
+files appear only inside the image markup.
 
 The nine existing blog scenarios rerun against the same package and all pass,
 run directory `/tmp/bvr-t10run.4eOy/final3-classic`:
