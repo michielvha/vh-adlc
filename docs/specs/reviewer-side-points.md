@@ -37,9 +37,10 @@ when any label still fails after 6, which is likely on the Claude route. Executi
 Pass conditions:
 
 - L-08 is raised at its minimum severity on the Claude route, and L-10 on the Codex route, in at least 2 of
-  6 passes, or 3 of 12. A single hit could be chance. When a route stops at 6 passes with exactly one hit,
-  a second set runs on a fresh copy, and the route is judged on 12 passes: the first 6 and the second
-  set's first 6.
+  6 passes, or 3 of 12. A single hit could be chance. A route that stops at 6 passes with exactly one hit
+  fails this check. If the sentence restores a label at 1 in 3 passes, that happens about 11% of the time
+  on the Claude route and 23% on the Codex route. The orchestrator accepted that risk under the owner's
+  delegation, because a false failure only leaves both labels as known losses.
 - No label the new brief raised reliably, in 6 or more of 12 passes, is lost. The 16 label and route pairs
   it raised less often are reported but do not decide the result, because they could miss by chance alone.
 - The mean of blocking findings per pass stays within the new brief's normal spread on each route, so the
@@ -172,15 +173,12 @@ check that both commits carry the sentence byte for byte.
   a route can stop at 6 passes with L-08 or L-10 at exactly 1 of 6, which is neither 2 of 6 nor a chance
   to reach 3 of 12. For a sentence that restores the label at 1 in 3 passes, that outcome would come up
   about 11% of the time on the host route and 23% on the command route, where fewer unrelated labels
-  trigger the extension. This rule is declared before the replay: when a route stops at 6 passes with its
-  label at exactly 1 of 6, one more set of that route runs on a second fresh copy of the case directory.
-  Only that set's counted passes 1 to 6, by pass number, count. The harness may start passes 7 to 12 on
-  the second copy, because its own extension still applies there (`run.ts:578`), so the run is stopped
-  once pass 6 is stored. Any later pass it stored is listed in the results as not counted. AC-02, AC-03
-  and AC-04 then judge that route on exactly 12 passes: the first set's 6 and the second set's passes 1 to
-  6, with retention counted from those passes' verdict files by the harness's rule. The budget therefore
-  stays at 12 counted passes per route, plus at most one pass started before the stop. No other outcome
-  gets a second set.
+  trigger the extension. Such a route fails AC-02. No second set runs: the orchestrator decided this on
+  2026-11-27 under the owner's delegation (ledger
+  [#179](https://github.com/michielvha/vh-adlc/issues/179)), because a false failure only leaves D-17 and
+  D-18 as the known losses they already are, and a second set would need a manual stop-and-count
+  procedure. At the old brief's rate of 2 in 3, the same outcome comes up under 1.5% of the time on either
+  route.
 - AC-03 checks only the 59 pairs the new brief raised in 6 or more of 12 passes: the 75 enterprise pass
   rows except the 16 the Background names. For each of them a chance failure is under 0.1%. Eight of the 16 lower-rate pairs can fail
   at all under the rule, and a sentence with no effect would make at least one of those eight fail about 16%
@@ -190,8 +188,7 @@ check that both commits carry the sentence byte for byte.
   passes under the brief under test. With 6 passes: host 7.11, command 24.66. With 12: host 6.85, command
   24.03. A sentence with no effect exceeds it about 2% of the time per route, and on at least one of the
   two routes about 4.5% of the time.
-- Apart from the second set above, a failure under any criterion counts as a failure. It is not rerun to
-  get a pass.
+- A failure under any criterion counts as a failure. It is not rerun to get a pass.
 
 The harness's `--results` file goes to scratch first. Before anything is committed, the private-terms check
 runs on it (`run.ts terms --case <copy> --file <results>`). Only counts and run identities are copied to
@@ -201,7 +198,7 @@ The means are counted from the copy's stored records as in the Background table.
 **Failure, retry and rollback.** A pass that fails to execute is recorded as failed, and the harness retries
 within its limit (`run.ts:226-231`). A run stopped by a usage limit resumes from the copy, because finished
 passes are stored as they complete. The original case directory is never written. If the replay misses
-AC-02, AC-03 or AC-04, the sentence does not ship: the experiment branch and the copies are deleted, the
+AC-02, AC-03 or AC-04, the sentence does not ship: the experiment branch and the copy are deleted, the
 feature is reported as not met, and D-17 and D-18 stay known losses. Rolling back after shipping means
 reverting one sentence and the version bump.
 
@@ -215,7 +212,7 @@ before the upgrade keeps the brief it loaded. No state, schema or boundary chang
       secondary one. The plugin's patch version is one higher than before the change.
 - [ ] AC-02: On the enterprise case, under the brief under test, L-08 is raised at its minimum severity on the
       host route, and L-10 at its minimum severity on the command route, each in at least 2 of 6 counted
-      first passes, or 3 of 12 when the set was extended or a second set ran under the rule in Design.
+      first passes, or 3 of 12 when the harness extended the set.
 - [ ] AC-03: None of the 59 enterprise label and route pairs that the replayed new brief raised in 6 or more of
       12 passes fails retention under the brief under test.
 - [ ] AC-04: On each route, the mean number of blocking findings per counted first pass under the brief under
@@ -230,8 +227,8 @@ before the upgrade keeps the brief it loaded. No state, schema or boundary chang
 | Criterion | Proof |
 | --- | --- |
 | AC-01 | Manual procedure: `git show origin/main:plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` contains the sentence from Design verbatim, outside any paragraph limited to one docs revision. Both plugin manifests show the patch version one above `0.33.1`, or one above whatever main holds when the bump lands. |
-| AC-02, AC-03 | `bun tests/vh-adlc/replay/run.ts run --only first-passes --routes-under-test host` and then `command`, against the case copy, with the arguments in Design. When a route stops at 6 with its label at exactly 1 of 6, the same command on a second fresh copy for that route, and a manual count over both copies' `runs/new-<route>-pass-*.verdicts.json` files. Pass: host L-08 and command L-10 at their minimum in at least 2 of 6 or 3 of 12 new runs, and none of the 59 pairs Background defines (the 75 enterprise pass rows except the 16 it names) fails retention. |
-| AC-04 | Manual procedure on the case host: for each counted first pass in the copy's `runs/new-<route>-pass-*.txt` with a `.verdicts.json` beside it, in both copies when a second set ran, count lines starting `SEVERITY: blocking`, and take the mean per route. Pass: at most the bound in AC-04 for the number of counted passes. |
+| AC-02, AC-03 | `bun tests/vh-adlc/replay/run.ts run --only first-passes --routes-under-test host` and then `command`, against the case copy, with the arguments in Design. Pass: host L-08 and command L-10 at their minimum in at least 2 of 6 or 3 of 12 new runs, and none of the 59 pairs Background defines (the 75 enterprise pass rows except the 16 it names) fails retention. |
+| AC-04 | Manual procedure on the case host: for each counted first pass in the copy's `runs/new-<route>-pass-*.txt` with a `.verdicts.json` beside it, count lines starting `SEVERITY: blocking`, and take the mean per route. Pass: at most the bound in AC-04 for the number of counted passes. |
 | AC-05 | `bun tests/vh-adlc/replay/run.ts terms --case <copy> --file tests/vh-adlc/evidence/reviewer-side-points/results.md` prints pass, and the file has the four parts AC-05 names. |
 
 ## Tasks
@@ -240,19 +237,7 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-### Q1: When a route stops at 6 passes with L-08 or L-10 found exactly once, should a second set run?
-
-**Recommendation:** A. Drop the second set and accept the stated risk, because a false failure only leaves
-both labels as the known losses they already are, while the second set needs a manual stop-and-count
-procedure that has drawn a finding in each of the last three reviews.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. No second set** | Plain harness runs with no manual counting or hand-written results rows. A route that stops at 6 with exactly one hit fails the label check. | If the sentence restores a label at 1 in 3 passes, a false failure about 11% of the time on the Claude route and 23% on the Codex route. At the old brief's 2 in 3, under 1.5% on either route. |
-| **B. Keep the second set, counted exactly** | No dead end at one hit: the route is judged on 12 passes. | A manual procedure: stop at the sixth counted pass, by order of the verdict files rather than file number. Write the second set's results rows by hand, with retention recounted over the 12 judged passes. Up to 6 more passes on that route. |
-
-**Why this is yours:** it trades the risk of rejecting a sentence that works against an extra manual
-procedure and its passes. The goal and the recorded rules do not decide that.
+None.
 
 ## Review Log
 
