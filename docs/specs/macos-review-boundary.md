@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised for spec review R-2; the next spec review on the host route is pending."
+status_description: "Spec review R-3 is clean; waiting for owner acceptance."
 issue: https://github.com/michielvha/vh-adlc/issues/187
 goal: "Spec and implementation reviews in this repository run on Codex from a Mac, with no owner step per review, and no reviewer process can change the owning worktree or the private clone once the review has been judged."
 covers:
@@ -307,6 +307,16 @@ None.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-27 | R-1 | spec | `7248ba28` | claude-opus-5-5 | procedural | 1 blocking, 4 should-fix, 4 nits; host route, because the Codex command route cannot run on macOS until this feature exists |
 | 2026-11-27 | R-2 | spec | `c0f89a56` | claude-opus-5-5 | procedural | 0 blocking, 1 should-fix, 2 nits; host route |
+| 2026-11-27 | R-3 | spec | `b6f3156b` | claude-opus-5-5 | procedural | clean: 0 blocking, 0 should-fix, 1 nit (unapplied under the nit rule); host route |
+
+### R-3
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan row AC-02 (test (2), Rename routes)
+EVIDENCE: Test (2) has both late writers "rename a directory, write `src/late.txt` through the new path and rename it back", and one of them renames the main checkout `T/a/b/main`. `src/late.txt` is in the owning worktree `T/a/b/wt`, which is not under `T/a/b/main`, so renaming the main checkout gives no new path to it. What that rename actually exposes is the common Git directory: refs and the linked worktree's index and HEAD under `T/a/b/main/.git/worktrees/wt`. On this Mac I set up plain directories in a fresh `mktemp -d` T: `T/a/b/main/dg` subpath-denied in place of the common directory, `T/a/b/wt` subpath-denied, and literal denies on `T/a/b/main`, `T/a/b`, `T/a` and T. Under that profile, `mv T/a/b/main T/a/b/m2` was refused ("rename ... Operation not permitted"), creating `T/a/b/main/side` succeeded, and a write through a symlink outside the trees into `T/a/b/wt/src` was refused. So the "rename is refused" record still makes the test fail when the main checkout's literal deny is missing. But the row's "the file doesn't exist afterwards" check does nothing for the main-checkout writer, and no write to the Git directory through the renamed path is ever tried or checked. This text is new in this revision, added for R-2 F-01. I could not build the fixture with real `git worktree add` here, because this session's harness refuses git commands that point outside its worktree. The rename and symlink results above come from plain directories.
+PROPOSAL: For the main-checkout writer, have it write a ref or `.git/worktrees/wt/index` through the renamed path, and assert that file is unchanged afterwards, instead of `src/late.txt`.
 
 ### R-2
 
