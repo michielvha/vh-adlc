@@ -308,6 +308,7 @@ None.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-27 | R-1 | spec | `5841585` | claude-opus-5-5 | procedural | 5 should-fix, 4 nits; revision follows |
 | 2026-11-27 | R-2 | spec | `5f5b05b` | claude-opus-5-5 | procedural | 3 should-fix, 5 nits; revision follows |
+| 2026-11-27 | R-3 | spec | `ed52406` | claude-opus-5-5 | procedural | 1 blocking, 1 should-fix, 1 nit; revision follows |
 
 ### R-1
 
@@ -431,3 +432,26 @@ SEVERITY: nit
 WHERE: Design (Read rule, "`skills/vh-adlc-spec/SKILL.md:164` ... gain the same pointer", and the skills' one-clause pointer); frontmatter `covers`
 EVIDENCE: Existing text tests outside `covers` pin the lines this Design rewrites. tests/vh-adlc/proportional-review.test.ts:196 expects "judged against the product profile and the files `bun scripts/loop/cli.ts context` lists". tests/vh-adlc/check.test.ts:694 and tests/vh-adlc/direct-operation-compatibility.test.ts:31 expect "scripts/loop/cli.ts context" in the skills and loop.md. `covers` lists only tests/vh-adlc/loop/, and the Design does not say whether these phrases must survive.
 PROPOSAL: State that the rewritten lines keep these phrases. Otherwise, list the three test files in `covers` and in the Design as updated.
+
+### R-3
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design (Read rule, "`references/loop.md:42` and `skills/vh-adlc-spec/SKILL.md:164` ... gain a pointer to `references/loop-settings.md` (Instruction freshness)" and the last paragraph, "with the pointer added after it ... Those tests therefore need no change"); Context (Background, Current state, the "Existing text tests pin phrases" bullet); frontmatter `covers`
+EVIDENCE: tests/vh-adlc/direct-operation-compatibility.test.ts does more than check for phrases. For the spec skill it strips only the `## Loop routes` and `## Issue labels` sections, then asserts `expect(body(current)).toBe(body(previous))` against `specBaseline = "c2eff1d0300af93f8aed228dcff68e6c55714ecf"` (lines 11, 19-27 and 101-108). skills/vh-adlc-spec/SKILL.md:164 sits under `## Under severity by consequence` (line 155), outside both stripped sections. `git show c2eff1d...:plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md` has the same line 164, "the product profile and the files `bun scripts/loop/cli.ts context` lists." `bun test tests/vh-adlc/direct-operation-compatibility.test.ts` passes now (8 pass). Adding the pointer the Design requires after that phrase changes the body, so "direct spec keeps its approved operation body" fails. The implementer then has to change the test's baseline, and that file is outside `covers` (only tests/vh-adlc/loop/). The R-2 revision added the "need no change" claim in answer to R-2 F-08.
+PROPOSAL: Either drop the SKILL.md:164 pointer (it already defers to the files `context` lists, and the Loop routes pointer governs how they are read), or list tests/vh-adlc/direct-operation-compatibility.test.ts in `covers` and say in the Design that its spec baseline moves to the implementing commit. Correct the Background bullet to match.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan row AC-07; Acceptance Criteria AC-07; Design (Read rule, "The rule sits in `references/loop-settings.md` under a heading named Instruction freshness")
+EVIDENCE: AC-07 requires that `references/loop-settings.md`, along with the skills and loop.md, "direct operations to pass the default branch to `context` and read each listed file at its reported version". The revised row checks the `--default-branch` command span and `(Instruction freshness)` only in the eight SKILL.md files and `references/loop.md`. For loop-settings.md it checks only the conventions-revision sentence. An Instruction freshness section that holds just that sentence, with no `--default-branch` step, no "read each entry of `freshness.files` at its `read` value" and no `git show <read>`, passes the row while every pointer leads to a rule that does not exist. The R-2 revision rewrote this row.
+PROPOSAL: In the AC-07 row, also assert that the Instruction freshness section of loop-settings.md contains `--default-branch <default branch>` and `git show <read>`. Give one must-pass example (the Design's rule bullets) and one must-fail example (the section with only the conventions sentence).
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan row AC-05 (the unrelated-history case)
+EVIDENCE: The case is "a clone whose branch was reset to a root commit unrelated to origin's history". It does not say that this root commit carries `.vh-adlc/loop.yaml` and its listed files. A root commit made with `git checkout --orphan` and `git commit --allow-empty` has no settings, so `read` is `[]`. The assertion "every entry `unverified`" then holds vacuously, and the case proves only the reason and the exit code. The R-2 revision added this case.
+PROPOSAL: Say that the unrelated root commit contains the settings file and at least one listed file, so the case asserts a non-empty list of `unverified` entries.
