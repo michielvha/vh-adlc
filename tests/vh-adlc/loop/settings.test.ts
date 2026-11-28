@@ -135,7 +135,7 @@ describe("review_scratch entries", () => {
     expect(loadLoopSettings(root, { overridePath: null }).review_scratch).toEqual(["frontend/node_modules"]);
     rmSync(outside, { recursive: true, force: true });
   });
-  for (const bad of ["../outside", "/abs/path", ".git/hooks", "a\\b"])
+  for (const bad of ["../outside", "/abs/path", ".git/hooks", "a\\b", "tracked/.", "a/./b", "./build"])
     test(`a lexically unsafe entry (${bad}) is still refused`, () => {
       const root = checkout({ ".vh-adlc/loop.yaml": `schema_version: 1\nreview_scratch: [${JSON.stringify(bad)}]\n` });
       expect(refusal(() => loadLoopSettings(root, { overridePath: null }))).toContain("review_scratch[0]");
