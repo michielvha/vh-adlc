@@ -1,3 +1,71 @@
+# Visual reading trials, 2026-11-27
+
+Native Codex CLI 0.172.0 scenarios on macOS 26.6.2 (arm64) against the installed
+0.34.0 package from `feat/blog-visual-reading` at `7b892f74`. The plugin payload
+fingerprint is `54d08e7bf77819259ec73d4f9e11a651f9ad372a00d6cdc5f53ec9dd3c30a8fc`; the engineering pin is
+`e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a`. The driver is `tests/vh-adlc/blog/run.ts`.
+
+All ten visual scenarios pass. Nine ran on this Mac. `visual-rendered` ran on a
+Linux host, because inside Codex's macOS sandbox Chromium cannot register its Mach
+port (`bootstrap_check_in ... Permission denied (1100)`) and the scenario's
+preflight stops it there.
+
+| Scenario | Result | Raw event SHA-256 |
+| --- | --- | --- |
+| visual-new | pass | `dbdfc0944684b0d3423fa24fd06415c09f61f1b069b4a45b00254f24f62c21e1` |
+| visual-short | pass | `5e3242da8c220f4aba4034bbf8c560a6dc6cf11417bccbb9a1623bec0ae4c3af` |
+| visual-illustration | pass | `a3a995b13270488ecba822c2410044577f1105fbec9b22d1125b6ad8782b0629` |
+| visual-presentation | pass | `0318e1273b11f417e6971643796156e654fcd5ec3d6f79b0ffe9e7c79f345a14` |
+| visual-backport | pass | `8ece314737e0090cef44e2820ff9743f1496f80aebb8df0610f15068732b1664` |
+| visual-revision | pass | `f4cf332b1c2b5724af7e6ab9fa212140b0dd15e7a3d54645bd3127afb30e86de` |
+| visual-review | pass | `dd4c38f8deffed5de12391563e8e44dbf7efe6dcf34ac4f05bcdef00957e45f6` |
+| visual-editor | pass | `3f8debb823e9a59113bcfc366b37afd86ae59307238eb9e935b5dc093776f155` |
+| visual-editor-pass | pass | `315dc0d38b4d9694065d3fd3f767814b0614187c92dca38fc2e3682969ada154` |
+
+`visual-backport` failed once in the same sequence, run directory
+`/tmp/bvr-t10run.4eOy/final3-visual`, raw events `cde44c352e95fb614d08075da0abf9f90f19271fb8011f64ef02541378c8b37f`: its handoff
+wrote `Rendered checks: unverified on desktop and phone ...` without the comma the
+fixed line requires. The rerun above, in `/tmp/bvr-t10run.4eOy/final3-backport`, passed
+against the same package.
+
+`visual-rendered` ran on Ubuntu 24.04.5 (x86_64) with codex-cli 0.172.0 and the
+host's Playwright `chromium_headless_shell-1248`, from `f4b06826`, whose
+`plugins/vh-adlc` is byte-identical to `7b892f74` (`git diff 7b892f74 f4b06826 --
+plugins/vh-adlc` is empty). Its payload fingerprint there is
+`e3c7c31151321f02ba398f0d05da8f415444997e9a5c01a918da5a8d0cc4fa74`; the fingerprint
+also covers file modes, which differ between the two hosts. It passed, raw events
+`48159ca4ccd3e60e72d593650063cafc2562d28f9cf000e5ca5015694f0b7574`, with beacons
+for the final article in light and dark at desktop and phone widths and the handoff
+line `Rendered checks: desktop light: pass; desktop dark: pass; phone light: small
+screenshot labels, with plan details in the caption; phone dark: small screenshot
+labels, with plan details in the caption.` An earlier run from `c22b9166`, raw
+events `13cab4dcacb5f192f4189424cdc88141f5d2d86fba78f6744044341148bb7dd4`, failed
+the stray-image check: as a phone repair it linked the screenshot at full size
+outside its figure. `f4b06826` states in that fixture's `AGENTS.md` that image
+files appear only inside the image markup.
+
+The nine existing blog scenarios rerun against the same package and all pass,
+run directory `/tmp/bvr-t10run.4eOy/final3-classic`:
+
+| Scenario | Result | Raw event SHA-256 |
+| --- | --- | --- |
+| new | pass | `acbf841c63182bbf3d0cc4958c3631dfdedcfa6abf7f8a43526393678beeef37` |
+| keep | pass | `994a51da8de6b9242e3bb99bde325d2f41048cb021a3ccaafd89e298486d4020` |
+| repair | pass | `8c96b555b3597b1924641ce99f4f4dc3622908652a81082f7958da204932ec85` |
+| promotion | pass | `b0d0f35bb0bbcfb1749addd2c66ae1017ddc8e335133df59e97e07001f83843c` |
+| denied-site | pass | `87d3cb5a3340e9cad5a203e8c588be478150b5ee3bcc039489c057e51e6fb2f9` |
+| fallback | pass | `852b199b2e533e11573f45f182eba2a4e622caf7fca6e9ea5ddc0edd9fbb782a` |
+| editor | pass | `fb3651e2e58c7b63d690df5048d7ec2e9ca9d8c78e26d16eeee09a84bb27f2e1` |
+| ship-public | pass | `c5f463733568beecf6f270761ebcc5afb0220aa6f5fdf0b18e24fdb9cf6e50f3` |
+| ship-internal | pass | `4763147e4e9dd46ad67def66ce82c4c07aa0fc02bd525acd48b254a621ec3242` |
+
+Earlier runs on 2026-11-27 at `ee7b7e3` to `cda5a837` found the defects those
+commits fixed: handoffs that did not quote the editor's entries or name gaps by
+their opening words, a parent that interrupted an editor, editors and a writer
+listing directories outside the project to find convention pages, a split paragraph
+in a presentation revision, and fixture prose the notes did not support. The raw
+runs and isolated auth profiles remain outside Git.
+
 # Article and promotion trials, 2026-10-29
 
 Nine native Codex CLI 0.163.0 scenarios pass against the installed 0.5.0 candidate.

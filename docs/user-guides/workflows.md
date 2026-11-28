@@ -273,6 +273,18 @@ reported outside it. New material can develop rough notes into prose, while
 revisions retain sound existing passages. The handoff groups substantive
 exceptions instead of asking the owner to approve every copy repair.
 
+New long-form articles, with 800 words of body prose or more, get a visual
+reading pass, including founder and opinion articles. The writer places
+treatments inside the body: relevant illustrations, product images or exact
+attributed quotes from the author's notes. It never adds filler or invents a
+quote, and creates or edits images only with permission. Pull quotes must differ
+from those in the current batch or related articles. A shorter article may record
+a no-visual exception instead. The writer checks the rendered page on desktop and
+phone in each supported theme, or reports the check as unverified, and the
+independent editor reviews presentation as well as prose. A plain revision
+changes no treatment and only reports presentation gaps; adding visuals to an
+existing article needs an explicit request.
+
 Promotion copy points to the verified canonical article URL. Unpublished or
 older article content keeps the bundle pending. Release-day launch copy may be
 prepared in advance when requested, with the release dependency recorded outside

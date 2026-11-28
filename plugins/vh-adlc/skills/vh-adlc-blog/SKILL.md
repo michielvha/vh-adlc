@@ -16,10 +16,17 @@ failure handling; article authoring itself needs no software feature document.
 
 Input is the owner's article brief, existing article, editorial request, or
 `promote <project or article>`. Read the adopter's instructions before writing.
-Publication remains subject to `references/authority.md`.
+For a new long-form article, complete the visual reading pass in
+`references/blog.md`, including for nontechnical stories; revisions follow its
+three revision kinds. Publication remains subject to `references/authority.md`.
 Name hosted items in your report to the owner as `references/loop.md` step 5 says.
 
-For an independent prose pass, dispatch the editor at
-`agents/vh-adlc-blog-editor.agent.md` with the original or source notes, candidate,
-source-position inventory, edit reasons, voice references and protected content.
-The editor's role differs from the feature reviewer: it reviews prose, not gates.
+Check the rendered page on desktop and phone in each theme the site supports.
+When rendering is unavailable, the handoff says `Rendered checks: unverified, <reason>`
+and names the missing assets; a Markdown-only inspection is never called a rendered review.
+
+Dispatch the prose and presentation editor at `agents/vh-adlc-blog-editor.agent.md`
+without parent history, as `references/blog.md` says, with the original or source
+notes, candidate, source-position inventory, edit reasons, voice references,
+protected content and the Presentation inputs in `references/blog.md`.
+The editor's role differs from the feature reviewer: it reviews articles, not lifecycle gates.

@@ -33,6 +33,8 @@ At the inspected vh-adlc commit `35f62ca3f8989e9f3bec51b6f2f9a9f420ef51d5`, the 
 
 The installed write-like-me skill instructs the writer to inspect actual writing samples, preferably through its search/retrieve tools, and allows supplied examples when those tools are unavailable. The current host exposes no write-like-me retrieval tools. The owner-designated VitePress workflow and its named posts provide local references for this work; this is not proof that connector retrieval works.
 
+`docs/specs/blog-visual-reading.md` replaces two rules here. Its visual reading pass replaces the Draft and handoff rule to "add visuals only when they solve an explanation problem"; the rule against visuals solely to decorate still holds. Its four-line editor return, with `Presentation repairs`, replaces the three-line return in AC-09. Those two rules are not review targets for this document.
+
 ## Scope
 
 Add an explicit `vh-adlc-blog` operation for topic-to-draft, revision and editorial review requests. Support repository-selected output locations, article metadata and author voice. It can prepare ordinary blog posts and product comparisons without requiring a new feature document for each article.
