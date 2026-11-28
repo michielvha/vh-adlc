@@ -1,6 +1,6 @@
 // The shared settings loader: which file it reads, which it refuses, and when it
 // needs the verified vh-adlc binary.
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
@@ -9,6 +9,12 @@ import { createYAMLReader, settingsFile } from "../../plugins/vh-adlc/scripts/se
 const LOADER = resolve(import.meta.dir, "../../plugins/vh-adlc/scripts/settings-file.ts");
 const made: string[] = [];
 afterAll(() => { for (const dir of made) rmSync(dir, { recursive: true, force: true }); });
+// Offline readers below need the verified binary in the cache; download it here when it is missing, so
+// this file does not depend on another file having installed it first.
+beforeAll(() => {
+  const ensured = Bun.spawnSync(["bash", resolve(dirname(LOADER), "ensure-vh-adlc.sh")], { stdout: "pipe", stderr: "pipe" });
+  if (ensured.exitCode !== 0) throw Error("verified vh-adlc binary unavailable: " + ensured.stderr.toString());
+});
 
 function checkout(files: Record<string, string> = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "vh-settings-file-")));

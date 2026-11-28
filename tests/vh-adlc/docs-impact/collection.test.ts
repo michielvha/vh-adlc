@@ -1,4 +1,4 @@
-import { afterAll, expect, test } from "bun:test";
+import { afterAll, beforeAll, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -7,6 +7,12 @@ import { collectImpact, resolveRoots } from "../../../plugins/vh-adlc/scripts/do
 
 const made: string[] = [];
 afterAll(() => { for (const root of made) rmSync(root, { recursive: true, force: true }); });
+// Collection reads settings through the offline YAML reader, which needs the verified binary in the cache;
+// download it here when it is missing, so this file does not depend on another file having installed it.
+beforeAll(() => {
+  const ensured = Bun.spawnSync(["bash", join(import.meta.dir, "../../../plugins/vh-adlc/scripts/ensure-vh-adlc.sh")], { stdout: "pipe", stderr: "pipe" });
+  if (ensured.exitCode !== 0) throw Error("verified vh-adlc binary unavailable: " + ensured.stderr.toString());
+});
 const declaration = 'Documentation impact roots: ["docs/"]\n';
 const guide = (pattern = "src/**") => `---\ncovers: ['${pattern}']\n---\nA guide.\n`;
 function put(root: string, path: string, value: string) { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), value); }
