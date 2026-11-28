@@ -34,7 +34,7 @@ rules on shared setup and on edge-case tables address them without removing cove
 Line coverage cannot decide removals in this suite. Bun's coverage does not record code that runs in a
 child process, and most docs-drift tests drive the CLI or a retained component copy in child processes.
 Mutation is the usable evidence. A first sample of three mutants found two kinds of redundancy and one
-guard that no test could fail.
+guard whose sample result was misleading.
 
 ## Cost
 
@@ -135,13 +135,12 @@ What this shows, within the three mutants sampled:
 - The one-second unit test already kills B, so the wrong-approval step in the 45-second journey is
   redundant for that guard.
 - Only a 45-second journey kills A. The test strategy asks for that check in a small test.
-- Nothing kills C. A first reading blamed the journey's copied-run step; the batch that followed
-  corrected it. The CLI refuses a copied run at `run-cli.ts:246` before publication starts, so no CLI
-  journey can reach C. C guards an already opened run whose host ownership record has since gone, and
-  no test covered that case. The journey's copy assertion had a weakness of its own: it checked only
-  for `setup-required`, which a missing approval also produces, so it did not show that the ownership
-  check was the one that refused. `testing.md` asks a test to assert something only the intended path
-  produces.
+- C survived the two files this sample ran, but that sample was too narrow. The batch's reviews showed
+  that eight existing tests in `run-directory.test.ts` already kill C. C is a second guard behind the
+  CLI's own copied-run refusal at `run-cli.ts:246`: with that refusal disabled, a copied run reaches C and
+  ends `incomplete`. What no test checked was narrower: an opened run that trusts its cached ownership
+  instead of rereading the host record. The journey's copy assertion checked only for `setup-required`;
+  asserting the CLI's diagnostic makes the refusal reason explicit, as `testing.md` asks.
 
 ### Prose-only tests
 
@@ -179,9 +178,8 @@ strategy requires; each states what covers the behaviour afterwards.
 3. Move the missing-approval check down. Add a small test for guard A beside
    `run-approval.test.ts`, then drop the repeated refusal steps from the journeys. Mutant A is the
    evidence to rerun after the move.
-4. Cover the ownership checks. Add a small test for an opened run that loses its host ownership
-   record, which mutant C must fail, and make the journey's copied-run step assert the diagnostic only
-   the CLI's ownership check produces.
+4. Cover the ownership checks. Add a small test that an opened run rechecks its host ownership record
+   before each stage, and make the journey's copied-run step assert the CLI's ownership diagnostic.
 5. Remove the load-order dependence. Resolve the binary in shared setup that can download it, or
    through the same helper other files use, rather than an offline call at load.
 6. Split `closure-controller.test.ts`. This is a lower priority on CI with four workers; it pays off

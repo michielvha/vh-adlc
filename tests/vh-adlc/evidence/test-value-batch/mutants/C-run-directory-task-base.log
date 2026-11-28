@@ -1,0 +1,227 @@
+# mutant C: plugins/vh-adlc/scripts/docs-drift/run-directory.ts
+# from: if (current.origin !== "original") fail("original host ownership required");
+# to:   if (false) fail("original host ownership required");
+# command: bun test --timeout 60000 tests/vh-adlc/docs-drift/zz-rd-base.test.ts
+# source diff:
+diff --git a/plugins/vh-adlc/scripts/docs-drift/run-directory.ts b/plugins/vh-adlc/scripts/docs-drift/run-directory.ts
+index 5b4cc061..4d72d02e 100644
+--- a/plugins/vh-adlc/scripts/docs-drift/run-directory.ts
++++ b/plugins/vh-adlc/scripts/docs-drift/run-directory.ts
+@@ -177,7 +177,7 @@ export function originalRunContext(run: RunDirectory) {
+   const options = contexts.get(run);
+   if (!options) fail("original opened run required");
+   const current = readRunDirectory(options);
+-  if (current.origin !== "original") fail("original host ownership required");
++  if (false) fail("original host ownership required");
+   if (current.digest !== run.digest) fail("stage changed; reopen the run before continuing");
+   return { options, current };
+ }
+# run:
+bun test v1.4.5 (a7733435c)
+
+tests/vh-adlc/docs-drift/zz-rd-base.test.ts:
+64 |   const f = fixture(), original = createRunDirectory(f.input), copy = join(f.root, "copy");
+65 |   cpSync(f.input.directory, copy, { recursive: true });
+66 |   const observer = readRunDirectory({ ...f.input, directory: copy });
+67 |   expect(observer.manifest).toEqual(original.manifest);
+68 |   expect(observer.origin).toBe("observation-only");
+69 |   expect(() => appendRunStage(observer, { command: "publish", state: "pending", artifacts: {} })).toThrow("original");
+                                                                                                       ^
+error: expect(received).toThrow(expected)
+
+Expected substring: "original"
+
+Received function did not throw
+Received value: {
+  schema_version: 1,
+  kind: "docs-drift-run-stage",
+  run_id: "f72a10bb-9f19-406c-87a3-b41bae158838",
+  revision: 1,
+  previous_sha256: "d85081791c834ebc4470afbd6bd1424eebfcee2ef84ba0bdaea7839fe1f1eb8e",
+  command: "publish",
+  state: "pending",
+  artifacts: {},
+}
+
+      at <anonymous> (/Users/michielvh/code/vh-adlc/.claude/worktrees/test-value-audit/tests/vh-adlc/docs-drift/zz-rd-base.test.ts:69:99)
+(fail) a copied directory remains observation-only even with matching run metadata [784.48ms]
+74 |   const f = fixture(), original = createRunDirectory(f.input), relocated = join(f.root, "relocated-source");
+75 |   readGit(f.root, "clone", "--no-local", f.input.repo, relocated);
+76 |   const observed = readRunDirectory({ ...f.input, repo: relocated });
+77 |   expect(observed.origin).toBe("observation-only");
+78 |   expect(observed.manifest).toEqual(original.manifest);
+79 |   expect(() => appendRunStage(observed, { command: "publish", state: "pending", artifacts: {} })).toThrow("original");
+                                                                                                       ^
+error: expect(received).toThrow(expected)
+
+Expected substring: "original"
+
+Received function did not throw
+Received value: {
+  schema_version: 1,
+  kind: "docs-drift-run-stage",
+  run_id: "e7794fb7-58a9-44f6-b391-c49f2e4d6438",
+  revision: 1,
+  previous_sha256: "93f882cca0e5dccad0c378ed5fb62e0c140c2a4a21f9ec8cc06476b00cad8c1a",
+  command: "publish",
+  state: "pending",
+  artifacts: {},
+}
+
+      at <anonymous> (/Users/michielvh/code/vh-adlc/.claude/worktrees/test-value-audit/tests/vh-adlc/docs-drift/zz-rd-base.test.ts:79:99)
+(fail) the same committed source at a new host path permits observation without inheriting the old origin [844.60ms]
+ 97 |   const f = fixture();
+ 98 |   createRunDirectory(f.input);
+ 99 |   rmSync(f.input.origins, { recursive: true });
+100 |   const run = readRunDirectory(f.input);
+101 |   expect(run.origin).toBe("observation-only");
+102 |   expect(() => appendRunStage(run, { command: "publish", state: "pending", artifacts: {} })).toThrow("original");
+                                                                                                   ^
+error: expect(received).toThrow(expected)
+
+Expected substring: "original"
+
+Received function did not throw
+Received value: {
+  schema_version: 1,
+  kind: "docs-drift-run-stage",
+  run_id: "223188f8-c5cc-417c-ab31-e6c1086fd493",
+  revision: 1,
+  previous_sha256: "1a14503871519fffc34a1dd74ceb40b83c00c2b0965eaf9b07ddc8729dd2e01c",
+  command: "publish",
+  state: "pending",
+  artifacts: {},
+}
+
+      at <anonymous> (/Users/michielvh/code/vh-adlc/.claude/worktrees/test-value-audit/tests/vh-adlc/docs-drift/zz-rd-base.test.ts:102:94)
+(fail) missing host ownership leaves the surviving directory observation-only [779.33ms]
+117 |   const directory = target === "caller" ? f.repo : target === "git" ? join(f.repo, ".git") : target === "run" ? f.input.directory : f.root;
+118 |   writeFileSync(join(directory, run.manifest.id + ".json"), readFileSync(join(f.input.directory, "run.json")), { mode: 0o600 });
+119 |   symlinkSync(directory, alias);
+120 |   const observed = readRunDirectory({ ...f.input, origins: alias });
+121 |   expect(observed.origin).toBe("observation-only");
+122 |   expect(() => appendRunStage(observed, { command: "publish", state: "pending", artifacts: {} })).toThrow("original");
+                                                                                                        ^
+error: expect(received).toThrow(expected)
+
+Expected substring: "original"
+
+Received function did not throw
+Received value: {
+  schema_version: 1,
+  kind: "docs-drift-run-stage",
+  run_id: "62240711-0a7a-4f64-84cf-aa43b962a704",
+  revision: 1,
+  previous_sha256: "e319fc0fc56ac99e0f741c53b5b46c5459ba3f570fa8e5617b984fa6bd4b5f86",
+  command: "publish",
+  state: "pending",
+  artifacts: {},
+}
+
+      at <anonymous> (/Users/michielvh/code/vh-adlc/.claude/worktrees/test-value-audit/tests/vh-adlc/docs-drift/zz-rd-base.test.ts:122:99)
+(fail) an origin alias targeting the caller cannot confer ownership [827.66ms]
+117 |   const directory = target === "caller" ? f.repo : target === "git" ? join(f.repo, ".git") : target === "run" ? f.input.directory : f.root;
+118 |   writeFileSync(join(directory, run.manifest.id + ".json"), readFileSync(join(f.input.directory, "run.json")), { mode: 0o600 });
+119 |   symlinkSync(directory, alias);
+120 |   const observed = readRunDirectory({ ...f.input, origins: alias });
+121 |   expect(observed.origin).toBe("observation-only");
+122 |   expect(() => appendRunStage(observed, { command: "publish", state: "pending", artifacts: {} })).toThrow("original");
+                                                                                                        ^
+error: expect(received).toThrow(expected)
+
+Expected substring: "original"
+
+Received function did not throw
+Received value: {
+  schema_version: 1,
+  kind: "docs-drift-run-stage",
+  run_id: "85ec2223-6da7-43f9-aab6-881a8247a9f4",
+  revision: 1,
+  previous_sha256: "9b3ec7b026307d7789014bf44023c582400cfac8c10bd9c14d3eb1a5bb86e910",
+  command: "publish",
+  state: "pending",
+  artifacts: {},
+}
+
+      at <anonymous> (/Users/michielvh/code/vh-adlc/.claude/worktrees/test-value-audit/tests/vh-adlc/docs-drift/zz-rd-base.test.ts:122:99)
+(fail) an origin alias targeting the git cannot confer ownership [786.52ms]
+117 |   const directory = target === "caller" ? f.repo : target === "git" ? join(f.repo, ".git") : target === "run" ? f.input.directory : f.root;
+118 |   writeFileSync(join(directory, run.manifest.id + ".json"), readFileSync(join(f.input.directory, "run.json")), { mode: 0o600 });
+119 |   symlinkSync(directory, alias);
+120 |   const observed = readRunDirectory({ ...f.input, origins: alias });
+121 |   expect(observed.origin).toBe("observation-only");
+122 |   expect(() => appendRunStage(observed, { command: "publish", state: "pending", artifacts: {} })).toThrow("original");
+                                                                                                        ^
+error: expect(received).toThrow(expected)
+
+Expected substring: "original"
+
+Received function did not throw
+Received value: {
+  schema_version: 1,
+  kind: "docs-drift-run-stage",
+  run_id: "d5d23a11-775f-4593-b2eb-e83eb93f8d0f",
+  revision: 1,
+  previous_sha256: "fecc235ec8707876b961b8627fb71ec7da7fa159de29b58bc1b0b218b60f38e4",
+  command: "publish",
+  state: "pending",
+  artifacts: {},
+}
+
+      at <anonymous> (/Users/michielvh/code/vh-adlc/.claude/worktrees/test-value-audit/tests/vh-adlc/docs-drift/zz-rd-base.test.ts:122:99)
+(fail) an origin alias targeting the run cannot confer ownership [825.58ms]
+117 |   const directory = target === "caller" ? f.repo : target === "git" ? join(f.repo, ".git") : target === "run" ? f.input.directory : f.root;
+118 |   writeFileSync(join(directory, run.manifest.id + ".json"), readFileSync(join(f.input.directory, "run.json")), { mode: 0o600 });
+119 |   symlinkSync(directory, alias);
+120 |   const observed = readRunDirectory({ ...f.input, origins: alias });
+121 |   expect(observed.origin).toBe("observation-only");
+122 |   expect(() => appendRunStage(observed, { command: "publish", state: "pending", artifacts: {} })).toThrow("original");
+                                                                                                        ^
+error: expect(received).toThrow(expected)
+
+Expected substring: "original"
+
+Received function did not throw
+Received value: {
+  schema_version: 1,
+  kind: "docs-drift-run-stage",
+  run_id: "415ca786-68f1-462e-9814-a8f127428f75",
+  revision: 1,
+  previous_sha256: "3f94bb07181c14f08e75bc3b38d1dd1cd9b549f719bfb404caae16b989ae93b4",
+  command: "publish",
+  state: "pending",
+  artifacts: {},
+}
+
+      at <anonymous> (/Users/michielvh/code/vh-adlc/.claude/worktrees/test-value-audit/tests/vh-adlc/docs-drift/zz-rd-base.test.ts:122:99)
+(fail) an origin alias targeting the parent cannot confer ownership [832.52ms]
+124 | 
+125 | test("an explicitly restored observation directory creates no host execution origin", () => {
+126 |   const f = fixture(), run = createRunDirectory({ ...f.input, ownership: "observation-only" });
+127 |   expect(run.origin).toBe("observation-only");
+128 |   expect(existsSync(f.input.origins)).toBe(false);
+129 |   expect(() => appendRunStage(run, { command: "publish", state: "pending", artifacts: {} })).toThrow("original");
+                                                                                                   ^
+error: expect(received).toThrow(expected)
+
+Expected substring: "original"
+
+Received function did not throw
+Received value: {
+  schema_version: 1,
+  kind: "docs-drift-run-stage",
+  run_id: "89493e27-d9cd-4881-96b9-08fd16f71db8",
+  revision: 1,
+  previous_sha256: "ebea258d233dd71a46086890f89cc7c2f02c0c26d0f09e8fa63c8d6026051d82",
+  command: "publish",
+  state: "pending",
+  artifacts: {},
+}
+
+      at <anonymous> (/Users/michielvh/code/vh-adlc/.claude/worktrees/test-value-audit/tests/vh-adlc/docs-drift/zz-rd-base.test.ts:129:94)
+(fail) an explicitly restored observation directory creates no host execution origin [603.94ms]
+
+ 16 pass
+ 8 fail
+ 54 expect() calls
+Ran 24 tests across 1 file. [18.80s]

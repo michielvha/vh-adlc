@@ -17,8 +17,9 @@ Task base: `d0deac947b0a4c332783eccb37da2cd4adc8d8e6`, origin/main merged into t
 Affected paths:
 
 - Proposal 5: `tests/vh-adlc/review-convergence.test.ts`, `tests/vh-adlc/owner-summary.test.ts`,
-  `tests/vh-adlc/settings-file.test.ts`, `tests/vh-adlc/proportional-review.test.ts`,
-  `tests/vh-adlc/audit/entry.test.ts` and `tests/vh-adlc/docs-impact/collection.test.ts`
+  `tests/vh-adlc/settings-file.test.ts`, `tests/vh-adlc/proportional-review.test.ts` and
+  `tests/vh-adlc/docs-impact/collection.test.ts`. (`tests/vh-adlc/audit/entry.test.ts` was changed and
+  then restored to the task base after review R-2: it already prepared the binary itself.)
 - Proposal 3: `tests/vh-adlc/docs-drift/run-approval.test.ts`
 - Proposal 4: `tests/vh-adlc/docs-drift/run-directory.test.ts`
 - Proposals 2 and 4: `tests/vh-adlc/docs-drift/normal-preparation.test.ts`
@@ -156,6 +157,37 @@ head's CI is recorded below once it finishes.
 
 R-1 F-04. The Definition now lists every affected path with its proposal.
 
+### After review R-2
+
+R-2 F-01. Both journey files pass standalone on the Mac at the batch's final plugin tree (the R-2 fix
+changes only `tests/vh-adlc/audit/entry.test.ts`): `normal-preparation.test.ts` 4 of 4 in 444 seconds and
+`closure-controller.test.ts` 9 of 9 in 1,337 seconds, at load 2 to 3 on 2026-11-28; the logs are
+`tests/vh-adlc/evidence/test-value-batch/standalone-*.log`. Exact-head CI run
+[46099403238](https://github.com/michielvha/vh-adlc/actions/runs/46099403238) for `654b02fe`: the Linux checker passed
+(4,443 pass, 0 fail, 1,546 seconds; `closure-controller` 380 s, `normal-preparation` 157 s), and so did
+`checker-macos`, `verify` and `paseo-hosts`. `remote-gui` failed one browser test, "two inline taps edit a URL and a
+field through stock Chromium and noVNC", on its focus assertion. The batch changes no `remote-gui` file, the job
+passed at `cfe3f7d9` with the same remote-gui sources, and the same assertion failed on
+`fix/instruction-freshness` in run [46027026365](https://github.com/michielvha/vh-adlc/actions/runs/46027026365). It is
+an intermittent failure outside this batch, reported to the workstream orchestrator for an issue; a pass on rerun
+is not treated as a fix.
+
+R-2 F-02. The audit had concluded too much from a narrow sample. Mutant C, run with logs against
+`run-directory.test.ts`, is killed by 8 existing tests at the task base and 9 at the head, so it was already
+guarded. A narrower mutant C2 that trusts the opened run's cached origin survives every task-base test and is
+killed only by the new small test. With the CLI's copied-run check disabled (D), the copy reaches C's guard and ends
+`incomplete`, which the old assertion also rejected; the tightened assertion makes the refusal reason explicit.
+Logs and tables: `tests/vh-adlc/evidence/test-value-batch/mutants/README.md`. The analysis document is corrected to
+say this.
+
+R-2 F-03. `tests/vh-adlc/audit/entry.test.ts` is restored to the task base: it already prepared the binary
+online and passed with an empty cache, so its change was outside the approved repair.
+
+R-2 F-04 (residual, for the owner). On the exact head, `closure-controller.test.ts` is still over the medium file
+budget (380 s against 300 s) and six of its tests, and all four `normal-preparation` variants, are over 30 seconds.
+The batch lowered both files, but meeting the budgets needs further work beyond the approved proposals. The owner kept
+the medium defaults; the breaches go to the owner as a decision, not into this batch.
+
 ## Reviews
 
 ### R-1
@@ -194,6 +226,42 @@ EVIDENCE: The task-base diff changes only tests and documentation, which fits bo
 PROPOSAL: Update the Definition to identify every affected path and its role in the approved proposals, then review the revised Definition at the resulting commit.
 ```
 
+### R-2
+
+Target: `654b02fe95d0f0231b086add914bc5adb42f63fe`.
+Model: gpt-6.2-sol, attested from Codex session log `rollout-2026-11-28T03-42-57-01a22008-ce3f-7ce0-9e85-0c0ef3794a07.jsonl` (the reply's own header said `MODEL: unknown`).
+Isolation: procedural, the same separate-operator settings as R-1 (fresh clone of the pushed head under `$TMPDIR`, `env -i`, `codex exec -m gpt-6.2-sol --json -s workspace-write`, Codex CLI 0.172.0). The clone's HEAD and status and the owning worktree's HEAD, status and branch were unchanged afterwards.
+
+```text
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: `docs/internal/maintenance/test-value-batch.md:55-66`, required standalone checks and final-head CI
+EVIDENCE: The Definition now names the full plugin tree, addressing that part of R-1 F-03. On the exact head, the eight smaller files and docs-drift typecheck passed. The standalone journeys stopped in setup. `normal-preparation` hit `EPERM` spawning `ps`, and `closure-controller` hit the same fixed-ref fetch error on the task base and target. Both journeys passed in Linux CI at `cfe3f7d9` with identical journey files and plugin tree. At review close, exact-head macOS CI had passed, the Linux checker was still running, and `remote-gui` had failed its first-tap focus assertion. Exact-head journey timings remain unavailable. [Prior Linux checker](https://github.com/michielvha/vh-adlc/actions/runs/46096871591/job/140830133550), [exact-head CI](https://github.com/michielvha/vh-adlc/actions/runs/46099403238)
+PROPOSAL: Retain passing standalone results from a Mac that can run both fixtures and the completed exact-head CI verdict and timings. Record the disposition of the `remote-gui` failure before completion.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: `docs/internal/maintenance/test-value-batch.md:60-68,86-91` and `docs/internal/analysis/test-value-audit.md:138-143`
+EVIDENCE: The retained A, B, D and E logs address R-1 F-02. The required full log for mutant C is absent from the evidence directory. In independent scratch runs, removing C's guard failed eight existing tests at the task base and failed the new test at the target. A narrower mutant that trusted the opened run's cached ownership passed all 24 base tests and failed the new test at `run-directory.test.ts:109`. The retained D log also shows that disabling the CLI guard changes the outcome to `incomplete`, which the old `setup-required` assertion already rejected.
+PROPOSAL: Retain the full mutant C logs and correct the audit to identify the new coverage as revalidation of an already opened run. Describe the copied-run diagnostic assertion as making the refusal reason explicit.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: `tests/vh-adlc/audit/entry.test.ts:15-17,53`, proposal 5
+EVIDENCE: All six installer files passed independently with separate empty caches on macOS, with one existing skip. This resolves R-1 F-01. The Definition lists every changed path, resolving the inventory gap in R-1 F-04. The task-base diff preserves the plugin tree and public contract, and the review clone's HEAD, refs, index and worktree matched their starting state. One test edit falls outside the approved load-order repair. `audit/entry.test.ts` already installed the binary online in `beforeAll` and passed all five tests with an empty cache at the task base. The edit makes its second installer call online-capable as well. [Owner approval](https://github.com/michielvha/vh-adlc/issues/170#issuecomment-7215733347)
+PROPOSAL: Restore the second installer call's `--offline` flag and update the affected-path list.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: blocking
+WHERE: `docs/internal/maintenance/test-value-batch.md:62-63,119-130`, journey timing budgets
+EVIDENCE: The directed test strategy sets medium-test budgets at 30 seconds per test and five minutes per file, and the owner retained those defaults. Linux CI at `cfe3f7d9`, with the same journey files and plugin tree as the target, measured 349 seconds for `closure-controller`, with six tests above 30 seconds. All four `normal-preparation` variants also exceeded 30 seconds. [Test strategy](https://github.com/vhco-pro/docs/blob/1fbe501bb9cee3e672fbe698c968fe36d8919f4d/conventions/test-strategy.md#time-budgets), [Linux checker](https://github.com/michielvha/vh-adlc/actions/runs/46096871591/job/140830133550)
+PROPOSAL: Record the exact-head measurements and take any remaining budget breaches to the owner for a decision. Further optimization needs its own authorization if it exceeds the approved batch.
+```
+
 ## State
 
-R-1 returned four findings, addressed above; review R-2 of the resulting head is pending, and so is its CI.
+R-1 and R-2 findings addressed above, except R-2 F-04, which is a residual for the owner. CI for the resulting head is pending; a further review waits on the orchestrator.

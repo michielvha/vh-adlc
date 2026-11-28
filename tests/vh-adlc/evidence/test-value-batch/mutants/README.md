@@ -19,3 +19,19 @@ runs the committed file, where only the matching variant has the refusal steps.
 The journey kills fail at the refusal assertion each guard serves: line 77 of the four-variant file
 (80 after the change) is the missing-approval outcome, 82 (85) the copied-run diagnostic, 91 (94) the
 missing-reviewer outcome and 95 (98) the wrong-approval exit code. No kill comes from setup.
+
+## Mutant C and the original-host check (after review R-2)
+
+`mutC.sh` disables the original-host check of an opened run (`run-directory.ts:180`); `mutC2.sh` makes it trust
+the opened run's cached origin instead of rereading the host record. Both ran against `run-directory.test.ts` at the
+task base `d0deac94` (as a scratch copy) and at the batch head, on the Mac, 2026-11-28.
+
+| Mutant | Task base `run-directory.test.ts` | Head `run-directory.test.ts` |
+| --- | --- | --- |
+| C, check disabled | killed: 8 of 24 tests fail (`C-run-directory-task-base.log`) | killed: 9 of 25 fail, including the new test (`C-run-directory-head.log`) |
+| C2, cached origin trusted | survived: 24 pass (`C2-run-directory-task-base.log`) | killed: only the new test, "an opened original run stops executing once its host ownership record is gone", fails (`C2-run-directory-head.log`) |
+
+So existing tests already guarded C. The new small test adds revalidation of an already opened run, which C2 shows
+no earlier test checked. The D logs above also show that with the CLI's copied-run check disabled, the copy reaches
+C's guard and the outcome becomes `incomplete` with "docs-drift run original host ownership required"; the old
+`setup-required` assertion would have rejected that too. The tightened assertion makes the refusal reason explicit.

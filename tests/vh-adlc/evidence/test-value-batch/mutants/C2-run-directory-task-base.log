@@ -1,0 +1,25 @@
+# mutant C2 (trust the opened run's cached origin): plugins/vh-adlc/scripts/docs-drift/run-directory.ts
+# from: if (current.origin !== "original") fail("original host ownership required");
+# to:   if (run.origin !== "original") fail("original host ownership required");
+# command: bun test --timeout 60000 tests/vh-adlc/docs-drift/zz-rd-base.test.ts
+# source diff:
+diff --git a/plugins/vh-adlc/scripts/docs-drift/run-directory.ts b/plugins/vh-adlc/scripts/docs-drift/run-directory.ts
+index 5b4cc061..56ab5e61 100644
+--- a/plugins/vh-adlc/scripts/docs-drift/run-directory.ts
++++ b/plugins/vh-adlc/scripts/docs-drift/run-directory.ts
+@@ -177,7 +177,7 @@ export function originalRunContext(run: RunDirectory) {
+   const options = contexts.get(run);
+   if (!options) fail("original opened run required");
+   const current = readRunDirectory(options);
+-  if (current.origin !== "original") fail("original host ownership required");
++  if (run.origin !== "original") fail("original host ownership required");
+   if (current.digest !== run.digest) fail("stage changed; reopen the run before continuing");
+   return { options, current };
+ }
+# run:
+bun test v1.4.5 (a7733435c)
+
+ 24 pass
+ 0 fail
+ 55 expect() calls
+Ran 24 tests across 1 file. [19.06s]
