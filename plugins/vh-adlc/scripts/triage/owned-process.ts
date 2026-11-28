@@ -5,7 +5,9 @@
 // setsid or setpgid, so every child carries an owner marker in its environment, which descendants
 // inherit, and processes that still carry it after the group is gone are stopped as well. `confirmed`
 // is true only when neither the group nor any marked process remains.
-import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, dirname, join } from "node:path";
 
 type Signal = "SIGTERM" | "SIGKILL";
 export type SignalRecord = { signal: Signal; accepted: boolean; error?: string };
@@ -13,16 +15,94 @@ export type OwnedResult = {
   pid: number; exit_code: number; timed_out: boolean; reaped: boolean; signals: SignalRecord[];
   cancelled: string | null; output_limit: boolean; captured?: { stdout: Uint8Array; stderr: Uint8Array };
   group_absent: boolean; survivors: number[]; confirmed: boolean;
-  /** `pid-namespace` when the client ran in its own PID namespace, whose every process the kernel stops when the client exits. */
-  boundary: "pid-namespace" | "marker";
+  /**
+   * `pid-namespace` when the client ran in its own PID namespace, whose every process the kernel stops when
+   * the client exits; `seatbelt` when every process it started ran under a sandbox-exec profile that refuses
+   * writes to the caller's protected paths.
+   */
+  boundary: "pid-namespace" | "seatbelt" | "marker";
 };
+/** Paths no client process may write (with each of their parent directories), and paths inside them it still may. */
+export type WriteDeny = {
+  deny: string[]; allow: string[];
+  /** The caller already resolved and validated every path. */ resolved?: boolean;
+  /** Credential stores no process may read, write or rename; their rules come after the allows so none can override them. */
+  credentials?: { directories: string[]; files: string[] };
+};
+
+export const SANDBOX_EXEC = "/usr/bin/sandbox-exec";
+let seatbeltProbe: boolean | undefined;
+/**
+ * Whether this host can run a client under a sandbox-exec write profile (macOS). The probe must see a write
+ * refused, and it fails inside another Seatbelt sandbox, because profiles do not nest.
+ */
+export function seatbeltAvailable(): boolean {
+  if (seatbeltProbe !== undefined) return seatbeltProbe;
+  seatbeltProbe = false;
+  if (process.platform !== "darwin" || !existsSync(SANDBOX_EXEC)) return seatbeltProbe;
+  let dir: string | undefined;
+  try {
+    dir = realpathSync(mkdtempSync(join(tmpdir(), "vh-adlc-seatbelt-")));
+    const target = join(dir, "probe");
+    const probe = Bun.spawnSync([SANDBOX_EXEC, "-D", `D0=${dir}`, "-p", '(version 1)(allow default)(deny file-write* (subpath (param "D0")))',
+      "/bin/sh", "-c", 'echo x > "$1" 2>/dev/null; [ ! -e "$1" ]', "sh", target], { stdout: "ignore", stderr: "ignore" });
+    seatbeltProbe = probe.exitCode === 0 && !existsSync(target);
+  } catch { seatbeltProbe = false; } finally { if (dir) rmSync(dir, { recursive: true, force: true }); }
+  return seatbeltProbe;
+}
+
+/** The resolved path, following symlinks through its longest existing prefix; Seatbelt matches resolved paths. */
+export function resolvedPath(path: string): string {
+  try { return realpathSync(path); } catch {
+    const parent = dirname(path);
+    return parent === path ? path : join(resolvedPath(parent), basename(path));
+  }
+}
+function parentsOf(path: string): string[] {
+  const out: string[] = [];
+  for (let at = dirname(path); ; at = dirname(at)) { out.push(at); if (dirname(at) === at) return out; }
+}
+
+/**
+ * The sandbox-exec prefix for a write-deny profile. Paths travel as `-D` parameters, never inside the
+ * profile text. A `literal` deny on every parent stops a process renaming a parent and writing through the
+ * new path, and still lets it create other entries beside the protected paths. Later rules win, so the
+ * allows carve scratch directories out of the denies.
+ */
+export function seatbeltPrefix(writeDeny: WriteDeny): string[] {
+  const resolve = writeDeny.resolved ? (path: string) => path : resolvedPath;
+  const deny = [...new Set(writeDeny.deny.map(resolve))], allow = [...new Set(writeDeny.allow.map(resolve))];
+  const parents = [...new Set(deny.flatMap(parentsOf))];
+  const parameters: string[] = [];
+  const rules = (prefix: string, kind: "subpath" | "literal", paths: string[]) => paths.map((path, i) => {
+    parameters.push("-D", `${prefix}${i}=${path}`);
+    return `(${kind} (param "${prefix}${i}"))`;
+  }).join(" ");
+  let profile = "(version 1)(allow default)";
+  if (deny.length) profile += `(deny file-write* ${rules("D", "subpath", deny)})(deny file-write* ${rules("P", "literal", parents)})`;
+  if (allow.length) profile += `(allow file-write* ${rules("A", "subpath", allow)})`;
+  // Credential stores: refuse reads, and refuse writes on each store and on every existing parent, so a
+  // rename can't expose a store under a new path. A missing parent gets no rule: there is nothing to rename.
+  const directories = [...new Set((writeDeny.credentials?.directories ?? []).map(resolve))];
+  const files = [...new Set((writeDeny.credentials?.files ?? []).map(resolve))];
+  if (directories.length || files.length) {
+    const stores = [rules("C", "subpath", directories), rules("F", "literal", files)].filter(Boolean).join(" ");
+    const storeParents = [...new Set([...directories, ...files].flatMap(parentsOf))].filter(path => existsSync(path));
+    profile += `(deny file-read* ${stores})(deny file-write* ${stores})`;
+    if (storeParents.length) profile += `(deny file-write* ${rules("Q", "literal", storeParents)})`;
+  }
+  return [SANDBOX_EXEC, ...parameters, "-p", profile];
+}
 
 let namespaceProbe: boolean | undefined;
 /** Whether this host can run a client in an unprivileged PID namespace (Linux with user namespaces). */
 export function pidNamespaceAvailable(): boolean {
   if (namespaceProbe === undefined) {
-    const probe = Bun.spawnSync(["unshare", "--user", "--map-current-user", "--pid", "--fork", "--kill-child", "true"], { stdout: "ignore", stderr: "ignore" });
-    namespaceProbe = probe.exitCode === 0;
+    // A host without unshare at all, such as macOS, makes the spawn itself throw.
+    try {
+      const probe = Bun.spawnSync(["unshare", "--user", "--map-current-user", "--pid", "--fork", "--kill-child", "true"], { stdout: "ignore", stderr: "ignore" });
+      namespaceProbe = probe.exitCode === 0;
+    } catch { namespaceProbe = false; }
   }
   return namespaceProbe;
 }
@@ -85,6 +165,8 @@ export function ownedClientCompleted(value: unknown, expectedExit = 0): boolean 
 export type OwnedOptions = {
   cwd: string; env: Record<string, string>; stdout: string; stderr: string;
   started?: (pid: number) => void | false; marker?: string; pidNamespace?: boolean;
+  /** Where no PID namespace runs the client, a sandbox-exec profile refusing these writes may (macOS). */
+  writeDeny?: WriteDeny;
   capture?: "memory"; watchedOutputs?: string[]; maxOutputBytes?: number; signal?: AbortSignal;
 };
 
@@ -96,8 +178,11 @@ export async function runOwnedClient(argv: string[], options: OwnedOptions,
   if (options.signal?.aborted) throw Error("owned client cancelled before startup");
   const marker = options.marker ?? `${process.pid}-${crypto.randomUUID()}`;
   // Namespace init exit also stops descendants that cleared their inherited marker.
-  const boundary = options.pidNamespace && pidNamespaceAvailable() ? "pid-namespace" as const : "marker" as const;
+  // Otherwise a write profile keeps every descendant, even one that left the group, off the protected paths.
+  const boundary = options.pidNamespace && pidNamespaceAvailable() ? "pid-namespace" as const
+    : options.writeDeny && seatbeltAvailable() ? "seatbelt" as const : "marker" as const;
   if (boundary === "pid-namespace") argv = ["unshare", "--user", "--map-current-user", "--pid", "--fork", "--kill-child", "--", ...argv];
+  if (boundary === "seatbelt") argv = [...seatbeltPrefix(options.writeDeny!), ...argv];
   const child = Bun.spawn(argv, { cwd: options.cwd, env: { ...options.env, [OWNER_MARKER_VARIABLE]: marker },
     stdout: options.capture === "memory" ? "pipe" : Bun.file(options.stdout),
     stderr: options.capture === "memory" ? "pipe" : Bun.file(options.stderr), stdin: "ignore", detached: true });

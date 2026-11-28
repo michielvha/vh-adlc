@@ -74,7 +74,7 @@ function directories(root: string, value: unknown, field: string): string[] {
     if (path === "." || path === "") fail(`${field}[${index}] may not be the whole checkout`);
     // A scratch directory is left out of the preservation check, never read, so it is checked by its
     // path alone: in a worktree it may be a symlink into another checkout (shared node_modules).
-    if (isAbsolute(path) || path.includes("\\") || path.includes("\0") || path.split("/").some(part => part === ".." || part === "") ||
+    if (isAbsolute(path) || path.includes("\\") || path.includes("\0") || path.split("/").some(part => part === ".." || part === "." || part === "") ||
         path.split("/")[0] === ".git") fail(`${field}[${index}]`);
     return path;
   });
