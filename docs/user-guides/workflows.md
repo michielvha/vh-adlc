@@ -378,11 +378,18 @@ commit; an implementation review runs in a private clone, where it may run check
 The review is stored only when the reply names the requested model and commit and
 the checkout is unchanged afterwards. Otherwise it stays pending.
 
-The command runs in its own PID namespace, created with `unshare --user --pid`, so no
-reviewer process outlives the review. On a host where that fails, command-route reviews
-stay pending. Ubuntu 23.10 and later restrict unprivileged user namespaces through
-AppArmor; allow them, for example with
-`sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`, to use these routes.
+On Linux the command runs in its own PID namespace, created with `unshare --user --pid`,
+so no reviewer process outlives the review. Ubuntu 23.10 and later restrict unprivileged
+user namespaces through AppArmor; allow them, for example with
+`sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`, to use these routes. On
+macOS the command runs under a `sandbox-exec` profile instead, which refuses every reviewer
+process writes to the worktree, its Git directories and the review's clone, and reads of a
+fixed list of credential stores. A Codex route on macOS therefore passes
+`-s danger-full-access`, because Codex's own sandbox can't start inside that profile. Either
+way the reviewer gets only an allowlisted environment, not the session's credentials. On a
+host with neither boundary, command-route reviews stay pending. The
+[loop settings reference](../../plugins/vh-adlc/references/loop-settings.md) has the details
+and limits.
 
 ## Loop settings
 

@@ -1,0 +1,15 @@
+schema_version: 1
+# Claude writes the specs and the code; Codex reviews them (#187). On macOS the route runs Codex under a
+# sandbox-exec write boundary, inside which Codex's own sandbox cannot start, hence -s danger-full-access
+# (references/loop-settings.md).
+roles:
+  spec_reviewer:
+    route: command
+    model: gpt-6.2-sol
+    model_attestation: codex-session
+    argv: [sh, -c, 'f=$1; shift; exec "$@" - < "$f"', sh, "{prompt_file}", codex, exec, -m, "{model}", -s, danger-full-access, --skip-git-repo-check, --json]
+  implementation_reviewer:
+    route: command
+    model: gpt-6.2-sol
+    model_attestation: codex-session
+    argv: [sh, -c, 'f=$1; shift; exec "$@" - < "$f"', sh, "{prompt_file}", codex, exec, -m, "{model}", -s, danger-full-access, --skip-git-repo-check, --json]
