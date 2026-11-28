@@ -2,7 +2,7 @@
 // The fixtures declare two treatment markups, which these checks recognize:
 //   image with caption: <figure> ... <img src="..." alt="..."> ... <figcaption>...</figcaption> ... </figure>
 //   pull quote:         <blockquote class="pull-quote"> <p>quote</p> <cite>author</cite> </blockquote>
-import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
@@ -105,11 +105,13 @@ const QUOTE_CLOSE = /<\/blockquote>/i;
 
 /** Splits an article into blocks; body prose is paragraph and list text outside every other block. */
 export function blocks(article: string): Block[] {
-  const lines = article.replace(/\r\n/g, "\n").split("\n");
+  // Lines keep any trailing \r, so a changed line ending changes the compared text.
+  const lines = article.split("\n");
+  const bare = (l: string) => l.replace(/\r$/, "");
   const out: Block[] = [];
   let i = 0;
-  if (lines[0] === "---") {
-    const end = lines.indexOf("---", 1);
+  if (bare(lines[0] ?? "") === "---") {
+    const end = lines.findIndex((l, n) => n > 0 && bare(l) === "---");
     if (end > 0) {
       out.push({ kind: "frontmatter", lines: lines.slice(0, end + 1) });
       i = end + 1;
@@ -137,7 +139,9 @@ export function blocks(article: string): Block[] {
 }
 
 export const bodyProse = (article: string) => blocks(article).filter((b) => b.kind === "prose").flatMap((b) => b.lines).join("\n");
-export const bodyWords = (article: string) => bodyProse(article).split(/\s+/).filter(Boolean).length;
+/** Words of body prose; list markers such as `-`, `*` and `1.` are formatting, not words. */
+export const bodyWords = (article: string) =>
+  bodyProse(article).split("\n").map((l) => l.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, "")).join(" ").split(/\s+/).filter(Boolean).length;
 
 /** True when some treatment block has a body paragraph before it and one after it. */
 export function hasBodyTreatment(article: string): boolean {
@@ -147,9 +151,16 @@ export function hasBodyTreatment(article: string): boolean {
 
 export const treatments = (article: string) => blocks(article).filter((b) => b.kind === "figure" || b.kind === "quote").map((b) => b.lines.join("\n"));
 
-/** The article with declared treatment blocks removed and blank-line runs folded to one. */
+/** The article with declared treatment blocks removed and runs of blank lines between blocks folded to one; code blocks stay verbatim. */
 export function withoutTreatments(article: string): string {
-  return blocks(article).filter((b) => b.kind !== "figure" && b.kind !== "quote").flatMap((b) => b.lines).join("\n").replace(/\n{3,}/g, "\n\n").replace(/\n+$/, "\n");
+  const out: string[] = [];
+  for (const b of blocks(article)) {
+    if (b.kind === "figure" || b.kind === "quote") continue;
+    if (b.kind === "blank") { if (out.length && out.at(-1)?.trim() === "") continue; out.push(""); continue; }
+    out.push(...b.lines);
+  }
+  while (out.length && out.at(-1) === "") out.pop();
+  return `${out.join("\n")}\n`;
 }
 
 /** The skeleton from the AC-04 row: headings by level, `:::` lines verbatim, prose runs as one line. */
@@ -211,9 +222,12 @@ export function resolveToken(token: string, articlePath: string, publicRoot: str
   return resolve(dirname(articlePath), token);
 }
 
+/** The regular file inside the public root a token resolves to, or null. */
 export const resolvesToFile = (token: string, articlePath: string, publicRoot: string) => {
   const path = resolveToken(token, articlePath, publicRoot);
-  return path !== null && existsSync(path) ? path : null;
+  if (path === null || !existsSync(path) || !statSync(path).isFile()) return null;
+  const root = realpathSync(publicRoot), file = realpathSync(path);
+  return file === root || file.startsWith(`${root}/`) ? path : null;
 };
 
 /** Markup outside declared image markup that shows an image: Markdown images, image elements or tokens. */
@@ -263,14 +277,15 @@ export function pullQuotes(article: string): Quote[] {
   });
 }
 
-/** Pull quotes the run added: those whose text the original article did not already hold as a pull quote. */
+/** Pull quotes the run added or changed: those whose text and attribution the original did not hold together. */
 export function addedQuotes(before: string, after: string): Quote[] {
-  const old = new Set(pullQuotes(before).map((q) => q.text));
-  return pullQuotes(after).filter((q) => !old.has(q.text));
+  const old = new Set(pullQuotes(before).map((q) => `${q.text}\u0000${q.cite}`));
+  return pullQuotes(after).filter((q) => !old.has(`${q.text}\u0000${q.cite}`));
 }
 
-/** True when the quote appears word for word in one of the sources, whitespace folded. */
-export const quoteFrom = (quote: Quote, sources: string[]) => sources.some((s) => fold(s).includes(quote.text));
+/** True when the quote appears word for word, on word boundaries, in one of the sources, whitespace folded. */
+export const quoteFrom = (quote: Quote, sources: string[]) =>
+  quote.text.length > 0 && sources.some((s) => new RegExp(`(?<![\\w])${escape(quote.text)}(?![\\w])`).test(fold(s)));
 
 /** Quote-like markup outside declared pull-quote markup, counted as the AC-03 row describes. */
 export function undeclaredQuotes(article: string): number {

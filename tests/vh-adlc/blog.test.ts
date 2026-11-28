@@ -494,3 +494,36 @@ describe("visual reading editor bounds", () => {
     expect(fold(raw(REF))).toMatch(/path of each cached convention page it needs/);
   });
 });
+
+describe("visual reading checks catch byte, quote, path and count changes", async () => {
+  const visual = await import("./blog/visual.ts");
+  const { mkdtempSync, mkdirSync: mkdir, writeFileSync: write, realpathSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const base = "# T\n\nOne line.\nTwo line.\n\n```sh\na\n\nb\n```\n";
+  test("line endings and blank lines inside code are compared exactly", () => {
+    expect(visual.bodyProse(base.replace(/\n/g, "\r\n"))).not.toBe(visual.bodyProse(base));
+    expect(visual.withoutTreatments(base.replace(/\n/g, "\r\n"))).not.toBe(visual.withoutTreatments(base));
+    expect(visual.withoutTreatments(base.replace("a\n\nb", "a\n\n\nb"))).not.toBe(visual.withoutTreatments(base));
+    expect(visual.withoutTreatments(base.replace("Two line.\n\n", "Two line.\n\n<figure>\n<img src=\"x.png\" alt=\"x\">\n</figure>\n\n"))).toBe(visual.withoutTreatments(base));
+  });
+  test("quotes match whole words and attribution changes count as added", () => {
+    expect(visual.quoteFrom({ text: "plan", cite: "" }, ["planning ahead"])).toBe(false);
+    expect(visual.quoteFrom({ text: "plan", cite: "" }, ["the plan, always"])).toBe(true);
+    const q = (cite: string) => `<blockquote class="pull-quote">\n<p>Keep it.</p>\n<cite>${cite}</cite>\n</blockquote>\n`;
+    expect(visual.addedQuotes(q("Fixture writer"), q("Someone else")).map((x) => x.cite)).toEqual(["Someone else"]);
+    expect(visual.addedQuotes(q("Fixture writer"), q("Fixture writer"))).toEqual([]);
+  });
+  test("image targets must be regular files inside the public root", () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), "bvr-target-")));
+    mkdir(join(dir, "site/img.png"), { recursive: true });
+    write(join(dir, "site/a.png"), "x");
+    write(join(dir, "outside.png"), "x");
+    const article = join(dir, "site/article.md");
+    expect(visual.resolvesToFile("img.png", article, join(dir, "site"))).toBeNull();
+    expect(visual.resolvesToFile("a.png", article, join(dir, "site"))).not.toBeNull();
+    expect(visual.resolvesToFile("../outside.png", article, join(dir, "site"))).toBeNull();
+  });
+  test("list markers are not counted as prose words", () => {
+    expect(visual.bodyWords("- one two\n1. three")).toBe(3);
+  });
+});
