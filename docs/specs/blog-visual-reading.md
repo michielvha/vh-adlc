@@ -56,7 +56,7 @@ These defaults were set under the owner's standing instruction to take the recom
 - A request for both wording changes and new visuals does the wording first, then a presentation revision over the revised prose.
 - Both manifests carry a version above `origin/main`'s when the feature ships: 0.35.0 while main is at 0.34.0, raised again if main moves first.
 
-Proof will come from static contract tests, ten new native Codex scenarios in the existing blog runner, one of which renders the article in a headless browser against a local preview, and a rerun of its nine existing scenarios against the changed package, recorded in the blog evidence README. All nineteen scenarios have run and passed against the 0.34.0 package (nine visual scenarios on macOS, `visual-rendered` on Linux, and the nine existing scenarios); those passes were judged by the harness before commit 536bad4 tightened its post-run checks, so the scenarios rerun against the current harness and the 0.35.0 package before the implementation review counts them. Five gaps raised in review are deferred to issue #204 and listed under Deferred. Since the acceptance at R-50, two independent reviews (R-51, R-52) found that three proof checks rejected correct output: the AC-04 gap line, the AC-05 illustration caption and the AC-07 image subject. After a third review found new counterexamples, the orchestrator decided under the owner's delegation (2026-11-28, ledger #179) to drop those three patterns: the implementation reviewer judges those outputs by meaning from the recorded transcripts, and every fixed-shape check stays mechanical. After R-54 the same rule covers three more free-text checks: the point of each treatment, the long-run location in the editor's entry and the missing phone check. `rain` joins the word-free list, and `covers` now includes the marketplace files, `check.test.ts` and the shared test fixtures. Acceptance authorizes implementing this and committing on `feat/blog-visual-reading`. Pushing to update PR #75 needs a ship request, and merging it needs the owner's separate approval. CI, which runs the Linux-only tests this macOS host cannot pass, is checked at ship on the pushed head and must pass before a merge; it is not part of the implementation review.
+Proof will come from static contract tests, ten new native Codex scenarios in the existing blog runner, one of which renders the article in a headless browser against a local preview, and a rerun of its nine existing scenarios against the changed package, recorded in the blog evidence README. All nineteen scenarios have run and passed against the 0.34.0 package (nine visual scenarios on macOS, `visual-rendered` on Linux, and the nine existing scenarios); those passes were judged by the harness before commit 536bad4 tightened its post-run checks, so the scenarios rerun against the current harness and the 0.35.0 package before the implementation review counts them. Five gaps raised in review are deferred to issue #204 and listed under Deferred. Since the acceptance at R-50, two independent reviews (R-51, R-52) found that three proof checks rejected correct output: the AC-04 gap line, the AC-05 illustration caption and the AC-07 image subject. After a third review found new counterexamples, the orchestrator decided under the owner's delegation (2026-11-28, ledger #179) to drop those three patterns: the implementation reviewer judges those outputs by meaning from the recorded transcripts, and every fixed-shape check stays mechanical. After R-54 the same rule covers three more free-text checks: the point of each treatment, the long-run location in the editor's entry and the missing phone check. `rain` joins the word-free list, and `covers` now includes the marketplace files, `check.test.ts`, the shared test fixtures, the docs pin in `knowledge.md`, `ensure-vh-adlc.sh` and the binary lock file. The handoff every visual check reads is now the parent's final message, and the chart view must come from the editor that reviewed the first candidate. Acceptance authorizes implementing this and committing on `feat/blog-visual-reading`. Pushing to update PR #75 needs a ship request, and merging it needs the owner's separate approval. CI, which runs the Linux-only tests this macOS host cannot pass, is checked at ship on the pushed head and must pass before a merge; it is not part of the implementation review.
 
 Since the acceptance at R-47, drift re-review R-48 found two rules out of date after main moved on, and the owner approved their replacements on 2026-11-24. The fixed version 0.17.0 would have been a downgrade from main's 0.33.0, so the version is now any version above main's. The local test exception for the fixture-lock error no longer applies, so the local suite is now compared with an `origin/main` worktree on the same macOS host.
 
@@ -344,6 +344,7 @@ None. The defaults in the owner summary were set under the owner's standing inst
 | 2026-11-28 | R-52 | spec | `536bad4` | claude-opus-5-5 | procedural | Host-route drift re-review, orchestrator-directed under the owner's delegation because R-51 re-opened accepted scope: 1 blocking (R-51 F-06 again: three Test Plan patterns reject correct outputs), 4 should-fix, 4 nits |
 | 2026-11-28 | R-53 | spec | `64bcde5` | gpt-6.2-sol | procedural | Review of the pattern revision on the Codex route: 7 blocking, 3 should-fix; new counterexamples to the widened patterns and re-opened deferred items; convergence trigger fires (7 after 1), no revision; added rerun task T15 (F-08); proportionality answer: narrow, decided by the orchestrator under the owner's delegation (ledger #179): the three free-text pattern checks become reviewer judgement from recorded transcripts, F-04 to F-07 stay deferred (#204) |
 | 2026-11-28 | R-54 | spec | `4129481` | gpt-6.2-sol | procedural | Review of the judged-outputs revision on the Codex route: 7 blocking, 6 should-fix, 1 nit; F-04 to F-07 re-open the #204 deferrals; F-01 to F-03 extend the same free-text concern to three more checks |
+| 2026-11-28 | R-55 | spec | `9eaaa64` | claude-opus-5-5 | procedural | Host-route gating pass, orchestrator-directed under the owner's delegation (ledger #179): no blocking; 1 should-fix, 3 nits; summary nit F-04 applied outside the baseline |
 
 ### R-1
 
@@ -2077,6 +2078,38 @@ SEVERITY: nit
 WHERE: Tasks T5 through T11, T14, T15
 EVIDENCE: The R-53 revision places the two new unchecked tasks above checked tasks that supply their prerequisites. T14 changes the harness built in T5 through T9, and T15 reruns the cases recorded in T10 and T11. The pinned standard orders tasks by dependency and keeps replanning in the unchecked tail.
 PROPOSAL: Put T14 and T15 after T11 and before T12.
+
+### R-55
+
+TARGET: 9eaaa64b435d4a447579a99424ff4cbaf1443323
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan evidence preamble (line 230), Test Plan AC-04 (the nine existing cases), Tasks T14 and T15
+EVIDENCE: The R-54 revision changes the preamble so that the runner keeps, "for each scenario `<id>`", "the parent's final message, which is the handoff every check reads". `tests/vh-adlc/blog/run.ts:587` loops over all selected cases, the nine existing ones included, and those cases' checks at `run.ts:678-685` (`pendingReported`, `noveltyFlagged`, `honestFallback`, `editorVerdict`, `explicitSuggestion`, `noSuggestion`) read `response`. That value is every agent message joined by `events()` at `tests/vh-adlc/lifecycle/fixtures.ts:441-464`. One implementer will read "every check" as covering these nine cases and point them at the final message only. Another will limit the change to the ten visual scenarios. Under the first reading, a correct run that said "self-edit" or "pending" in an earlier message fails AC-04's requirement that the nine existing cases "rerun against the changed package and pass". This traces to the R-54 F-08 fix.
+PROPOSAL: Say which scenarios the final-message handoff applies to: the ten visual scenarios, with the nine existing cases keeping their current checks over every agent message. Otherwise say plainly that all nineteen change, and that T14 updates the existing checks to match.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan evidence preamble (line 230), Tasks T14
+EVIDENCE: The preamble has `<id>.judged.md` hold "the handoff lines that name a treatment, the gap passage or a missing rendered check". A treatment line can be found mechanically by basename or the quote's first five words. Finding the gap-passage line or the missing-check line, though, needs a phrase match such as "ledger cutover" or `phone`, and the revision dropped exactly those patterns. T14 still asks for unit tests of the excerpts. The full handoff is kept in `<id>.handoff.txt`, and the reviewer "reads those files", so a missed excerpt does not by itself decide a verdict.
+PROPOSAL: Say that `judged.md` is a reading aid, that the verdicts for AC-04 and AC-08 read the full `<id>.handoff.txt`, and that `judged.md` excerpts only the parts found by fixed shape (treatment keys, declared captions and alt text, labelled entries).
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan evidence preamble (line 230)
+EVIDENCE: The preamble still keeps "the article as `<out>/<id>/article.md`" for every scenario. `visual-editor` writes `candidate-1.md` and `candidate-2.md` (`tests/vh-adlc/blog/run.ts:171,200`), and `visual-editor-pass` writes `candidate.md` (`run.ts:216,238`). This is the second half of R-54 F-11, which the revision left unapplied. The judged outputs for those two scenarios come from rollouts and the handoff, so no verdict depends on the path.
+PROPOSAL: Name the article or candidate files for each scenario, for example "the article or candidates under `<out>/<id>/`".
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context Owner summary (line 59), frontmatter `covers`
+EVIDENCE: The summary says "`covers` now includes the marketplace files, `check.test.ts` and the shared test fixtures". The R-54 revision also added `plugins/vh-adlc/knowledge.md`, `plugins/vh-adlc/scripts/ensure-vh-adlc.sh` and `plugins/vh-adlc/vh-adlc.lock.json` to `covers` (frontmatter lines 22-24). Because of those three paths, any binary or docs-pin bump on main makes the next spec review a full pass. The summary also leaves out two other proof changes in the same revision: the handoff is now the parent's final message, and the chart view is now bound to the first candidate's editor.
+PROPOSAL: Add the three new `covers` paths and the two proof changes to the summary's list of changes since R-50.
 
 ## Sources
 
