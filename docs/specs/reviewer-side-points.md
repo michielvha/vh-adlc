@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Claimed on feat/reviewer-side-points; next the experiment commit and the host replay on a copy of the enterprise case."
+status: abandoned
+status_description: "Abandoned by the owner on 2026-11-28: the host-route replay refuted the side-point cause for L-08 (0 of 12 passes), so the sentence does not ship. D-17 and D-18 stay known losses on #172."
 issue: https://github.com/michielvha/vh-adlc/issues/172
 branch: feat/reviewer-side-points
 goal: "A spec reviewer that finds a secondary defect while writing up a wider finding reports it, either inside that finding or as a finding of its own, so the enterprise replay labels L-08 and L-10 pass retention again without more blocking findings per pass."
@@ -240,9 +240,12 @@ before the upgrade keeps the brief it loaded. No state, schema or boundary chang
 
 ## Tasks
 
-- [ ] T1 `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` on the experiment branch `exp/reviewer-side-points`, from `ef685da1` - the sentence from Design after the line-82 sentence; `git diff ef685da1 exp/reviewer-side-points` adds that sentence and nothing else (AC-02, AC-03, AC-04)
-- [ ] T2 `tests/vh-adlc/evidence/reviewer-side-points/results.md` - the host route replay on the case copy, with the arguments in Design; the file holds the brief identities, the host runs with identity and status, the host retention verdicts with L-08's count at its minimum, and the host blocking and should-fix means, and `run.ts terms` on it prints pass (AC-02, AC-03, AC-04, AC-05)
+- [x] T1 `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` on the experiment branch `exp/reviewer-side-points`, from `ef685da1` - the sentence from Design after the line-82 sentence; `git diff ef685da1 exp/reviewer-side-points` adds that sentence and nothing else (AC-02, AC-03, AC-04)
+      Evidence: `git diff ef685da1 b04b70ac` (exp/reviewer-side-points) shows 1 file, 2 insertions: the Design sentence as two lines right after "Return every finding you can establish within this pass's scope; do not hold any back for a later pass." (line 79 at ef685da1), no other change. No failing test first: the proof is the replay in T2 and T3.
+- [x] T2 `tests/vh-adlc/evidence/reviewer-side-points/results.md` - the host route replay on the case copy, with the arguments in Design; the file holds the brief identities, the host runs with identity and status, the host retention verdicts with L-08's count at its minimum, and the host blocking and should-fix means, and `run.ts terms` on it prints pass (AC-02, AC-03, AC-04, AC-05)
+      Evidence: `bun tests/vh-adlc/replay/run.ts run --only first-passes --routes-under-test host` on a copy of the enterprise case on the case host, 2026-11-27, brief under test `b04b70ac` with docs `0fa68d68`: 12 counted passes (the harness extended after 6). L-08 at its minimum 0 of 6 and 0 of 12, so AC-02 is not met. None of the 22 host pairs among the 59 fails. Blocking mean 5.33 against a bound of 6.85, should-fix mean 19.00. `run.ts terms` on the results file: pass. Limitation: the host route only.
 - [ ] T3 `tests/vh-adlc/evidence/reviewer-side-points/results.md` - the command route replay on the same copy; the file adds the command runs, retention verdicts with L-10's count, and means, and states each of AC-02 to AC-04 as met or not met against its threshold; `run.ts terms` on it prints pass (AC-02, AC-03, AC-04, AC-05)
+      Not run: AC-02 was already not met on the host route, so the command route's result could not change the outcome. The workstream orchestrator decided to skip it on 2026-11-27 under the owner's delegation (ledger [#179](https://github.com/michielvha/vh-adlc/issues/179)), saving 6 to 12 Codex passes. T4 and T5 do not run, because the replay missed AC-02.
 - [ ] T4 `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` - only if T2 and T3 meet AC-02 to AC-04: the same sentence after the "Return every finding" sentence on the feature branch; the sentence matches T1's byte for byte, and `bun test tests/vh-adlc/proportionality.test.ts tests/vh-adlc/proportional-review.test.ts tests/vh-adlc/feature-native-review.test.ts --timeout 60000` passes (AC-01)
 - [ ] T5 `plugins/vh-adlc/.claude-plugin/plugin.json`, `plugins/vh-adlc/plugin.json` - the patch-version bump; both manifests show the version one above main's, and `bun test tests/vh-adlc/loop/plugin-version.test.ts --timeout 60000` passes (AC-01)
 
