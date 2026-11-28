@@ -110,15 +110,31 @@ func TestSpecRecords(t *testing.T) {
 		{"mixed", finding("F-01", "nit") + "\nNO FINDINGS", false, false, true, false},
 		{"empty", "", false, false, false, false},
 		{"prose only", "Looks fine to me.", false, false, false, false},
+		{"no findings with trailing spaces", "NO FINDINGS  \n", true, true, false, true},
+		{"nits with trailing spaces", trailing(finding("F-01", "nit")+"\n"+finding("F-02", "should-fix"), "  "), true, true, false, false},
+		{"blocking with trailing tab", trailing(finding("F-01", "blocking"), "\t"), true, false, false, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := r.SpecRecords(lines(tt.text))
+			// Trim only newlines, so trailing spaces on the last line reach SpecRecords.
+			got := r.SpecRecords(strings.Split(strings.Trim(tt.text, "\n"), "\n"))
 			if got.WellFormed != tt.wellFormed || got.Clean() != tt.clean || got.Mixed != tt.mixed || got.NoFindings != tt.no {
 				t.Fatalf("got %+v clean=%v", got, got.Clean())
 			}
 		})
 	}
+}
+
+// trailing appends suffix to every non-empty line, the way some reviewers end
+// Markdown lines with a hard break.
+func trailing(text, suffix string) string {
+	ls := strings.Split(text, "\n")
+	for i, l := range ls {
+		if l != "" {
+			ls[i] = l + suffix
+		}
+	}
+	return strings.Join(ls, "\n")
 }
 
 func TestImplRecords(t *testing.T) {
@@ -136,6 +152,19 @@ func TestImplRecords(t *testing.T) {
 	}
 	if recs[1].Verdict != "not verified" {
 		t.Fatalf("second record = %+v", recs[1])
+	}
+	spaced, ok := r.ImplRecords(strings.Split(trailing(good, "  "), "\n"))
+	if !ok || len(spaced) != 2 || spaced[0].ID != "AC-01" || spaced[0].Text != "The first end state." || spaced[0].Verdict != "met" || spaced[1].Verdict != "not verified" {
+		t.Fatalf("records with trailing spaces = %+v, ok = %v", spaced, ok)
+	}
+	// A criterion header with empty text still ends in the separator the
+	// pattern requires; ignoring trailing spaces must not drop that record.
+	empty, ok := r.ImplRecords(strings.Split(good+"\nCRITERION: AC-02 \nVERDICT: not met\nEVIDENCE: x", "\n"))
+	if !ok || len(empty) != 3 || empty[2].ID != "AC-02" || empty[2].Text != "" || empty[2].Verdict != "not met" {
+		t.Fatalf("records with an empty criterion text = %+v, ok = %v", empty, ok)
+	}
+	if _, ok := r.ImplRecords(strings.Split(good+"\nCRITERION: AC-03 \nEVIDENCE: x", "\n")); ok {
+		t.Error("an incomplete record with empty criterion text: ok = true, want false")
 	}
 	for name, text := range map[string]string{
 		"verdict missing": "CRITERION: AC-01 Text.\nEVIDENCE: x\n",
