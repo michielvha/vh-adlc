@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Replay on the host route missed AC-02 (L-08 0 of 12), so the sentence does not ship; the command route was not run. Waiting on the owner's choice of end state."
+status: abandoned
+status_description: "Abandoned by the owner on 2026-11-28: the host-route replay refuted the side-point cause for L-08 (0 of 12 passes), so the sentence does not ship. D-17 and D-18 stay known losses on #172."
 issue: https://github.com/michielvha/vh-adlc/issues/172
 branch: feat/reviewer-side-points
 goal: "A spec reviewer that finds a secondary defect while writing up a wider finding reports it, either inside that finding or as a finding of its own, so the enterprise replay labels L-08 and L-10 pass retention again without more blocking findings per pass."
