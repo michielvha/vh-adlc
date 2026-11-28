@@ -340,6 +340,7 @@ None. The defaults in the owner summary were set under the owner's standing inst
 | 2026-11-28 | R-51 | spec | `00ad0a1` | gpt-6.2-sol | procedural | Drift re-review on the Codex route: 6 blocking, 10 should-fix, 2 nits; none traces to the covered drift |
 | 2026-11-28 | R-52 | spec | `536bad4` | claude-opus-5-5 | procedural | Host-route drift re-review, orchestrator-directed under the owner's delegation because R-51 re-opened accepted scope: 1 blocking (R-51 F-06 again: three Test Plan patterns reject correct outputs), 4 should-fix, 4 nits |
 | 2026-11-28 | R-53 | spec | `64bcde5` | gpt-6.2-sol | procedural | Review of the pattern revision on the Codex route: 7 blocking, 3 should-fix; new counterexamples to the widened patterns and re-opened deferred items; convergence trigger fires (7 after 1), no revision; added rerun task T15 (F-08); proportionality answer: narrow, decided by the orchestrator under the owner's delegation (ledger #179): the three free-text pattern checks become reviewer judgement from recorded transcripts, F-04 to F-07 stay deferred (#204) |
+| 2026-11-28 | R-54 | spec | `4129481` | gpt-6.2-sol | procedural | Review of the judged-outputs revision on the Codex route: 7 blocking, 6 should-fix, 1 nit; F-04 to F-07 re-open the #204 deferrals; F-01 to F-03 extend the same free-text concern to three more checks |
 
 ### R-1
 
@@ -1973,6 +1974,106 @@ SEVERITY: should-fix
 WHERE: Context Owner summary and Background
 EVIDENCE: Context records the October incident and the owner’s request to avoid repeating it. It gives no account of recurrence or whether the normal editor pass would catch the gap. It also gives no reason for rejecting the simpler option of adding a presentation check to the existing editor.
 PROPOSAL: State the observed frequency and whether the current workflow recovers without the owner’s help. Explain why an editor-only check would leave the problem unresolved.
+
+### R-54
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Context Owner summary, Design Editor, AC-07, Test Plan AC-07, T14
+EVIDENCE: The R-53 revision removes the image-subject pattern but retains the requirement that the `unbroken prose` entry contain `harbor survey`. In Bun, the label passed and the phrase check failed for `unbroken prose: insert a pull quote halfway through the 2,500 words after the existing pull quote.` That entry uniquely locates the gap and proposes a repair, which meets the Design and AC-07.
+PROPOSAL: Keep the label check mechanical and judge whether the entry identifies the seeded gap.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: Context Owner summary, Design Editor and Handoff and documentation, AC-08, Test Plan AC-08, T9, T10, T15
+EVIDENCE: `tests/vh-adlc/blog/run.ts:578-579` and the AC-08 row require the word `phone` in the editor entry and handoff. The splitter accepted `unverified render: the handset preview still needs checking`, and the word check rejected it. The fixed viewport names in the Design apply to `Rendered checks:` entries. The editor entry and handoff can correctly identify the missing check in their own words.
+PROPOSAL: Keep the viewport names on the fixed `Rendered checks:` line and check that the editor entry and handoff identify the missing phone check by meaning.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: blocking
+WHERE: Context Owner summary, Design The reading pass and Handoff and documentation, AC-01, Test Plan AC-01, T8, T10, T15
+EVIDENCE: AC-01 requires the handoff to give the point of each treatment. The proof also requires four words besides the treatment identifier. `handoffNamesTreatment` returned `false` for `- asset-1.png: shows approval controls.` That line identifies the supplied screenshot and says what it shows.
+PROPOSAL: Keep a check that links the handoff to the treatment and judge whether the handoff states its point.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: blocking
+WHERE: Context Owner summary and Background, Scope, Design Relationship to blog-authoring and The reading pass, AC-01, AC-09, Test Plan AC-01 and AC-09, T4, `docs/specs/blog-authoring.md` Context, Draft and handoff, and AC-09
+EVIDENCE: The Context pointer claims to replace two review targets. `docs/specs/blog-authoring.md:98` still requires added visuals to solve an explanation problem. A long founder story can be clear throughout and still need a pull quote for pacing under this feature. The pinned standard and `internal/doc/baseline.go:21-44` keep the older Design in force after a Context-only edit. `docs/specs/blog-authoring.md:121` specifies the contents of the editor return and leaves its line count open.
+PROPOSAL: Raise a scoped revision of blog-authoring's visual rule for owner approval. Record the fourth return line as an extension that preserves the earlier AC-09 requirements.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: blocking
+WHERE: Scope, Context Owner summary, Design Terminology, The reading pass, Editor, and Handoff and documentation, AC-01, AC-02, AC-09, and their Test Plan rows
+EVIDENCE: D-01 defers “An owner request for a text-only long-form article, or a destination that cannot hold a treatment, with quotable notes.” AC-01 still requires a body treatment for a 1,200-word text-only request with quotable notes and an exact-wording span. The no-visual exception applies only below 800 words, and the long-form fallback assumes the notes contain no quotable line. A writer that honors the text-only instruction cannot meet AC-01 in that case.
+PROPOSAL: Make the owner's explicit restriction and the destination's supported format govern placement at every length. Align AC-01 and its proof with that scope.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: blocking
+WHERE: Scope, Context Owner summary, Design The reading pass, Rendering checks, and Editor, AC-04, Test Plan AC-04
+EVIDENCE: D-03 defers “An owner edit saved to the article or an asset while the editor runs.” `plugins/vh-adlc/references/blog.md:218-232` tells the writer to send the candidate to the editor, wait for the final return and apply repairs. A writer that saves from its earlier copy can erase an intervening owner edit. The AC-04 comparison against the original snapshot can still pass after that edit is lost.
+PROPOSAL: Require the writer to preserve intervening edits and report any conflict that prevents safe application of a repair. Verify that an owner edit saved during the editor turn survives.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: blocking
+WHERE: Scope, Context Owner summary, Design Terminology, Rendering checks, and Handoff and documentation, AC-08, AC-09, Test Plan AC-08 and AC-09
+EVIDENCE: D-04 defers “Per-article fixed handoff lines in a batch with different outcomes.” The Design allows one `Rendered checks:` line per handoff and requires rendered results to appear only there. A batch with one rendered article and one article that could not be rendered requires both the entries form and the `unverified` form under AC-08. A single line cannot carry both forms or identify which article each result covers.
+PROPOSAL: Give each named article its own fixed line within a batch handoff. Verify a batch containing one rendered article and one unrendered article.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context Owner summary, Design The reading pass and Handoff and documentation, AC-04, Test Plan evidence preamble and AC-04, T14, T15
+EVIDENCE: The new preamble calls `<id>.response.txt` the parent's handoff. `tests/vh-adlc/lifecycle/fixtures.ts:441-464` concatenates every `agent_message`, and `tests/vh-adlc/blog/run.ts:645-646,686` writes that concatenation to the file. The historical `visual-review.response.txt` contains a progress message about the cutover gap before the final handoff. A run with the same progress update and a final handoff that omits the gap could pass the revised manual check.
+PROPOSAL: Use the parent rollout's final turn message as the handoff for judging AC-04. Preserve it in full so excerpt selection does not depend on finding an expected phrase.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context Owner summary, Design Asset and quote integrity, AC-05, Test Plan evidence preamble and AC-05, T14
+EVIDENCE: The R-53 revision checks the meaning of a caption or alt text. A new figure with alt text `Conceptual sketch of the approval workflow` and caption `Screenshot of the live approval screen` can pass if the reviewer reads the alt text alone. The Design forbids presenting the illustration as product UI.
+PROPOSAL: Judge the caption and alt text together for the same newly added image. Treat a claim of captured product UI in either field as a failure.
+
+FINDING: F-10
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context Owner summary, Design Editor, AC-07, Test Plan evidence preamble and AC-07, T7, T14
+EVIDENCE: The revised proof asks for an editor return that correctly describes the chart and a recorded view by one of the editors. `tests/vh-adlc/blog/run.ts:557-571` binds the image finding to the first candidate's editor but accepts a view from the combined set of editor turns. The second editor could supply the only image view while the first supplies the prose that passes manual review.
+PROPOSAL: Require the editor assigned the first candidate to receive the PNG tool output before returning the finding. Tie the excerpt and view to that editor's thread.
+
+FINDING: F-11
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context Owner summary, Design Artifacts and publication, Test Plan evidence preamble and AC-04, AC-05, AC-07, AC-08, T10, T11, T12, T14, T15
+EVIDENCE: The revised plan makes review depend on files outside Git, but T15 requires only versions, hosts, payload fingerprints and raw event hashes in the README. Those fields do not locate the files, identify the full harness revision or bind the article and linked editor rollout to the recorded attempt. The evidence preamble also assigns every scenario an `article.md`, although `visual-editor` uses `candidate-1.md` and `candidate-2.md` and `visual-editor-pass` uses `candidate.md`.
+PROPOSAL: Record the exact harness commit and a private evidence location for each attempt, with the result record and the original files the reviewer must inspect. Name the actual article or candidate path for each manual check.
+
+FINDING: F-12
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter `covers`, Context Owner summary, Design Artifacts and publication, Test Plan AC-01, AC-04, AC-07 and AC-08, T7 through T11, T14, T15
+EVIDENCE: The rerun depends on the docs pin and binary bootstrap. `tests/vh-adlc/blog/run.ts:48-52,528-538` reads `plugins/vh-adlc/knowledge.md` and runs `plugins/vh-adlc/scripts/ensure-vh-adlc.sh`, which reads `plugins/vh-adlc/vh-adlc.lock.json` at line 37. None of these three paths is covered. A change to the resolved docs or binary can change whether the rerun starts or what inputs the editor receives without making the review stale.
+PROPOSAL: Add the docs pin, binary bootstrap script and binary lock to `covers`.
+
+FINDING: F-13
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context Owner summary and Background
+EVIDENCE: Context records one owner reminder and describes an ongoing problem. It gives no evidence about recurrence or whether the existing editor would catch the omission. It also gives no reason for passing over the simpler option of adding a presentation check to the existing editor. The ledger's harm statement covers resuming the branch. [Workstream ledger #179](https://github.com/michielvha/vh-adlc/issues/179)
+PROPOSAL: State what is known about recurrence and recovery, and explain why an editor-only check would leave the owner's problem unresolved.
+
+FINDING: F-14
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T5 through T11, T14, T15
+EVIDENCE: The R-53 revision places the two new unchecked tasks above checked tasks that supply their prerequisites. T14 changes the harness built in T5 through T9, and T15 reruns the cases recorded in T10 and T11. The pinned standard orders tasks by dependency and keeps replanning in the unchecked tail.
+PROPOSAL: Put T14 and T15 after T11 and before T12.
 
 ## Sources
 
