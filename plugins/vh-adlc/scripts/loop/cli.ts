@@ -23,9 +23,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadLoopSettings, loadLoopSettingsAt, routeFor, type LoopOperation } from "./settings";
 import { runReviewRoute } from "./review-route";
-import { loopContext, type LoopContext } from "./procedure";
+import { contextReport, loopContext, type LoopContext } from "./procedure";
 import { cacheReviewPages } from "./pages";
-import { pluginStatus } from "./plugin-version";
 import { applicableRungs, deferredRungs, featureDelta, mayAdvance, RUNG_STAGES, runRungs, type RungStage } from "./rungs";
 import { ciReport, conventionSupportsSkipPaths, deliveryVerdict, repositoryVisibility, skipMarker } from "./delivery";
 import { claim, isolation } from "./claim";
@@ -103,7 +102,7 @@ export async function main(argv: string[]): Promise<number> {
     console.log(JSON.stringify(routeFor(settings, operation, options.continues ? { continues: options.continues as Exclude<LoopOperation, "resume"> } : {})));
     return 0;
   }
-  if (command === "context") { console.log(JSON.stringify({ ...loopContext(settings), plugin: pluginStatus(settings.root) })); return 0; }
+  if (command === "context") { console.log(JSON.stringify(contextReport(settings, options["default-branch"]))); return 0; }
   if (command === "isolation") { console.log(JSON.stringify(isolation(settings, repo, { hostWorktreeTool: options["host-worktree-tool"] === "true" }))); return 0; }
   if (command === "claim") {
     const document = need(options, "document"), featureBranch = need(options, "feature-branch"), description = need(options, "status-description");

@@ -21,7 +21,8 @@ that table's orchestration row.
 1. Get the binary and run `vh-adlc knowledge` with `conventions/delivery.md`,
    `conventions/feature-documents.md` and `guides/humanize-prose.md`. Report the one-line result and
    read the pages from the cache.
-2. Run `bun scripts/loop/cli.ts context` and read every file it lists: the repository's instruction
+2. Run `bun scripts/loop/cli.ts context --default-branch <default branch>` and read every file it lists
+   at the version `references/loop-settings.md` (Instruction freshness) names: the repository's instruction
    files and its project procedure, whose `## Orchestration` section sets this workstream's specifics.
    If its `plugin.stale` is true, follow the stale-orchestrator rule in `references/orchestrate.md`
    before anything else. If it reports `plugin.binary_warning`, run only the binary

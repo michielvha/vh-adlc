@@ -139,8 +139,9 @@ Every page the loop needs is requested on every call, so a pin older than the pl
 
 A repository may declare loop settings in `.vh-adlc/loop.yaml` (`references/loop-settings.md`). The
 SDD operations (spec, tasks, implement, review, ship, investigate and resume) then read their loop role's
-route with `bun scripts/loop/cli.ts route`, and before acting read the instruction files and project
-procedure that `bun scripts/loop/cli.ts context` lists.
+route with `bun scripts/loop/cli.ts route`, and before acting run
+`bun scripts/loop/cli.ts context --default-branch <default branch>` and read every file it lists at the
+version `references/loop-settings.md` (Instruction freshness) names.
 
 ## 3. Decide with the binary
 
