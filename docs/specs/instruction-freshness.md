@@ -349,6 +349,7 @@ None.
 | 2026-11-27 | R-5 | implementation | `8c79b67` | claude-opus-5-5 | procedural | All eight criteria met |
 | 2026-11-27 | R-6 | spec | `9c0d567` | claude-opus-5-5 | procedural | Drift re-review after merging main: 1 nit in Context, applied outside the baseline |
 | 2026-11-27 | R-7 | implementation | `9c0d567` | claude-opus-5-5 | procedural | All eight criteria met after merging main |
+| 2026-11-28 | R-8 | spec | `9381c9a` | gpt-6.2-sol | procedural | Codex drift re-review: 5 blocking, 10 should-fix, 2 nits |
 
 ### R-1
 
@@ -592,3 +593,124 @@ EVIDENCE: Same run at 9c0d567, all pass: the pointer test for all eight SKILL.md
 CRITERION: AC-08 In a clone with no `origin/HEAD`, `context` reports a verified tip both with `--default-branch` and, through `git ls-remote`, without it.
 VERDICT: met
 EVIDENCE: Same run at 9c0d567, all pass. "a clone without origin/HEAD still verifies" runs `git symbolic-ref --delete refs/remotes/origin/HEAD`, then `context` with `--default-branch main` and with no flag; both report `freshness.tip` equal to origin's tip, with no file entry and no settings entry `unverified`. The ls-remote fallback is in fetchTip in freshness.ts. Limitation: local bare origin.
+
+### R-8
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design (Settings file, States, Read rule); Acceptance Criteria AC-03 and AC-07; Test Plan rows AC-03 and AC-07
+EVIDENCE: `settings.ts:85-90` checks that a listed path resolves inside the directory supplying the settings. For a tip-supplied list, that directory is a temporary archive. `procedure.ts:21-27` then passes the same paths to `freshness.ts:60-72`, which follows working-tree symlinks without checking containment. The read rule directs the operation to open the resulting local path. This can read files outside the checkout, across the boundary enforced by the existing settings reader.
+PROPOSAL: Require checkout containment before hashing or returning any local path, including paths first supplied by tip settings. Keep the same boundary when the operation opens the file.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: Context (Owner summary, fetch paragraph); Design (Default branch and fetch, Concurrency, failure, upgrade); Acceptance Criteria AC-06; Test Plan row AC-06
+EVIDENCE: `--no-tags` does not confine ref updates to `refs/remotes/origin/<branch>`. In a scratch clone with an extra configured fetch destination for `main`, the reviewed `context` returned successfully and created `refs/heads/copied-main` as well as advancing `refs/remotes/origin/main`. The explicit refspec at `freshness.ts:46` still uses configured mappings. The AC-06 fixture checks a default clone and passes. [Git fetch documentation](https://git-scm.com/docs/git-fetch#Documentation/git-fetch.txt---refmapltrefspecgt)
+PROPOSAL: Specify a fetch that ignores configured destination mappings and disables pruning and recursive submodule fetches. Extend AC-06 with a configured extra destination and assert that every other ref is preserved.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: blocking
+WHERE: Scope (`--default-branch` and read-rule bullets); Design (Default branch and fetch, Read rule); Acceptance Criteria AC-07; Test Plan row AC-07; Tasks T5 and T6
+EVIDENCE: The exact command in the read rule and the AC-07 must-pass example omits `--repo`. After substituting `main`, running it against the reviewed CLI returned `{"status":"error","reason":"missing --repo"}`. `cli.ts:90-105` requires the flag before handling `context`. The AC-07 text check passes on the unusable command and rejects a command that includes `--repo` inside the required code span.
+PROPOSAL: Put the complete invocation in the rule, pointers and must-pass example. Run the documented invocation in a behind-tip fixture and verify that the operation can open the reported versions.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: blocking
+WHERE: Context (Owner summary and Background, Current state); Scope (tip settings); Design (Settings file, Output); Acceptance Criteria AC-03; Test Plan row AC-03
+EVIDENCE: The design relies on `loadLoopSettingsAt`, which uses `git archive` at `settings.ts:246-255`. In a scratch clone where the tracked `.vh-adlc/loop.yaml` had `export-ignore`, `git show` returned valid tip settings listing the new instruction file. `context` reported the settings as `stale` with no error but returned `read: []`. The operation silently skipped every instruction. [Git archive documentation](https://git-scm.com/docs/git-archive#_attributes)
+PROPOSAL: Read and validate settings against the committed tree independently of archive attributes. Add an AC-03 fixture with `export-ignore` on the settings file and verify the reported list and lenses.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: blocking
+WHERE: Frontmatter `goal`; Context (Owner summary); Design (States, Settings file, Read rule); Acceptance Criteria AC-01, AC-03 and AC-07; Test Plan rows AC-01/AC-02, AC-03 and AC-07
+EVIDENCE: The existing settings reader accepts symlinks to files inside the repository. In a scratch clone where the tip replaced a listed Markdown file with an in-repository symlink, `context` reported `stale` and `git show` of its `read` value printed the link target's name. The prescribed read therefore cannot return the instruction content for a file the settings reader accepts.
+PROPOSAL: Specify how a tip read resolves supported in-repository symlinks to instruction content. Add a fixture that checks the content returned for a listed path whose type changes at the tip.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter `goal`; Context (Owner summary); Scope (default branch flag); Design (Default branch and fetch, Read rule); Acceptance Criteria AC-08; Test Plan row AC-08
+EVIDENCE: The no-flag design treats an existing `origin/HEAD` as authoritative. In a scratch clone where origin changed its default from `main` to `next` and kept `main`, `git ls-remote --symref origin HEAD` named `next`, while `context` reported `main` and marked the old instruction `current`. AC-08 removes the cached symbolic ref, so it cannot catch this case.
+PROPOSAL: Define how no-flag calls verify the current remote default when a cached symbolic ref exists. Add a case where the old default branch still exists after the switch.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Frontmatter `goal`; Context (Owner summary); Scope (tip settings); Design (Settings file, Output); Acceptance Criteria AC-03 and AC-04; Test Plan rows AC-03 and AC-04
+EVIDENCE: The settings design keeps the local list and lenses for `removed` settings. In a scratch clone where origin deleted `.vh-adlc/loop.yaml` and the clone left it untouched, `context` reported `settings.state: "removed"` but still listed the old rule. AC-04 deletes a listed file while retaining edited settings and never checks the effect of deleting the settings file itself.
+PROPOSAL: Define the effective list and lenses when the tip deliberately removes unchanged local settings. Test that case separately from a branch retaining its own edited settings.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context (Owner summary and Background, Current state); Design (Default branch and fetch, States, Settings file); Acceptance Criteria AC-01, AC-03 and AC-05; Test Plan rows AC-01/AC-02, AC-03 and AC-05
+EVIDENCE: `cli.ts:99-105` validates the local settings and every listed file before it fetches. In a scratch clone with a missing local instruction file and a valid copy at the tip, `context` stopped with `instruction_files[0] must reference a file`. A sparse checkout can hit the same path even though the tip has valid settings and content.
+PROPOSAL: Specify how `context` distinguishes an unavailable local copy from invalid settings. Add a case with a valid tip and a listed file outside the checkout's sparse paths.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context (Owner summary, settings and fallback paragraphs); Design (Settings file, Output, Read rule); Acceptance Criteria AC-03 and AC-07; Test Plan rows AC-03 and AC-07
+EVIDENCE: The settings section says `freshness.settings` tells operations which settings supplied the list. On a tip load failure, `procedure.ts:21-27` keeps the local list but leaves `settings.read` pointing to the tip. The read rule requires a report notice only for `unverified`. A load failure can therefore send an operation back to the stale list without the owner-facing notice promised for an unverified result. The fallback test checks the JSON error only.
+PROPOSAL: Make the report identify the settings source actually used. Require the operation to report the fallback reason when tip settings cannot be loaded.
+
+FINDING: F-10
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context (Owner summary, settings paragraph); Design (Settings file, Output, Concurrency, failure, upgrade); Acceptance Criteria AC-03; Test Plan row AC-03
+EVIDENCE: The upgrade section says an old operation can ignore `freshness` and behave as before. AC-03 expressly adds a path that is absent locally to the existing `read` array. An old operation following the former local-path rule will try to open that missing file. The new field is additive, but the contents of the old field have changed.
+PROPOSAL: Preserve the old field's local-path contract or version the change and document which callers must upgrade together. Exercise an old consumer against output containing a tip-only path.
+
+FINDING: F-11
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context (Owner summary and Background, review policy); Scope (tip lenses and review prompt); Design (Settings file, Output, Read rule); Acceptance Criteria AC-03 and AC-07; Test Plan rows AC-03 and AC-07; Open Questions
+EVIDENCE: The spec skill tells the caller to pass the lenses declared by `context`. The command route instead builds its prompt with `loopContext(policy)` from the reviewed commit at `cli.ts:181-195`. If the tip and reviewed commit disagree, a host dispatch following the skill and a command dispatch can apply different checks or severities to the same commit. AC-03 proves which lenses `context` prints and leaves dispatch precedence open.
+PROPOSAL: Set one precedence rule for the instruction list and lenses used by both review routes. If the reviewed commit governs review policy, state which operations use the tip list and test both dispatch paths when the snapshots differ.
+
+FINDING: F-12
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context (Owner summary, fetch paragraph); Design (Default branch and fetch, Concurrency, failure, upgrade); Acceptance Criteria AC-06; Test Plan row AC-06
+EVIDENCE: In a scratch clone, `context` overwrote the previous `FETCH_HEAD` with the new tip. Another operation in the same worktree can lose the fetch result it was about to use. The AC-06 snapshot excludes `FETCH_HEAD`, and the design's claim that an interrupted fetch always leaves the old tracking ref goes beyond what a timeout establishes once Git has started committing updates. [Git fetch documentation](https://git-scm.com/docs/git-fetch#Documentation/git-fetch.txt---no-write-fetch-head)
+PROPOSAL: Preserve `FETCH_HEAD` and include it in the fixture. Describe the interruption guarantee in terms of the ref state Git actually leaves behind and the command's `unverified` result.
+
+FINDING: F-13
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context (Owner summary, timeout limitation); Design (Default branch and fetch, Concurrency, failure, upgrade); Acceptance Criteria AC-05; Test Plan row AC-05; Tasks T3 and T4
+EVIDENCE: Every AC-05 fixture returns promptly without making Git wait. The test plan would pass if both timeout arguments were removed. Sharing the failed-fetch branch establishes how a failure is handled after Git returns and supplies no evidence that either network call returns on time.
+PROPOSAL: Add a controlled stall for each network phase. Assert a bounded return, the applicable reason and preservation of the local reading list.
+
+FINDING: F-14
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter `covers`; Scope (minor version bump); Design (Concurrency, failure, upgrade); Tasks T7
+EVIDENCE: T7 records that `plugins/vh-adlc/.claude-plugin/plugin.json` was bumped but excludes it from `covers`. `tests/vh-adlc/check.test.ts:170-187,226-232` checks the two manifests and uses the Claude manifest for the package version gate. A change to that manifest can break the documented rollout or rollback contract without making the review stale.
+PROPOSAL: Cover both plugin manifests and include their agreement in the version bump's done condition.
+
+FINDING: F-15
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan row AC-05; Tasks T2, T3 and T4
+EVIDENCE: T3 says the five AC-05 tests are failing tests, but its recorded run says all five passed because T2 already implemented the behavior. The task sequence therefore omits the demonstration required by `conventions/testing.md` that each regression check fails against its defect.
+PROPOSAL: Run the AC-05 checks against versions that lack the corresponding behavior and record the observed failures. Update the task evidence to reflect the order in which the work actually happened.
+
+FINDING: F-16
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan row AC-07
+EVIDENCE: The pointer check at `tests/vh-adlc/loop/context-freshness.test.ts:138-142` looks only for the command and reference in the same sentence. A sentence containing both can still tell the operation to ignore the reported versions. I compared the row with the clean R-4 target and confirmed its text is unchanged. This finding only widens the set of wrong outputs the reviewed pattern rejects.
+PROPOSAL: Add a must-fail example where the command and reference appear together but the sentence tells the operation to read the checkout copies.
+
+FINDING: F-17
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Owner summary and Background, final Current state bullet)
+EVIDENCE: Since R-6, the repository has added `.vh-adlc/loop.yaml` with two reviewer command routes. The empty reading list is still accurate, but the explanation that the repository declares no loop settings is stale. The summary also stops at R-5 even though R-7 records the later implementation review after merging main. The focused tests against a writable scratch copy of the reviewed export reported 33 passed and zero failed.
+PROPOSAL: Say that this repository configures review routes and declares no instruction files, project procedure or lenses. Bring the summary's review history through R-7 and keep the local-origin and timeout limitations.
