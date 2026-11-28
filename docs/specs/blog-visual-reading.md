@@ -321,6 +321,7 @@ None. The defaults in the owner summary were set under the owner's standing inst
 | 2026-11-24 | R-50 | spec | `92d2b0c` | claude-opus-5-5 | procedural | No blocking finding: 1 should-fix, 1 nit outside the baseline: add the version-bump task, trim an uncited Background claim; both applied |
 | 2026-11-24 | R-50 | spec | `92d2b0c` | n/a | n/a | accepted by owner |
 | 2026-11-28 | R-51 | spec | `00ad0a1` | gpt-6.2-sol | procedural | Drift re-review on the Codex route: 6 blocking, 10 should-fix, 2 nits; none traces to the covered drift |
+| 2026-11-28 | R-52 | spec | `536bad4` | claude-opus-5-5 | procedural | Host-route drift re-review, orchestrator-directed under the owner's delegation because R-51 re-opened accepted scope: 1 blocking (R-51 F-06 again: three Test Plan patterns reject correct outputs), 4 should-fix, 4 nits |
 
 ### R-1
 
@@ -1817,6 +1818,71 @@ SEVERITY: nit
 WHERE: Context Owner summary and Background
 EVIDENCE: The October incident explains who had to ask for another pass and what was missing. Context gives no account of how often the problem recurs or whether the normal editor pass would catch it without an owner reminder. It also gives no reason for rejecting the simpler alternative of adding one explicit presentation check to the existing editor procedure.
 PROPOSAL: State the observed recurrence and recovery behavior, then explain why the simpler editor check would leave the owner's problem unresolved.
+
+### R-52
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Test Plan AC-04 row (line 228), AC-05 row (line 229) and AC-07 row (line 231)
+EVIDENCE: The three free-text patterns reject correct outputs. At X, `tests/vh-adlc/blog/run.ts:564` checks the AC-07 entry with `/rainfall|precipitation|weather/i`, `run.ts:409` checks the AC-05 caption with `/illustrat/i`, and `run.ts:342,423` call `visual.namesGap` for AC-04. I ran these checks from a scratch directory outside the repository. `visual.namesGap("The ledger cutover needs a pause halfway through its 1,600 words. Put a pull quote there.", "The ledger cutover")` returned false, and so did "- The ledger cutover section runs 1,600 words with nothing to rest the eye; add a pull quote halfway." The AC-07 pattern returned false for "the chart shows monthly rain totals, but the caption calls it a plan review; replace it", which reports the image from what it shows, as AC-07 requires. `/illustrat/i` returned false for the caption "Artist's impression of the change workflow, not a product screen.", which identifies the image as an illustration and not product UI, as AC-05 requires. These rows have not changed since R-47. R-51 F-06 raised the same false rejections, and no stated limit, Deferred entry or change answers it. Under the Test Plan rule, a pattern that rejects a correct output is blocking even on a row that has passed review, because the proof then fails a correct implementation.
+PROPOSAL: Widen each pattern so these outputs pass, and list them as must-pass examples next to a must-fail example in each row. For AC-07, use `\brain` in place of `rainfall` and add `rain` to the pre-run word-free list. For AC-05, accept an "impression" or "conceptual" wording. For AC-04, match the gap by its `ledger cutover` location plus a break, pause or quote word.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context Owner summary (line 52), Tasks T10 and T11 evidence (lines 258, 260)
+EVIDENCE: The summary says "All nineteen scenarios have run and passed against the 0.34.0 package ... the merges from main since then have not changed what they exercise". `tests/vh-adlc/evidence/blog/README.md:1-45` records those passes at `7b892f74` and `f4b06826`. At X, `git log 7b892f74..HEAD -- tests/vh-adlc/blog/visual.ts tests/vh-adlc/blog/run.ts` lists 536bad4. That commit changed the post-run checks the scenarios apply: `blocks` and `withoutTreatments` now compare line endings and code-block blank lines exactly, `quoteFrom` matches whole words, `addedQuotes` counts a changed attribution, `resolvesToFile` accepts only regular files inside the public root, and `bodyWords` drops list markers. So the recorded passes were judged by the earlier, looser checks. The summary leaves this out and suggests the observed proof still covers the current harness. The convention asks the summary to keep planned checks separate from observed proof.
+PROPOSAL: State in the summary that the recorded passes predate the tightened checks of 536bad4, so the scenarios need a rerun against the current harness and the 0.35.0 package before the implementation review can count them.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context Owner summary (lines 52-54), Scope, Design Editor (line 184) and Handoff and documentation (lines 188, 191), Test Plan AC-08, Open Questions (no Deferred section)
+EVIDENCE: Issue #204, which is open, defers R-51 F-03, F-04, F-05, F-11 and F-12. The document records none of them as a `Not handled:` Scope line or as a `## Deferred` entry, and the summary does not mention the deferral. Later passes will therefore raise them again, because only a stated limit or a Deferred entry answers a finding. At least one is a failure the owner would hit on the request this feature came from ("backport this visual stuff into the other articles", Background line 62). Line 188 allows each fixed line "at most once", but line 191 says "Every new article and presentation revision handoff has this line". A batch backport where one article was rendered and another was not has no single valid `Rendered checks:` line that reports both. Line 184 also requires every image entry to name "what the image shows and what its caption claims", which an `unverified image` or `missing caption` entry cannot do. `plugins/vh-adlc/agents/vh-adlc-blog-editor.agent.md:61` repeats that requirement.
+PROPOSAL: Add a `## Deferred` section with one entry for each #204 item, each with source `drift re-review R-51`. This sits outside the baseline and leaves the reviews fresh. Add one sentence to the owner summary saying these items were deferred to #204.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter `covers`, Design Artifacts and publication (line 205), Test Plan AC-01, AC-07 and AC-09 rows
+EVIDENCE: The convention says `covers` lists every path whose change can affect the feature. `tests/vh-adlc/blog/run.ts:9` imports `events`, `fingerprint` and `git` from `../lifecycle/fixtures`, which `covers` does not list. The AC-09 proof relies on `tests/vh-adlc/check.test.ts:226-234`, and Artifacts and publication names that file and the two marketplace files as the install path. None of these is covered. A change to any of them can break the proof or the install without making the implementation review stale.
+PROPOSAL: Add `tests/vh-adlc/lifecycle/fixtures.ts` and `tests/vh-adlc/check.test.ts` to `covers`, plus the two marketplace files if the install path stays part of the proof. Make the change in the next normative revision.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Goal, Design The reading pass (line 119) and Editor (line 184), AC-01, Test Plan AC-01 row
+EVIDENCE: AC-01 and its row require at least one treatment between body paragraphs, and they require that every `Presentation repairs` entry appears in the handoff as `applied` or `open`. A 1,200-word `visual-new` draft with one treatment after its first paragraph and a 1,000-word unbroken run passes, as long as the writer marks the editor's `unbroken prose` entry `open`. Design line 155 assumes the writer applies editor repairs, but no criterion or proof checks that the writer fixes a reading-flow defect it could fix. The owner can still get the wall of prose this feature exists to prevent, with every box ticked.
+PROPOSAL: Require the writer to apply an `unbroken prose` or `no body treatment` repair whenever a permitted treatment exists, and leave such an entry `open` only for a gap the handoff names. Add a check to `visual-new` that no such entry is left `open` while the notes hold an unused quotable line.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Design Packaging (line 201), Tasks T13 (line 243), Context Owner summary (line 50)
+EVIDENCE: Packaging still says "that is 0.34.0 while main is at 0.33.0", and T13 says the same. The summary says "0.35.0 while main is at 0.34.0". At X, `git show origin/main:plugins/vh-adlc/.claude-plugin/plugin.json` reads 0.34.0 and both feature manifests read 0.35.0. 00ad0a1 set 0.35.0, and no task records that bump. The rule "above `origin/main`'s" itself is unambiguous. This traces to the covered drift merge of d0deac94.
+PROPOSAL: When a revision next touches Packaging, update its example to the current versions, and note the 0.35.0 bump of 00ad0a1 under T13.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Context Owner summary (line 36), Design Relationship to blog-authoring (line 113)
+EVIDENCE: Line 36 says blog-authoring "fixes a three-line editor return", and line 113 says "AC-09's three-line return gains `Presentation repairs`". At X, `docs/specs/blog-authoring.md:121` (line 119 on main) and its Design at line 92 define a verdict, copy repairs and exceptions, not a three-line format. The literal three lines live in the editor agent on main (Background line 58). Background line 60 states this correctly.
+PROPOSAL: Describe blog-authoring's return as its verdict, repairs and exceptions return. Keep "three-line" for the editor agent's format.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Context Owner summary and Background
+EVIDENCE: Context states who was harmed (the owner had to ask for visuals by hand on 29 October). It gives no frequency and names no simpler alternative it rejected, such as adding one presentation check to the existing editor procedure without the writer-side pass, and gives no reason for rejecting one. The status is past `draft`.
+PROPOSAL: Add one sentence on how often the gap recurred, and one on why an editor-only check would still leave the owner to request the pass.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan AC-02 row (line 226)
+EVIDENCE: `visual.noVisualCategory` accepts "No-visual exception: short-read: no assets were provided.", although the explanation gives a reason the Design forbids. This finding only widens a free-text pattern row that passed review at R-47 and has not changed since. R-51 F-17 listed the same example.
+PROPOSAL: List it as a widening nit and do not apply it.
 
 ## Sources
 
