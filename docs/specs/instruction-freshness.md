@@ -1,6 +1,6 @@
 ---
 status: complete
-status_description: "All eight criteria met in implementation review R-5; shipped for owner merge."
+status_description: "Codex review R-9: AC-05 and AC-08 met; six criteria are residuals in #206. Waits for owner merge."
 issue: https://github.com/michielvha/vh-adlc/issues/139
 branch: fix/instruction-freshness
 goal: "SDD operations read the repository's listed instruction files and project procedure as they stand at the default branch tip, even from a checkout that is behind it."
@@ -66,8 +66,17 @@ fixes, mostly to make the planned tests exact. The third found that an extra poi
 would have broken a pinned skill-body test. That pointer and a similar one in `references/loop.md` are
 dropped, because the read rule already decides which version operations hold, and the remaining test
 gaps are closed. The fourth found only two wording slips in this Context section, both fixed, and
-nothing in the normative sections. The owner accepted the spec at R-4 and asked to ship it; the code
-PR waits for the owner's merge.
+nothing in the normative sections. The owner accepted the spec at R-4 and asked to ship it.
+
+Codex then reviewed the shipped branch. Its spec pass (R-8) raised blocking edge cases, and its
+implementation pass (R-9 at `6fdd3ed`) returned AC-05 and AC-08 as met and the other six as not met.
+The failures are cases the ordinary fixtures do not cover: a listed file that is or becomes an
+in-repository symlink, `export-ignore` on the tip's settings, a listed path the tip turns into a
+directory, an extra configured fetch mapping, and the documented command leaving out `--repo`. Under
+the owner's delegated decision (2026-11-28), those six criteria are residuals tracked in
+[#206](https://github.com/michielvha/vh-adlc/issues/206), the hardening is deferred as D-01, and the
+PR refers to #139 instead of closing it. A host-route gating pass (R-10) followed. The code PR waits
+for the owner's merge.
 
 ### Background
 
@@ -367,6 +376,7 @@ None.
 | 2026-11-27 | R-7 | implementation | `9c0d567` | claude-opus-5-5 | procedural | All eight criteria met after merging main |
 | 2026-11-28 | R-8 | spec | `9381c9a` | gpt-6.2-sol | procedural | Codex drift re-review: 5 blocking, 10 should-fix, 2 nits |
 | 2026-11-28 | R-9 | implementation | `6fdd3ed` | gpt-6.2-sol | procedural | Codex: AC-05 and AC-08 met; six criteria not met on the R-8 edge cases, recorded as residuals in #206 |
+| 2026-11-28 | R-10 | spec | `3606d01` | claude-opus-5-5 | procedural | Host-route gating pass the orchestrator directed under the owner's delegation (2026-11-28, ledger #179), because R-8's blockers are now deferred as D-01 to #206: 1 should-fix outside the baseline, applied |
 
 ### R-1
 
@@ -814,3 +824,12 @@ SEVERITY: should-fix
 WHERE: Design (Settings file), `references/loop-settings.md` (Instruction freshness), Test Plan row AC-03
 EVIDENCE: In the invalid-tip-settings probe, `context` returned the local list and `old-lens` while `freshness.settings.read` pointed to the invalid tip settings. The reference says that field identifies the settings that supplied the list. The report rule requires a notice only for `unverified`, so this fallback has no required notice.
 PROPOSAL: Identify the settings source actually used and require the operation to report the fallback reason.
+
+### R-10
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter `status_description`; Context (Owner summary, fourth paragraph "Proof was observed in implementation review R-5 ..." and its last sentences "The owner accepted the spec at R-4 and asked to ship it; the code PR waits for the owner's merge.")
+EVIDENCE: The diff since R-8 (`9381c9a`) unticks AC-01, AC-02, AC-03, AC-04, AC-06 and AC-07. Each now carries `Evidence: R-9 (Codex gpt-6.2-sol, \`6fdd3ed\`): not met; ...` and `Residual: https://github.com/michielvha/vh-adlc/issues/206`, and the diff adds `D-01` deferring the R-8 hardening. The Review Log row for R-9 reads "six criteria not met on the R-8 edge cases, recorded as residuals in #206", and R-8 records 5 blocking findings. Yet `status_description` (line 3) still says "All eight criteria met in implementation review R-5; shipped for owner merge." The Owner summary (lines 58-70) still says "Proof was observed in implementation review R-5 at `8c79b67`, which returned all eight criteria as met", gives the review history only through R-4, and names "Two limits" (local bare origin, untimed timeout path). It does not mention R-8's blocking findings, R-9's six not-met verdicts, the residuals in #206 or D-01. conventions/feature-documents.md (Owner summary in Context) says the summary "must agree with them and distinguish planned checks from observed proof. Refresh it when scope, proof or decisions change and before asking for acceptance." An owner deciding the merge from the summary or the status line would believe every criterion is met with only two minor limits. This traces to the change since R-8: the criteria flipped, but the summary and status line did not. `vh-adlc gate complete` at 3606d019 fails only on `spec_review_clean` (R-8), and `vh-adlc fresh` reports R-8 and R-9 as not stale.
+PROPOSAL: Rewrite the status line and the Owner summary's proof paragraph to say what R-9 at `6fdd3ed` found: AC-05 and AC-08 met, and six criteria not met on the R-8 edge cases (symlinked listed files, `export-ignore` on the tip settings, a path the tip turns into a directory, extra fetch mappings, the documented command missing `--repo`). Say those six are residuals tracked in #206 and the hardening is deferred as D-01 under the owner's delegated decision. Both edits are outside the normative baseline.
