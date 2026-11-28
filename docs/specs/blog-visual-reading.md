@@ -248,6 +248,7 @@ Each visual fixture's `AGENTS.md` declares the destination's image-with-caption 
   - Evidence: `bun test tests/vh-adlc/check.test.ts --timeout 60000` failed 77 pass, 1 fail ("a package change comes with a version change") at 0.33.0; after both manifests moved to 0.34.0, 78 pass, 0 fail. `origin/main` is at 0.33.0.
   - Evidence: 00ad0a1 moved both manifests to 0.35.0 after main reached 0.34.0; `bun test tests/vh-adlc/check.test.ts tests/vh-adlc/blog.test.ts --timeout 60000` gave 108 pass, 0 fail.
 - [ ] T14 `tests/vh-adlc/blog/run.ts`, `tests/vh-adlc/blog/visual.ts` and `tests/vh-adlc/blog.test.ts` - widen the AC-04 gap, AC-05 illustration and AC-07 subject checks and the word-free list to the revised Test Plan patterns, with the rows' must-pass and must-fail examples as unit tests that fail before the change; `bun test tests/vh-adlc/blog.test.ts` passes (AC-04, AC-05, AC-07)
+- [ ] T15 `tests/vh-adlc/evidence/blog/README.md` - rerun all nineteen scenarios against the 0.35.0 package and the T14 harness, nine visual scenarios and the nine existing ones on macOS and `visual-rendered` on Linux, and record versions, hosts, payload fingerprints and raw event hashes before T12 (AC-01, AC-02, AC-03, AC-04, AC-05, AC-07, AC-08)
 - [x] T4 `docs/user-guides/workflows.md` and `docs/specs/blog-authoring.md` - rework the PR #75 user guide paragraph (800-word threshold, batch-or-related quote rule, plain-revision rule) and add the Context pointer naming the two replaced rules; `bun test tests/vh-adlc/blog.test.ts` passes, and `bun test tests/vh-adlc --parallel --timeout 60000` fails only the same failing test names, file by file, as on an `origin/main` worktree on the same host (AC-09)
   - Evidence: on this macOS host, run alone one after the other under `caffeinate -dimsu` with the GNU coreutils PATH, `bun test tests/vh-adlc --parallel --timeout 60000` gave 4,212 pass, 7 skip, 205 fail on an `origin/main` worktree at 4f17f9a0 (4,424 tests, 4,003 s) and 4,226 pass, 7 skip, 214 fail on the feature tree at ee7b7e3 (4,447 tests, 4,270 s). Every `origin/main` failing test name also failed on the feature tree. The nine feature-only names were timeouts in five docs-drift files; rerun alone with the same command, those five files gave 134 pass, 0 fail on both trees. `bun test tests/vh-adlc/blog.test.ts` passes (28).
 - [x] T5 `tests/vh-adlc/blog.test.ts` - failing unit tests with the Test Plan's cases for the `Presentation repairs` splitter, the `No-visual exception:` and `Rendered checks:` line parsers and the four-entry coverage check; they fail because `tests/vh-adlc/blog/visual.ts` does not exist (AC-02, AC-07, AC-08)
@@ -336,6 +337,7 @@ None. The defaults in the owner summary were set under the owner's standing inst
 | 2026-11-24 | R-50 | spec | `92d2b0c` | n/a | n/a | accepted by owner |
 | 2026-11-28 | R-51 | spec | `00ad0a1` | gpt-6.2-sol | procedural | Drift re-review on the Codex route: 6 blocking, 10 should-fix, 2 nits; none traces to the covered drift |
 | 2026-11-28 | R-52 | spec | `536bad4` | claude-opus-5-5 | procedural | Host-route drift re-review, orchestrator-directed under the owner's delegation because R-51 re-opened accepted scope: 1 blocking (R-51 F-06 again: three Test Plan patterns reject correct outputs), 4 should-fix, 4 nits |
+| 2026-11-28 | R-53 | spec | `64bcde5` | gpt-6.2-sol | procedural | Review of the pattern revision on the Codex route: 7 blocking, 3 should-fix; new counterexamples to the widened patterns and re-opened deferred items; convergence trigger fires (7 after 1), no revision; added rerun task T15 (F-08) |
 
 ### R-1
 
@@ -1897,6 +1899,78 @@ SEVERITY: nit
 WHERE: Test Plan AC-02 row (line 226)
 EVIDENCE: `visual.noVisualCategory` accepts "No-visual exception: short-read: no assets were provided.", although the explanation gives a reason the Design forbids. This finding only widens a free-text pattern row that passed review at R-47 and has not changed since. R-51 F-17 listed the same example.
 PROPOSAL: List it as a widening nit and do not apply it.
+
+### R-53
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Context Owner summary, Design The reading pass, AC-04, Test Plan AC-04, and T14
+EVIDENCE: The revised AC-04 pattern passes its listed examples. I ran it against “Under The cutover, insert a figure halfway through the 1,600 words starting at The ledger cutover so readers can come up for air.” The location check passed and the pattern failed. The line identifies the gap and proposes a treatment. The pattern also accepted “The ledger cutover accurately describes how to pause a migration,” which reports no presentation gap.
+PROPOSAL: Check the passage location mechanically and verify that the report identifies a stretch that needs a break. Add both examples to the proof.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: Context Owner summary, Design Asset and quote integrity, AC-05, Test Plan AC-05, and T14
+EVIDENCE: The revised AC-05 pattern rejects “Artist’s impression of the change workflow.” The same words pass with a straight apostrophe. It also rejects “Hand-drawn depiction of the change workflow” and accepts “Conceptual overview captured from the live product UI.”
+PROPOSAL: Check whether the caption or alt text identifies the image as an illustration without presenting it as captured product UI. Include both apostrophe forms, the hand-drawn caption and the product UI counterexample.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: blocking
+WHERE: Context Owner summary, Design Editor, AC-07, Test Plan AC-07, and T14
+EVIDENCE: The revised AC-07 check accepts the new rain-totals example. It still rejects “irrelevant image: the chart shows monthly rain totals, but the caption presents it as a workflow for reviewing plans.” The report identifies both the visible subject and the caption’s claim. The check accepts “irrelevant image: the image shows a rainbow, while the caption calls it a plan review” because `rain\w*` matches `rainbow`.
+PROPOSAL: Keep the label and image-view checks and verify that the entry accurately describes the chart and the caption. Add the paraphrased caption and the rainbow report as proof cases.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: blocking
+WHERE: Context Owner summary and Background, Scope, Design Relationship to blog-authoring, AC-09, Test Plan AC-09, T4, and `docs/specs/blog-authoring.md` Context, Design Draft and handoff, and AC-09
+EVIDENCE: The revised summary correctly attributes the three-line format to the old editor agent, then says this document replaces two rules in blog-authoring through a Context pointer. `docs/specs/blog-authoring.md:98` still requires visuals to solve an explanation problem. Its AC-09 at line 121 specifies the contents of the editor return and leaves the line count open. The pinned standard and `internal/doc/baseline.go:21-44` keep the earlier Design and criterion in the normative baseline after a Context edit.
+PROPOSAL: Ask the owner to approve a normative revision of blog-authoring’s visual rule. Describe `Presentation repairs` as an extension of the editor agent’s format and preserve the existing AC-09 requirements.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: blocking
+WHERE: Scope, Context Owner summary, Design Terminology, The reading pass, Editor, and Handoff and documentation, AC-01, AC-02, and AC-09, and their Test Plan rows
+EVIDENCE: The revision adds “D-01: An owner request for a text-only long-form article, or a destination that cannot hold a treatment, with quotable notes.” A 1,200-word text-only request with a quotable point and an exact-wording span falls within AC-01, which requires a body treatment. The request forbids that treatment. The long-form fallback requires the notes to lack a quotable line, and the no-visual exception applies only below 800 words.
+PROPOSAL: Make explicit owner restrictions and destination limits govern treatment placement at every length. Align AC-01 and its proof with that rule and check that the handoff explains the limit.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: blocking
+WHERE: Scope, Context Owner summary, Design The reading pass, Rendering checks, and Editor, AC-04, and Test Plan AC-04
+EVIDENCE: The revision adds “D-03: An owner edit saved to the article or an asset while the editor runs.” The design allows the writer to read an existing article, wait for the editor and save repairs from that earlier copy without checking the current file. A full-file save can erase the owner’s uncommitted edit while still preserving every byte of prose from the writer’s initial snapshot.
+PROPOSAL: Require the writer to preserve intervening edits and stop on a conflict it cannot reconcile. Prove that an owner edit saved during the editor turn survives the writer’s repair step.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: blocking
+WHERE: Scope, Context Owner summary, Design Terminology, The reading pass, Rendering checks, and Handoff and documentation, AC-02, AC-08, and AC-09, and their Test Plan rows
+EVIDENCE: The revision adds “D-04: Per-article fixed handoff lines in a batch with different outcomes.” `references/blog.md:244-265` groups batch exceptions in one report and permits each fixed line once. For a batch with one rendered article and one unrendered article, AC-08 requires an entries line for the first and an `unverified` line for the second. A single line cannot satisfy both forms or identify which article each result belongs to.
+PROPOSAL: Allow one instance of each fixed line per named article in a batch handoff. Check a batch with one rendered article and one unrendered article.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context Owner summary, Design Packaging, Test Plan AC-04, and Tasks T9 through T12 and T14
+EVIDENCE: The revised summary requires all nineteen scenarios to rerun against the revised harness and the 0.35.0 package before implementation review. T10 and T11 hold the 0.34.0 results, and the remaining tasks name only the pattern changes and implementation review. The latest results in `tests/vh-adlc/evidence/blog/README.md:1-60` are from the earlier package and harness.
+PROPOSAL: Add an unchecked task after T14 to rerun all nineteen scenarios and record their results before T12. Name Linux for the `visual-rendered` run, as T9 requires.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter `covers`, Context Owner summary, Design Artifacts and publication, Test Plan AC-01, AC-04, AC-07, and AC-08, and Tasks T7 through T11 and T14
+EVIDENCE: The revised `covers` adds the shared fixture file and marketplace files. The native runner also reads `plugins/vh-adlc/knowledge.md` and executes `scripts/ensure-vh-adlc.sh` for its docs preflight at `tests/vh-adlc/blog/run.ts:48-52,529-538`. That script reads `plugins/vh-adlc/vh-adlc.lock.json`. The imported event parser at `tests/vh-adlc/lifecycle/fixtures.ts:441-465` calls `readConnector` from `publication.ts`. Changes to these uncovered paths can alter or break the proof without making it stale.
+PROPOSAL: Cover the native runner’s pin, binary bootstrap and event-classification dependencies.
+
+FINDING: F-10
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context Owner summary and Background
+EVIDENCE: Context records the October incident and the owner’s request to avoid repeating it. It gives no account of recurrence or whether the normal editor pass would catch the gap. It also gives no reason for rejecting the simpler option of adding a presentation check to the existing editor.
+PROPOSAL: State the observed frequency and whether the current workflow recovers without the owner’s help. Explain why an editor-only check would leave the problem unresolved.
 
 ## Sources
 
