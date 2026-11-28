@@ -320,6 +320,7 @@ None. The defaults in the owner summary were set under the owner's standing inst
 | 2026-11-24 | R-49 | spec | `5f43917` | claude-opus-5-5 | procedural | Drift follow-up: 2 blocking, 1 should-fix, 3 nits from the R-48 revision: unconditional version assertion, Linux CI clause unobservable at review, failure comparison undefined; stopped for the owner |
 | 2026-11-24 | R-50 | spec | `92d2b0c` | claude-opus-5-5 | procedural | No blocking finding: 1 should-fix, 1 nit outside the baseline: add the version-bump task, trim an uncited Background claim; both applied |
 | 2026-11-24 | R-50 | spec | `92d2b0c` | n/a | n/a | accepted by owner |
+| 2026-11-28 | R-51 | spec | `00ad0a1` | gpt-6.2-sol | procedural | Drift re-review on the Codex route: 6 blocking, 10 should-fix, 2 nits; none traces to the covered drift |
 
 ### R-1
 
@@ -1688,6 +1689,134 @@ SEVERITY: nit
 WHERE: Context Background (line 64)
 EVIDENCE: Line 64 says "Some tests need Linux, Bubblewrap and flock, so CI runs every test only on Ubuntu and a portable subset on macOS (`.github/workflows/ci.yml:85-86`); those tests fail on this host on `origin/main` as well." At X, ci.yml:85-86 reads "Managed verification and effect recovery require Linux/Bubblewrap/flock. Ubuntu runs every test; macOS checks the portable feature and report inputs." That supports the CI split but not the claim that those tests fail on this host on origin/main. No command or output is given for that, and the convention says Context cites its claims with a file:line or a command and its output. This is what is left of R-49 F-05 after the revision.
 PROPOSAL: Cite an origin/main worktree run on this host, with its command, commit and failing file or test list, or limit the sentence to what ci.yml:85-86 shows.
+
+### R-51
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Context Owner summary and Background, Scope, Design Relationship to blog-authoring, AC-09, Test Plan AC-09, T4, and `docs/specs/blog-authoring.md` Context, Draft and handoff, and AC-09
+EVIDENCE: The Context pointer says two rules cease to be review targets, but `docs/specs/blog-authoring.md:98` still requires visuals to solve an explanation problem. Its AC-09 at line 121 specifies the substance of the editor return without requiring exactly three lines. The literal three-line format was in the old editor agent. The pinned standard keeps Design and Acceptance Criteria normative, and `vh-adlc fresh` at the reviewed commit still reports blog-authoring's implementation review stale on both the editor and the blog reference.
+PROPOSAL: Ask the owner to approve a normative change to blog-authoring's visual rule through its own revision process. Describe the fourth line as an extension of the agent's return format and preserve the existing AC-09 requirements.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: blocking
+WHERE: Context Owner summary, Scope, Design Artifacts and publication, and Open Questions
+EVIDENCE: The summary directs the session to merge PR #75 after green CI under an uncited standing rule. `plugins/vh-adlc/references/authority.md:27-29` grants a ship request authority to push and update the PR and requires separate approval for the exact merge. `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:113` directs ship to never merge. A matching head and green checks establish readiness and supply no merge authority.
+PROPOSAL: Make exact approval for the PR #75 merge an owner decision unless a source already records that approval. Describe the merge as a separately authorized action after ship.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: blocking
+WHERE: Goal, Context Owner summary, Scope, Design Terminology, The reading pass, Editor, and Handoff and documentation, AC-01, AC-02, AC-09, and their Test Plan rows
+EVIDENCE: The design limits `owner-request` and `format` exceptions to articles below 800 words. Its long-form fallback requires the notes to contain no quotable line. An owner can request a 1,200-word plain-text article and supply quotable notes. That request prohibits treatments, yet the design requires one and the editor is told to flag its absence.
+PROPOSAL: Make explicit treatment restrictions and destination capabilities apply at every length. Prove that a long-form text-only request with quotable notes produces a compliant article and an accurate handoff.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: blocking
+WHERE: Context Owner summary, Design Rendering checks, Editor, and Handoff and documentation, AC-07 through AC-09, their Test Plan rows, and T3
+EVIDENCE: Design line 184 requires every image entry to name what the image shows and what its caption claims. The same section requires `unverified image` when the editor cannot see the image and `missing caption` when the caption is absent. The package repeats the unconditional requirement at `plugins/vh-adlc/agents/vh-adlc-blog-editor.agent.md:59-62`. Either fallback can make the required statement impossible.
+PROPOSAL: Apply the image-and-caption description requirement to observed mismatches. For an unviewable image or a missing caption, require a location and the specific limit or missing information.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: blocking
+WHERE: Scope, Design The reading pass, Rendering checks, Editor, and Handoff and documentation, AC-04, and Test Plan AC-04
+EVIDENCE: A presentation revision can read an existing article, wait for an independent editor, and save repairs to the same file. The design gives no save-time check that the article or affected asset is still the version the writer read. An owner who saves new prose during that interval can lose uncommitted text when the writer saves its older copy, even if the proof confirms that the older prose was preserved byte for byte.
+PROPOSAL: Bind saves to the observed article and affected asset versions. Add a scenario where an owner edit lands during review and verify that the writer preserves it and reports the conflict.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: blocking
+WHERE: Design The reading pass, Editor, and Asset and quote integrity, AC-04, AC-05, AC-07, and their Test Plan rows
+EVIDENCE: I ran the specified checks against valid reports. The AC-04 check rejects “The ledger cutover needs a pause halfway through its 1,600 words. Put a pull quote there.” The AC-05 pattern rejects the caption “Artist's impression of the change workflow.” The AC-07 pattern rejects “The figure shows monthly rain totals. The caption calls it a plan review. Replace the figure.” Each example establishes the required meaning. These are false rejections under the pinned Test Plan rule.
+PROPOSAL: Keep structured criteria for location and verdict labels, and judge the remaining claims by meaning. Add these reports as must-pass examples and include a must-fail example for each check.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context Owner summary, Design Packaging and Artifacts and publication, AC-01 through AC-05, AC-07 through AC-09, their Test Plan rows, and T10 through T13
+EVIDENCE: The owner summary says none of the trials has run. T10 and T11 cite completed trials, and I matched archived macOS event hashes to their receipts at `7b892f74`. Those trials used 0.34.0. The Linux receipt names `f4b06826`. The merge from main and the bump at `00ad0a1e` changed the package since both trial commits. Both target manifests are 0.35.0, and main at `d0deac94` is 0.34.0. The five focused manifest and marketplace tests pass, but they do not establish native behavior.
+PROPOSAL: Update the owner summary and packaging example to the current versions. Keep the 0.34.0 trials as historical proof and run the native scenarios against the current installed package, specifying the Linux requirement for `visual-rendered`.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context Owner summary and Background, AC-09, Test Plan AC-09, and T4
+EVIDENCE: T4 is checked against a same-failing-test-names condition. Its recorded full runs had 205 failures at `4f17f9a0` and 214 at `ee7b7e3`, including nine feature-only timeouts. The isolated reruns passed, but they do not establish equality under the specified full-suite command. Main and the feature test tree have both changed since those runs.
+PROPOSAL: Record the comparison for the reviewed commit and the exact current base on the same host. If isolated reruns are intended to adjudicate full-suite timeouts, specify which results count and how the cause of a timeout is established.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: should-fix
+WHERE: `covers` frontmatter, Scope, Design Packaging and Artifacts and publication, Test Plan AC-07 and AC-09, and T4, T7, and T13
+EVIDENCE: The pinned standard requires `covers` to list paths whose changes can affect the feature. The release procedure and proof depend directly on `.agents/plugins/marketplace.json`, `.claude-plugin/marketplace.json`, and `tests/vh-adlc/check.test.ts`. The native driver imports its event, fingerprint and Git helpers from `tests/vh-adlc/lifecycle/fixtures.ts`. None of these paths is covered, so a later change to installation or proof can escape the feature's freshness check.
+PROPOSAL: Add the direct marketplace, checker and shared-driver dependencies to `covers`. Include the CI workflow if AC-09 continues to make its delivery checks depend on that workflow.
+
+FINDING: F-10
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Goal, Context Owner summary, Scope, Design The reading pass, Editor, and Handoff and documentation, AC-01, AC-07, and their Test Plan rows
+EVIDENCE: `visual-new` can pass with one early treatment and an `unbroken prose` repair marked open. AC-07 establishes that an editor can flag a long stretch, but no new-article proof requires the writer to fix an actionable reading-flow defect before handoff. The owner can still receive the long wall of prose that prompted the feature.
+PROPOSAL: Exercise a new article with a supported way to break a sustained passage and check that the writer applies that repair. Keep the existing handoff for gaps that cannot be resolved within the owner's constraints.
+
+FINDING: F-11
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context Owner summary, Scope, Design Terminology, The reading pass, Asset and quote integrity, and Handoff and documentation, AC-02, AC-08, AC-09, and their Test Plan rows
+EVIDENCE: Each fixed handoff line may appear at most once, yet every new article and presentation revision requires its own rendered results. The existing operation groups batch exceptions in one report at `plugins/vh-adlc/references/blog.md:242-265`. A batch with one rendered article and one unrendered article has no valid single line that identifies both results. The same problem occurs when two short articles take different no-visual exceptions.
+PROPOSAL: Scope the fixed lines to each named article within the batch handoff. Add a two-article case with different outcomes.
+
+FINDING: F-12
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Goal, Context Owner summary, Scope, Design Presentation inputs, Rendering checks, Editor, and Handoff and documentation, AC-08, Test Plan AC-08, and T9
+EVIDENCE: The four beacons in `tests/vh-adlc/blog/run.ts:375-378` establish that a page carrying the final Markdown hash loaded at each viewport and theme. A writer can satisfy the outcome by loading those pages and claiming `pass` four times without inspecting spacing, contrast, image loading, legibility or overflow.
+PROPOSAL: Keep the load evidence and add an observable inspection result. Give the fixture a presentation defect that a viewport check should find and require the handoff to report it or show the repaired result.
+
+FINDING: F-13
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context Owner summary, Design The reading pass, AC-04, Test Plan AC-04, and T6 and T8
+EVIDENCE: Presentation revisions promise byte-identical prose, headings, front matter and code. `tests/vh-adlc/blog/visual.ts:107-152` normalizes CRLF to LF before both comparisons and collapses blank-line runs across the projected article. Converting every line ending in a sample article left both `bodyProse` and `withoutTreatments` equal. The check can also hide blank-line changes inside a code block.
+PROPOSAL: Compare the original byte ranges for protected content after removing only the permitted treatment edits and their placement separators. Include line-ending and code-block whitespace changes as failing examples.
+
+FINDING: F-14
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context Owner summary, Scope, Design Asset and quote integrity, AC-03, Test Plan preamble and AC-03, and T6 and T8
+EVIDENCE: I exercised the shared helpers. `quoteFrom` accepted `plan` from `planning`. `addedQuotes` missed a change from `Fixture writer` to `Someone else` on the same displayed quote. `resolvesToFile` accepted a directory as an image target. The proof can pass changes that violate verbatim wording, attribution or the project-file requirement.
+PROPOSAL: Check whole-word quote boundaries and compare text and attribution for each added or changed quote. Resolve image targets to regular files inside the declared project root and add failing cases for all three behaviors.
+
+FINDING: F-15
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context Owner summary, Design Terminology, The reading pass, and Rendering checks, Test Plan preamble and AC-03, AC-04, AC-07, and AC-08, and T7 and T9
+EVIDENCE: Design line 155 requires rendering screenshots to stay outside the project. Test Plan AC-07 assigns `TMPDIR` to `.scratch/` inside the fixture project, and AC-08 inherits that setting. `tests/vh-adlc/blog/run.ts:94-95,613-617` excludes that directory from the snapshots. Writing evidence there passes the harness while violating the destination rule.
+PROPOSAL: Give each scenario a temporary directory outside its project and permit only that directory for evidence. Keep the article-reference check against that directory.
+
+FINDING: F-16
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context Owner summary, Design Terminology and The reading pass, AC-01, AC-02, AC-09, and Test Plan AC-01, AC-02, and AC-09
+EVIDENCE: The 800-word boundary uses paragraph and list text. `bodyWords("- one two")` returned 3, counting the list marker as prose. The short and long fixtures are far from 800, so both can pass while the writer and editor classify articles near the threshold differently.
+PROPOSAL: Define visible prose counting for list markers and similar formatting. Add fixtures at 799 and 800 words and verify that writer and editor apply the same rule.
+
+FINDING: F-17
+KIND: factual
+SEVERITY: nit
+WHERE: Context Owner summary, Design The reading pass and Handoff and documentation, AC-02, and Test Plan AC-02
+EVIDENCE: The approved AC-02 pattern row accepts `No-visual exception: short-read: no assets were provided.` I reproduced that result with `noVisualCategory`. The explanation gives the reason the design forbids. Catching this example only widens a free-text pattern row that passed R-47 and has not changed since.
+PROPOSAL: Record this example as a widening nit for the short-read explanation check.
+
+FINDING: F-18
+KIND: factual
+SEVERITY: nit
+WHERE: Context Owner summary and Background
+EVIDENCE: The October incident explains who had to ask for another pass and what was missing. Context gives no account of how often the problem recurs or whether the normal editor pass would catch it without an owner reminder. It also gives no reason for rejecting the simpler alternative of adding one explicit presentation check to the existing editor procedure.
+PROPOSAL: State the observed recurrence and recovery behavior, then explain why the simpler editor check would leave the owner's problem unresolved.
 
 ## Sources
 
