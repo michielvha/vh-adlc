@@ -1,0 +1,56 @@
+## no denied paths: 7 fail (exit 1, ran 27)
+   - a detached writer that cleared its environment cannot write into the owning worktree after the review
+   - a late writer cannot rename the worktree's grandparent and write through the new path
+   - a late writer cannot rename the main checkout and change the linked worktree's index through it
+   - an implementation reviewer cannot write into its private clone during the review
+   - a spec reviewer cannot make the export writable and write into it during the review
+   - refs and the linked worktree's index stay unchanged
+   - a separate Git directory whose name ends in a space stays protected
+## no parent literal denies: 2 fail (exit 1, ran 27)
+   - a late writer cannot rename the worktree's grandparent and write through the new path
+   - a late writer cannot rename the main checkout and change the linked worktree's index through it
+## no Git-directory denies: 3 fail (exit 1, ran 27)
+   - a late writer cannot rename the main checkout and change the linked worktree's index through it
+   - refs and the linked worktree's index stay unchanged
+   - a separate Git directory whose name ends in a space stays protected
+## no clone deny: 1 fail (exit 1, ran 27)
+   - an implementation reviewer cannot write into its private clone during the review
+## no export deny: 1 fail (exit 1, ran 27)
+   - a spec reviewer cannot make the export writable and write into it during the review
+## no allow rules: 2 fail (exit 1, ran 27)
+   - writes into a declared scratch directory and the temporary directory still land
+   - a real scratch directory and a scratch symlink to a disjoint directory stay writable
+## no link-count check: 1 fail (exit 1, ran 27)
+   - a protected file that already has a second hard link leaves the review pending before the reviewer runs
+## no disappearing-file guard: 1 fail (exit 1, ran 27)
+   - a file that disappears between the listing and its lstat gives a retryable result, not an error
+## no scratch overlap check: 7 fail (exit 1, ran 27)
+   - a scratch symlink to the owning worktree's root leaves the review pending before the reviewer runs
+   - a scratch symlink to the common Git directory leaves the review pending before the reviewer runs
+   - a scratch symlink to a tracked directory of the worktree leaves the review pending before the reviewer runs
+   - a scratch symlink to the filesystem root leaves the review pending before the reviewer runs
+   - a scratch symlink into the reviewer's .ssh leaves the review pending before the reviewer runs
+   - a scratch symlink into the reviewer's .config leaves the review pending before the reviewer runs
+   - with HOME unset, the stores of the account's home are still protected
+## no filesystem-root containment: 1 fail (exit 1, ran 27)
+   - a scratch symlink to the filesystem root leaves the review pending before the reviewer runs
+## no Git metadata error guard: 1 fail (exit 1, ran 27)
+   - an index that can't be read during the check gives a retryable result, not a pass
+## no credential read denies: 2 fail (exit 1, ran 27)
+   - a reviewer can read none of the eight stores but can read other files
+   - with no .config in the home, a reviewer can still create one while the stores stay unreadable
+## no credential store write denies: 2 fail (exit 1, ran 27)
+   - renaming a store, its parent or the home and reading through the new path is refused
+   - the credential rules win over a write allow that covers a store
+## no credential parent denies: 1 fail (exit 1, ran 27)
+   - renaming a store, its parent or the home and reading through the new path is refused
+## allows placed after the credential rules: 1 fail (exit 1, ran 27)
+   - the credential rules win over a write allow that covers a store
+## no store overlap check: 3 fail (exit 1, ran 27)
+   - a scratch symlink into the reviewer's .ssh leaves the review pending before the reviewer runs
+   - a scratch symlink into the reviewer's .config leaves the review pending before the reviewer runs
+   - with HOME unset, the stores of the account's home are still protected
+## no environment allowlist: 1 fail (exit 1, ran 27)
+   - only allowlisted variables and request.env reach the reviewer
+## no boundary precheck: 1 fail (exit 1, ran 27)
+   - a route started inside another Seatbelt sandbox stays pending and names the missing boundary

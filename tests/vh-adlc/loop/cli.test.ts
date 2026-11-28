@@ -1,6 +1,6 @@
 // The loop entry: route lookup and a command-route review run end to end through the CLI.
 import { afterAll, describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { pagesStub } from "./pages-stub";
 const STUB = pagesStub();
 import { tmpdir } from "node:os";
@@ -91,6 +91,24 @@ describe("review pages", () => {
     // AGENTS.md at the docs revision too: after a merge moves the pin, it is not cached yet, and it routes further pages.
     for (const page of ["AGENTS.md", "conventions/feature-documents.md", "conventions/frontend-testing.md", "guides/humanize-prose.md"])
       expect([page, existsSync(join(pages.cache, "vh-adlc", "docs", "abc", page))]).toEqual([page, true]);
+  });
+
+  test("a docs revision whose AGENTS.md routes through README.md has README.md and the pages it links cached before the reviewer starts", () => {
+    const { stub, ran } = reviewer();
+    const pages = pagesStub("abc", { pages: {
+      "AGENTS.md": "1. Read [README.md](README.md) and follow its task route.\n",
+      "README.md": "For Go, read [Go](conventions/go.md) and the [example](examples/static/README.md#setup). See [the site](https://example.com/x.md).\n" } });
+    const { root, commit } = repo({ ...routed(stub), "AGENTS.md": "Specs live in [docs/specs](docs/specs/f.md). Read conventions/testing.md.\n" });
+    const run = cliWith(pages.env, "review", "--repo", root, "--document", "docs/specs/f.md", "--commit", commit, "--kind", "spec",
+      "--docs-revision", "abc", "--binary", pages.binary, "--plugin-pin", "def");
+    for (const page of ["AGENTS.md", "README.md", "conventions/feature-documents.md", "conventions/go.md", "conventions/testing.md", "examples/static/README.md"])
+      expect([page, existsSync(join(pages.cache, "vh-adlc", "docs", "abc", page))]).toEqual([page, true]);
+    // A link in the reviewed repository's own AGENTS.md names that repository's file, and a URL is not a docs page.
+    const requested = readFileSync(pages.log, "utf8");
+    expect(requested).not.toContain("docs/specs/f.md");
+    expect(requested).not.toContain("example.com");
+    expect(run.json).toMatchObject({ status: "ready" });
+    expect(existsSync(ran)).toBe(true);
   });
 
   test("a routed page that cannot be cached leaves the review pending without starting the reviewer", () => {

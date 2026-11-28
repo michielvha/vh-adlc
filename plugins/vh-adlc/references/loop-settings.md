@@ -36,7 +36,7 @@ Resume takes the route of the operation it continues.
 | `roles.<role>.model` | Optional for `host`, passed to the host as a requested model under `review-protocol.md`. Required for `command`. |
 | `roles.<role>.argv` | `command` only: the executable, then its arguments. It must contain `{prompt}` or `{prompt_file}`, and may use `{model}` and `{export_dir}`. No other placeholder is accepted. `{prompt}` passes the whole prompt as one argument, which Linux limits to 128 KiB, and a scoped spec re-review's prompt carries the document diff, so a large revision can pass that limit. Prefer `{prompt_file}`, for example `sh -c 'f=$1; shift; exec "$@" - < "$f"' sh {prompt_file} codex exec ...` for a CLI that reads `-` from standard input. |
 | `roles.<role>.model_attestation` | Optional, `command` only: `codex-session` reads the served model from Codex's session log for the run's thread id instead of the reviewer's self-report; the `argv` must include `--json`. A missing log, no or several recorded models, or a mismatch leaves the review pending. |
-| `review_scratch` | Optional list of directories inside the checkout left out of the before-and-after check: build output a shell-enabled implementation reviewer may write to, and ignored directories other sessions or tools write while a review runs, such as other worktrees, temp roots and `node_modules`. Changes there do not leave the review pending. An entry is checked by its path alone, so it may be a symlink, such as a worktree's shared `node_modules`. Never `.`, an absolute path, `..` or `.git`. |
+| `review_scratch` | Optional list of directories inside the checkout left out of the before-and-after check: build output a shell-enabled implementation reviewer may write to, and ignored directories other sessions or tools write while a review runs, such as other worktrees, temp roots and `node_modules`. Changes there do not leave the review pending. The settings check an entry by its path alone, so it may be a symlink, such as a worktree's shared `node_modules`; under the macOS boundary the route also resolves it and leaves the review pending when it points onto a protected path. Never `.`, an absolute path, `..` or `.git`. |
 | `project_procedure` | Optional contained file of local rules. Every SDD operation reads it before acting. |
 | `instruction_files` | Optional contained files, such as `AGENTS.md` and `CLAUDE.md`. Every SDD operation reads them, and every spec review checks the document against them. |
 | `lenses` | Optional list of `{name, check, severity}`: a named check every spec review applies, with severity `blocking`, `should-fix` or `nit`. |
@@ -133,9 +133,35 @@ PATH entry.
 Only `spec_reviewer` and `implementation_reviewer` accept a `command` route; settings that give one to
 `author` or `implementer` are refused, naming the role. Agent and skill files never name a model.
 
-A command route runs its CLI in its own PID namespace (`unshare --user --pid`), so every process it
-started, even one that left its group and cleared its environment, stops when the CLI exits. On a host
-without that boundary, a command-route review stays pending.
+A command route keeps every process its CLI starts, even one that left its group and cleared its
+environment, from changing the owning worktree or the private clone after the review has been judged.
+On Linux it runs the CLI in its own PID namespace (`unshare --user --pid`), so all of them stop when the
+CLI exits. On macOS it runs the CLI under a `sandbox-exec` profile that denies every process it starts
+writes to the owning worktree, its Git directory and common Git directory, the private clone or export,
+and each of their parent directories, outside `review_scratch`. Everything else stays writable, such as
+the temporary directory, `~/.codex` and build caches, and a process that outlives the review is not
+stopped there. On macOS a review also stays pending when a protected file already has a second hard
+link, when a `review_scratch` entry resolves onto a protected path, and when a protected file disappears
+or can't be read while the route checks for hard links, which is worth a retry. On a host with neither
+boundary, including a process already inside another Seatbelt sandbox, a command-route review stays
+pending.
+
+Seatbelt profiles do not nest, which has two consequences on macOS. A Codex route passes
+`-s danger-full-access`, because Codex's own sandbox cannot start inside the route's profile; its tool
+commands can then write outside the protected paths and reach the network. And a reviewer inside the
+profile cannot run tests that start their own `sandbox-exec`, such as the route's own boundary tests;
+those tests need a run outside any sandbox, and run inside one they report a single "unsandboxed run"
+failure.
+
+The reviewer CLI never inherits the controller's environment, which holds the session's credentials: it
+gets `PATH`, `HOME`, `TMPDIR`, `USER`, `LOGNAME`, `SHELL`, `LANG`, every `LC_*`, `TERM`, `CODEX_HOME` and
+the `XDG_*` base directories, when set, and nothing else. On macOS the profile also refuses reads, writes
+and renames of a fixed list of credential stores under the reviewer's home: `.ssh`, `.aws`, `.kube`,
+`.docker`, `.config/gh`, `.config/gcloud`, `.netrc` and `.git-credentials`. A `review_scratch` entry that
+equals, contains or lies inside one of those stores, or equals a store's parent, leaves the review
+pending. The macOS Keychain stays reachable, because denying it also breaks Codex's network connections,
+so a token kept there can still be read by a reviewer command; other readable files stay readable; and on
+Linux the PID namespace denies no reads, so the listed stores stay readable there.
 
 Feature reservations use the adopted remote's committed `.vh-adlc/work-ownership.yaml`,
 independent of local loop overrides or a stale feature checkout. See
