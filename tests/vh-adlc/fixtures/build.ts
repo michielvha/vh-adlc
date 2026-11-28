@@ -123,8 +123,8 @@ export const CONVERGENCE_DOCS_PIN = "0c983f6793bfe35eb96ae95ad0c361c6200af44f";
 
 // COMPANION_DOCS_PIN is the vhco-pro/docs revision that holds proportional review's convention: severity by
 // consequence for the product profile, stated limits, scoped re-review and the Deferred section. The
-// proportional review scenarios pin a fixture project to its tree. It is the merged revision, the same one
-// AGENTS.md and knowledge.md pin.
+// proportional review scenarios pin a fixture project to its tree, and their recorded evidence ran against
+// it. AGENTS.md and knowledge.md pinned the same revision until they moved on to 1fbe501.
 export const COMPANION_DOCS_PIN = "e79eaa6a0126f2e8ddca2cf14e3db3067b244cc7";
 
 // The docs fixture: revision A is the real vhco-pro/docs tree at the plugin pin.
