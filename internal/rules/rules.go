@@ -338,11 +338,13 @@ type ImplRecord struct {
 // ImplRecords reads the implementation-review records of a subsection: each
 // record_criterion line followed by a record_verdict line. It reports false
 // when there are no records or one is incomplete. Trailing spaces and tabs on
-// a line are ignored.
+// a verdict line are ignored. The criterion line is matched as stored: its
+// pattern requires a separator after the ID, which trimming would remove from
+// a record with empty text, and Fold already trims the criterion text.
 func (r *Rules) ImplRecords(lines []string) ([]ImplRecord, bool) {
 	var recs []ImplRecord
 	for i := 0; i < len(lines); i++ {
-		line := recordLine(lines[i])
+		line := lines[i]
 		m := r.Re.RecordCriterion.FindStringSubmatchIndex(line)
 		if m == nil {
 			continue

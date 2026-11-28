@@ -13,7 +13,9 @@ with `review check`. Lint must accept a well-formed review stored that way. `rev
 patterns still come from the pinned feature-document standard, and nothing about their syntax is compiled
 in. Stored-data format, command interface, report codes and the trust boundary are unchanged.
 
-Task base: `4f17f9a08d5fd30ad0ac44f20a0f67b6e9cf2b91`.
+Task base: `4f17f9a0743a110ec1312b5cf7c9f77f3f0bd3c4`, the parent of `264607f6`. Until R-3 this
+line named `4f17f9a08d5fd30ad0ac44f20a0f67b6e9cf2b91`, a full SHA wrongly expanded from the short
+`4f17f9a0`; that object does not exist.
 
 Affected paths: `internal/rules/rules.go`, `internal/rules/rules_test.go`,
 `internal/review/review_test.go`, this record.
@@ -21,9 +23,12 @@ Affected paths: `internal/rules/rules.go`, `internal/rules/rules_test.go`,
 Verification inputs: `go.mod`, `go.sum`, `.golangci.yml`, the record patterns in
 `internal/testrepo/testdata/docs/feature-documents.md` (the fixture copy of the pinned standard).
 
-Proposed change: before matching the record patterns, `SpecRecords` and `ImplRecords` drop trailing
-spaces and tabs from each line. Lint and the gate conditions both read records through these two
-functions, so they stay consistent. `review check` is not changed.
+Proposed change: before matching the record patterns, `SpecRecords` drops trailing spaces and tabs
+from each line, and `ImplRecords` drops them from the verdict line. `ImplRecords` matches the
+criterion line as stored, because `record_criterion` (`'^CRITERION: (AC-\d{2,}) '`) requires a
+separator after the ID that trimming would remove from a record with empty text, and `Fold` already
+trims the criterion text. Lint and the gate conditions both read records through these two functions,
+so they stay consistent. `review check` is not changed.
 
 Why this restores the contract rather than adding semantics: the pinned patterns are end-anchored
 (`'^FINDING: F-\d{2,}$'`, `'^VERDICT: (met|not met|untested|not verified)$'`). A reviewer that ends
@@ -71,6 +76,18 @@ After the change:
   These are the Linux-only clean/env tests. Linux CI is authoritative for them.
 - The plugin checker (`bun test tests/vh-adlc`) was not run. No TypeScript or plugin file changed.
 
+After R-3 (fix for its F-01, on top of the merge of `origin/main` at `572b5eda`):
+
+- The new `TestImplRecords` cases failed first, with the trimmed criterion header: `records with an
+  empty criterion text = [{ID:AC-01 ...` (two records instead of three; the `CRITERION: AC-02 ` record
+  with verdict `not met` was skipped).
+- With `ImplRecords` matching the criterion line as stored: `go test -count=1 ./internal/rules/
+  ./internal/review/ ./internal/doc/ ./internal/gate/` passed (180 tests), and so did the earlier
+  trailing-space regression tests. `go vet ./...`, `gofmt -l internal/`, `golangci-lint run` (2.15.0)
+  and `go mod tidy -diff` are clean.
+- `go test -count=1 ./...`: failures only in `cmd/vh-adlc` (clean/env tests) and `internal/clean`,
+  the same Linux-only set as before.
+
 ## Reviews
 
 ### R-1
@@ -110,10 +127,46 @@ Model: claude-opus-5-5. Isolation: procedural.
 NO FINDINGS
 ```
 
+### R-3
+
+Target: `572b5edaf5cc08dc90fdbbaee123561097065a33` (pushed head of PR #181).
+Model: gpt-6.2-sol, attested from the Codex session log (thread `01a21fec-ec3e-7913-a275-c90de552aa09`,
+every turn `"model":"gpt-6.2-sol"`); the reply itself said `MODEL: unknown`. Isolation: procedural.
+
+How it ran: operator-run under the workstream orchestrator's authorisation of 2026-11-28 (ledger #179),
+because the command route has no maintenance kind ([#205](https://github.com/michielvha/vh-adlc/issues/205)).
+`codex exec -m gpt-6.2-sol -s workspace-write --json` with `maintenance-review.md` as its instructions,
+in a fresh private clone of the pushed head under `$TMPDIR`, with the clone as its working directory and
+an allowlisted environment (`env -i` with only `PATH`, `HOME`, `TMPDIR`, `USER`, `LANG` and
+`TERM=dumb`; no `GH_TOKEN` or `SSH_AUTH_SOCK`). The session log records the sandbox as
+`workspace-write` with network access on. Afterwards the owning worktree's HEAD, status and index were
+unchanged and the clone was clean at the target; the reviewer's other writes were scratch
+directories and a Go build cache under `$TMPDIR`.
+
+```text
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: internal/rules/rules.go:342–355 and docs/internal/maintenance/review-records-trailing-space.md:32–34
+EVIDENCE: `ImplRecords` trims the required separator after a criterion ID when the criterion text is empty. The pinned pattern then fails to match and the parser skips the record. A scratch gate test appended a second `AC-02` record with empty text and a `not met` verdict to an otherwise valid review. The completion gate passed at the reviewed commit and failed with `impl_review_clean` when only the base parser was restored. A truncated extra criterion record showed the same change from rejection to acceptance. The trailing-space regression tests passed at the reviewed commit and failed with the base parser.
+PROPOSAL: Match criterion headers against the stored line so the required separator survives, let `Fold` handle criterion text, and retain trailing-space tolerance for verdicts. Add gate tests that keep rejecting duplicate and incomplete records with empty criterion text.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: docs/internal/maintenance/review-records-trailing-space.md:16
+EVIDENCE: The recorded task-base SHA does not resolve in the checkout. The original fix commit `264607f68463255f8fbd3f22de04f1c475f30ac6` has parent `4f17f9a0743a110ec1312b5cf7c9f77f3f0bd3c4`. I verified that this parent and `origin/main` contain the same pre-fix `rules.go` blob.
+PROPOSAL: Use `4f17f9a0743a110ec1312b5cf7c9f77f3f0bd3c4` as the task base in the Definition and future review dispatches.
+```
+
+Response to R-3: both findings are correct. F-01: `ImplRecords` now matches the criterion line as
+stored and trims only the verdict line, which keeps the record-with-empty-text case rejected as
+before. `TestImplRecords` covers a complete record with empty text (parsed, verdict `not met`) and an
+incomplete one (rejected). The gate reads records only through `ImplRecords`, so the parser test
+covers the gate path the finding exercised. F-02: the Definition's task base is corrected. The
+source and the Definition changed, so a new review is required.
+
 ## State
 
-Locally complete. The required checks were observed (see Evidence), and the current independent
-review R-2 of `f3d2a06e` has no findings. The affected source and the Definition have not changed
-since that commit; only this State section and R-2 were appended. The work is on branch
-`fix/review-records-trailing-space` and is not pushed. Publication and the binary-spec docs-impact
-follow-up wait for a ship request relayed by the orchestrator.
+Review R-3 returned one blocking finding and one nit, both addressed. A new Codex review of the
+resulting commit is pending. The branch is `fix/review-records-trailing-space`.

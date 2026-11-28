@@ -157,6 +157,15 @@ func TestImplRecords(t *testing.T) {
 	if !ok || len(spaced) != 2 || spaced[0].ID != "AC-01" || spaced[0].Text != "The first end state." || spaced[0].Verdict != "met" || spaced[1].Verdict != "not verified" {
 		t.Fatalf("records with trailing spaces = %+v, ok = %v", spaced, ok)
 	}
+	// A criterion header with empty text still ends in the separator the
+	// pattern requires; ignoring trailing spaces must not drop that record.
+	empty, ok := r.ImplRecords(strings.Split(good+"\nCRITERION: AC-02 \nVERDICT: not met\nEVIDENCE: x", "\n"))
+	if !ok || len(empty) != 3 || empty[2].ID != "AC-02" || empty[2].Text != "" || empty[2].Verdict != "not met" {
+		t.Fatalf("records with an empty criterion text = %+v, ok = %v", empty, ok)
+	}
+	if _, ok := r.ImplRecords(strings.Split(good+"\nCRITERION: AC-03 \nEVIDENCE: x", "\n")); ok {
+		t.Error("an incomplete record with empty criterion text: ok = true, want false")
+	}
 	for name, text := range map[string]string{
 		"verdict missing": "CRITERION: AC-01 Text.\nEVIDENCE: x\n",
 		"bad verdict":     "CRITERION: AC-01 Text.\nVERDICT: maybe\n",
