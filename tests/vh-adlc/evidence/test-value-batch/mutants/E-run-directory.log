@@ -1,0 +1,82 @@
+# mutant E: plugins/vh-adlc/scripts/docs-drift/run-directory.ts
+# from: for (const reference of Object.values(stage.artifacts)) readBoundArtifact({ source_repo: options.repo, artifact_root: scope.directory, reference });
+# to:   void stage;
+# command: bun test --timeout 1200000 tests/vh-adlc/docs-drift/run-directory.test.ts
+# source diff:
+diff --git a/plugins/vh-adlc/scripts/docs-drift/run-directory.ts b/plugins/vh-adlc/scripts/docs-drift/run-directory.ts
+index 5b4cc061..51b32083 100644
+--- a/plugins/vh-adlc/scripts/docs-drift/run-directory.ts
++++ b/plugins/vh-adlc/scripts/docs-drift/run-directory.ts
+@@ -134,7 +134,7 @@ export function readRunDirectory(input: RunOptions): RunDirectory {
+   const stages = files.map((file, index) => {
+     if (file !== String(index + 1).padStart(10, "0") + ".json") fail("stage sequence changed");
+     const bytes = readArtifact(join(stageDirectory, file)), stage = stageRecord(record(bytes), manifest, index + 1, digest);
+-    for (const reference of Object.values(stage.artifacts)) readBoundArtifact({ source_repo: options.repo, artifact_root: scope.directory, reference });
++    void stage;
+     digest = sha256(bytes);
+     return stage;
+   });
+# run:
+bun test v1.4.5 (a7733435c)
+
+tests/vh-adlc/docs-drift/run-directory.test.ts:
+82 | test("changed retained artifacts stop inspection and never replace the original reference", () => {
+83 |   const f = fixture(), run = createRunDirectory(f.input), bytes = canonicalJSON({ complete: true });
+84 |   writeFileSync(join(f.input.directory, "role.json"), bytes, { mode: 0o600 });
+85 |   appendRunStage(run, { command: "verify", state: "pending", artifacts: { worker: { path: "role.json", sha256: sha256(bytes) } } });
+86 |   writeFileSync(join(f.input.directory, "role.json"), "changed");
+87 |   expect(() => readRunDirectory(f.input)).toThrow("changed");
+                                               ^
+error: expect(received).toThrow(expected)
+
+Expected substring: "changed"
+
+Received function did not throw
+Received value: {
+  authority: "none",
+  origin: "original",
+  directory: "/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-drift-publish-1ePH6o/run",
+  manifest: {
+    schema_version: 1,
+    kind: "docs-drift-run",
+    id: "3271c1e0-fb38-4dc7-96b6-cf16fbb1e59b",
+    nonce: "66a8c019-4ef9-4782-bda0-5397d0c8018a",
+    directory: "/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-drift-publish-1ePH6o/run",
+    device: "16777234",
+    inode: "77573475",
+    source_repo: "/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-drift-publish-1ePH6o/source",
+    source_commit: "559c3c240930994920e5d9c44a3d0baf9700dd2a",
+    settings_sha256: "1df7c1f92e97fda4709d05afebe45853e2fd023812847e761da050440c68a243",
+    read_set_sha256: "2b2067d85635d76c8997ed6ff5926d22629ec5c571e4fa02df915161e88dad39",
+    entry: "interactive",
+    mode: "audit",
+    proposals: [],
+    bun_version: "1.4.5",
+  },
+  stages: [
+    {
+      schema_version: 1,
+      kind: "docs-drift-run-stage",
+      run_id: "3271c1e0-fb38-4dc7-96b6-cf16fbb1e59b",
+      revision: 1,
+      previous_sha256: "e54ddce8d1c5e759f826eb69fa7db1485c7f2b4e48e929c5105b439b5056039b",
+      command: "verify",
+      state: "pending",
+      artifacts: {
+        worker: {
+          path: "role.json",
+          sha256: "ccbc6726842d83aea07933c211d212d83713fd67442f8d13bd743ad93fb89bc3",
+        },
+      },
+    }
+  ],
+  digest: "a92bdeb7bf8c7ee736838f939a8b238f605e30611878862f764a087a2aa56c02",
+}
+
+      at <anonymous> (/Users/michielvh/code/vh-adlc/.claude/worktrees/test-value-audit/tests/vh-adlc/docs-drift/run-directory.test.ts:87:43)
+(fail) changed retained artifacts stop inspection and never replace the original reference [911.80ms]
+
+ 24 pass
+ 1 fail
+ 58 expect() calls
+Ran 25 tests across 1 file. [19.64s]

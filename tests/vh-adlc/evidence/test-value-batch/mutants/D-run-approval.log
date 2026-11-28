@@ -1,0 +1,25 @@
+# mutant D: plugins/vh-adlc/scripts/docs-drift/run-cli.ts
+# from: } else if (run.origin !== "original") {
+# to:   } else if (false) {
+# command: bun test --timeout 1200000 tests/vh-adlc/docs-drift/run-approval.test.ts
+# source diff:
+diff --git a/plugins/vh-adlc/scripts/docs-drift/run-cli.ts b/plugins/vh-adlc/scripts/docs-drift/run-cli.ts
+index ed12985e..fb0b3e3d 100644
+--- a/plugins/vh-adlc/scripts/docs-drift/run-cli.ts
++++ b/plugins/vh-adlc/scripts/docs-drift/run-cli.ts
+@@ -243,7 +243,7 @@ export async function runDirectoryMain(argv: string[]): Promise<number> {
+               ...(reviewed.pending_reference ? { pending_publication: reviewed.pending_reference } : {}),
+               ...(reviewed.worker ? { assessment_worker: reviewed.worker } : {}), ...(reviewed.reviewer ? { assessment_reviewer: reviewed.reviewer } : {}) } }).artifacts;
+         }
+-      } else if (run.origin !== "original") {
++      } else if (false) {
+         report.outcome = "setup-required";
+         report.diagnostics = ["The original host ownership record is required for executing stages. Use resume --action inspect to observe this copy."];
+       } else if (options.command === "scan") {
+# run:
+bun test v1.4.5 (a7733435c)
+
+ 2 pass
+ 0 fail
+ 7 expect() calls
+Ran 2 tests across 1 file. [3.29s]

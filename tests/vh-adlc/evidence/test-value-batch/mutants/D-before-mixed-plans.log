@@ -1,0 +1,90 @@
+# mutant D: plugins/vh-adlc/scripts/docs-drift/run-cli.ts
+# from: } else if (run.origin !== "original") {
+# to:   } else if (false) {
+# command: bun test --timeout 1200000 tests/vh-adlc/docs-drift/zz-np-before.test.ts -t owned candidate: mixed-plans$
+# source diff:
+diff --git a/plugins/vh-adlc/scripts/docs-drift/run-cli.ts b/plugins/vh-adlc/scripts/docs-drift/run-cli.ts
+index ed12985e..fb0b3e3d 100644
+--- a/plugins/vh-adlc/scripts/docs-drift/run-cli.ts
++++ b/plugins/vh-adlc/scripts/docs-drift/run-cli.ts
+@@ -243,7 +243,7 @@ export async function runDirectoryMain(argv: string[]): Promise<number> {
+               ...(reviewed.pending_reference ? { pending_publication: reviewed.pending_reference } : {}),
+               ...(reviewed.worker ? { assessment_worker: reviewed.worker } : {}), ...(reviewed.reviewer ? { assessment_reviewer: reviewed.reviewer } : {}) } }).artifacts;
+         }
+-      } else if (run.origin !== "original") {
++      } else if (false) {
+         report.outcome = "setup-required";
+         report.diagnostics = ["The original host ownership record is required for executing stages. Use resume --action inspect to observe this copy."];
+       } else if (options.command === "scan") {
+# run:
+bun test v1.4.5 (a7733435c)
+
+tests/vh-adlc/docs-drift/zz-np-before.test.ts:
+77 |   expect(missingApproval.report).toMatchObject({ outcome: "setup-required" });
+78 |   const copy = join(f.root, "copied-prepared-run"); cpSync(directory, copy, { recursive: true });
+79 |   const copied = await invoke("publish", copy);
+80 |   expect(copied.result.exit_code).toBe(2);
+81 |   // A missing approval also asks for setup, so assert the refusal only the ownership check gives.
+82 |   expect(copied.report).toMatchObject({ outcome: "setup-required",
+                             ^
+error: expect(received).toMatchObject(expected)
+
+  {
++   "authority": "none",
++   "bun_version": "1.4.5",
++   "command": "publish",
++   "component": {
++     "diagnostics": [],
++     "expected": {
++       "component_sha256": "91bd3f9d4bc59d58d426fb10a6141d7149e9f84448eb48471e9932685fa0d29f",
++       "plugin_version": "0.34.0",
++       "source_commit": "74643424a9dd6fa95be09f63c57d0e62a6663f7f",
++     },
++     "matched": true,
++   },
+    "diagnostics": [
+-     "The original host ownership record is required for executing stages. Use resume --action inspect to observe this copy.",
++     "docs-drift run original host ownership required",
+    ],
+-   "outcome": "setup-required",
++   "outcome": "incomplete",
++   "run_directory": "/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-drift-publish-g0zjL4/copied-prepared-run",
++   "schema_version": 1,
++   "source_commit": "0611b88824a911f2b495df6d5f4357b1d5114937",
++   "stage": "verify",
++   "stage_artifacts": {
++     "candidate": {
++       "path": "candidate-6aea9cb2-6c24-43dc-9102-fc0f513d650e.json",
++       "sha256": "d3a4eae891987d936f8dce20270fa658c55c9bc22c78fe657b3fd700592e08d7",
++     },
++     "candidate_review": {
++       "path": "candidate-review-6aea9cb2-6c24-43dc-9102-fc0f513d650e.json",
++       "sha256": "85d5e22cca82418440a7d8901b5bb62204ada264ffd08a93f9bc853c786eb12b",
++     },
++     "candidate_verification": {
++       "path": "candidate-verification-d29eaa94-e405-46ea-ac5c-6d9d3790df01.json",
++       "sha256": "c005cf1193271838d378d1e109f3d35b5758fd49637f8c554b4a842189fad06f",
++     },
++     "reviewed_plan": {
++       "path": "reviewed-plan-6aea9cb2-6c24-43dc-9102-fc0f513d650e.json",
++       "sha256": "4e68227d90f64dbc1bc0ee6ecf8f0689002c7841bb970f536c9a784662149084",
++     },
++     "reviewer_capture": {
++       "path": "native-role-DbI6TE/capture.json",
++       "sha256": "ee8c6f0cde901e92e94d135ec4e5fd8279a34b801ddfdcbcd589560acc6aae38",
++     },
++   },
+  }
+
+- Expected  - 2
++ Received  + 40
+
+      at <anonymous> (/Users/michielvh/code/vh-adlc/.claude/worktrees/test-value-audit/tests/vh-adlc/docs-drift/zz-np-before.test.ts:82:25)
+(fail) normal prepare retains the original worker selection and edits only its owned candidate: mixed-plans [35923.18ms]
+Preserved failed normal preparation fixtures ["/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-flat-native-m7KyIw","/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-drift-publish-g0zjL4"]
+
+ 0 pass
+ 3 filtered out
+ 1 fail
+ 36 expect() calls
+Ran 1 test across 1 file. [35.94s]

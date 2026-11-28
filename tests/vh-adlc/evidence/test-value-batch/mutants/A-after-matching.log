@@ -1,0 +1,89 @@
+# mutant A: plugins/vh-adlc/scripts/docs-drift/run-approval.ts
+# from: if (!existsSync(join(run.directory, "approval.yaml"))) throw new SetupRequired
+# to:   if (false) throw new SetupRequired
+# command: bun test --timeout 1200000 tests/vh-adlc/docs-drift/normal-preparation.test.ts -t owned candidate: matching$
+# source diff:
+diff --git a/plugins/vh-adlc/scripts/docs-drift/run-approval.ts b/plugins/vh-adlc/scripts/docs-drift/run-approval.ts
+index 38182c88..f2d56bd9 100644
+--- a/plugins/vh-adlc/scripts/docs-drift/run-approval.ts
++++ b/plugins/vh-adlc/scripts/docs-drift/run-approval.ts
+@@ -23,7 +23,7 @@ export function recordRunApproval(options: { repo: string; run: RunDirectory; ma
+   }
+   if (latestRunArtifact(run, "journal")) throw Error("Original operation approval is missing");
+   const source = run.manifest.source_commit, settings = loadCommittedSettings(repo, source).settings;
+-  if (!existsSync(join(run.directory, "approval.yaml"))) throw new SetupRequired("Retain exact approval.yaml for the displayed manifest before publication.");
++  if (false) throw new SetupRequired("Retain exact approval.yaml for the displayed manifest before publication.");
+   const request = readArtifact(join(run.directory, "approval.yaml"));
+   if (request.length > settings.reports.max_entry_bytes) throw Error("Bounded publication approval required");
+   const payload: unknown = collectionReaders().yaml(request);
+# run:
+bun test v1.4.5 (a7733435c)
+
+tests/vh-adlc/docs-drift/normal-preparation.test.ts:
+75 |   // The refusals do not depend on the variant, and mutation showed every variant killing the same
+76 |   // refusal mutants, so they run once. See docs/internal/maintenance/test-value-batch.md.
+77 |   if (fault === "matching") {
+78 |     const missingApproval = await invoke("publish");
+79 |     expect(missingApproval.result.exit_code).toBe(2);
+80 |     expect(missingApproval.report).toMatchObject({ outcome: "setup-required" });
+                                        ^
+error: expect(received).toMatchObject(expected)
+
+  {
+-   "outcome": "setup-required",
++   "authority": "none",
++   "bun_version": "1.4.5",
++   "command": "publish",
++   "component": {
++     "diagnostics": [],
++     "expected": {
++       "component_sha256": "7b5c6cb9e7cc262b5586b6e504136929a4ad4f0117fad51a5912737e02c8a9dc",
++       "plugin_version": "0.34.0",
++       "source_commit": "ec8f13891abb1fcabe9af42e2e44629ea0a90f43",
++     },
++     "matched": true,
++   },
++   "diagnostics": [
++     "ENOENT: no such file or directory, open '/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-drift-publish-CRojph/run/approval.yaml'",
++   ],
++   "outcome": "incomplete",
++   "run_directory": "/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-drift-publish-CRojph/run",
++   "schema_version": 1,
++   "source_commit": "11efcbcc725693ad858c8d431922e4f22bafd23f",
++   "stage": "verify",
++   "stage_artifacts": {
++     "candidate": {
++       "path": "candidate-f1476eec-6bdc-4d0b-bbd0-a25c60d80ac5.json",
++       "sha256": "9beccf8147044c0da1a5790aa525014e8eafff0b617402f651968c0334d73dde",
++     },
++     "candidate_review": {
++       "path": "candidate-review-f1476eec-6bdc-4d0b-bbd0-a25c60d80ac5.json",
++       "sha256": "c84923ba3c094c9d6aeee7b37fa327c47ca241f203a011ad1c40e2d02c9beb65",
++     },
++     "candidate_verification": {
++       "path": "candidate-verification-a8f60db9-e838-4b8e-b48e-afcfc149c989.json",
++       "sha256": "291c88125d72ec5a1d046af9451ec2e3f21353cb1ac0360df547b61c9c23aeeb",
++     },
++     "reviewed_plan": {
++       "path": "reviewed-plan-f1476eec-6bdc-4d0b-bbd0-a25c60d80ac5.json",
++       "sha256": "940f5e3c5332b6c2150d334f9c4e3d8eee75dfe68231d011182a386d78c5deee",
++     },
++     "reviewer_capture": {
++       "path": "native-role-gpcbDi/capture.json",
++       "sha256": "cb901803a2cdb6024cf4e82dcf8751fb4f5dea43df80970ca6c2623847483699",
++     },
++   },
+  }
+
+- Expected  - 1
++ Received  + 42
+
+      at <anonymous> (/Users/michielvh/code/vh-adlc/.claude/worktrees/test-value-audit/tests/vh-adlc/docs-drift/normal-preparation.test.ts:80:36)
+(fail) normal prepare retains the original worker selection and edits only its owned candidate: matching [33625.69ms]
+Preserved failed normal preparation fixtures ["/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-flat-native-tsnbq7","/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-drift-publish-CRojph"]
+
+ 0 pass
+ 3 filtered out
+ 1 fail
+ 29 expect() calls
+Ran 1 test across 1 file. [33.64s]
