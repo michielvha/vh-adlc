@@ -12,7 +12,7 @@ Preserved contract: the plugin's runtime code and public behaviour do not change
 Every behaviour a changed test guarded stays guarded, shown by the same mutants killed before and
 after the change.
 
-Task base: `4137984349f4756522c27711764b057b0e5a5a7d`, origin/main after the batch was rebased onto it (first created from `e910dfe888d0f8e3ede251c9e8b82a516b004bab`; main gained only documentation commits in between).
+Task base: `d0deac947b0a4c332783eccb37da2cd4adc8d8e6`, origin/main merged into the batch branch on 2026-11-28 before its review (first created from `e910dfe888d0f8e3ede251c9e8b82a516b004bab`). The batch's own changes are `git diff d0deac94...HEAD`.
 
 Affected paths:
 
