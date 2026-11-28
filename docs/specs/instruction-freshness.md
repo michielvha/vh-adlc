@@ -272,34 +272,46 @@ the plugin removes the field and the rule together, because they ship in one ver
 
 ## Acceptance Criteria
 
-- [x] AC-01: In a clone whose listed instruction file and project procedure are behind origin's default
+- [ ] AC-01: In a clone whose listed instruction file and project procedure are behind origin's default
       branch tip and unchanged locally, `context` reports both as `stale`, and `git show` of each `read`
       value prints the tip's content.
       Evidence: `bun test tests/vh-adlc/loop/context-freshness.test.ts tests/vh-adlc/loop/glossary.test.ts --timeout 60000` on macOS at f842355: 25 pass, 0 fail. The test "stale, current and edited files each report their state and the version to read" shows the instruction file and project procedure as `stale` with `<tip>:<path>`, and `git show` prints origin's content. Limitation: local bare-repository origin, no network remote.
-- [x] AC-02: A listed file equal to the tip reports `current` with its path. A listed file the current
+      Evidence: R-9 (Codex gpt-6.2-sol, `6fdd3ed`): not met; a listed file the tip turns into an in-repository symlink reads as the link target (R-8 F-05). The ordinary fixtures still pass.
+      Residual: https://github.com/michielvha/vh-adlc/issues/206
+- [ ] AC-02: A listed file equal to the tip reports `current` with its path. A listed file the current
       branch changed since it left the tip, committed or uncommitted, reports `edited` with its path,
       even when the tip also differs.
       Evidence: `bun test tests/vh-adlc/loop/context-freshness.test.ts tests/vh-adlc/loop/glossary.test.ts --timeout 60000` on macOS at f842355: 25 pass, 0 fail. The same test shows a file equal to the tip as `current`, and a committed and an uncommitted edit of files the tip also changed as `edited` with their paths.
-- [x] AC-03: When the local settings file is behind the tip, `freshness.settings` is `stale` and the
+      Evidence: R-9 (Codex gpt-6.2-sol, `6fdd3ed`): not met; an unchanged in-repository symlink reads as `edited` (R-8 F-05). The ordinary fixtures still pass.
+      Residual: https://github.com/michielvha/vh-adlc/issues/206
+- [ ] AC-03: When the local settings file is behind the tip, `freshness.settings` is `stale` and the
       reading list and lenses are the tip's, including a file the tip added that the clone lacks, which
       reports `stale`.
       Evidence: `bun test tests/vh-adlc/loop/context-freshness.test.ts tests/vh-adlc/loop/glossary.test.ts --timeout 60000` on macOS at f842355: 25 pass, 0 fail. "stale local settings take the reading list and lenses from the tip" shows settings `stale`, the tip-added `e.md` listed as `stale` and the tip's lens. "tip settings that fail to load" keeps the local list and reports a `schema_version` error.
-- [x] AC-04: When the local settings are kept and the tip deleted a listed file the clone left
+      Evidence: R-9 (Codex gpt-6.2-sol, `6fdd3ed`): not met; `export-ignore` on the tip's settings drops the tip list without an error (R-8 F-04). The ordinary fixtures still pass.
+      Residual: https://github.com/michielvha/vh-adlc/issues/206
+- [ ] AC-04: When the local settings are kept and the tip deleted a listed file the clone left
       unchanged, that file reports `removed` with a null `read`.
       Evidence: `bun test tests/vh-adlc/loop/context-freshness.test.ts tests/vh-adlc/loop/glossary.test.ts --timeout 60000` on macOS at f842355: 25 pass, 0 fail. "a listed file the tip deleted reads as removed" shows the clone's edited settings kept and `d.md` reported `removed` with a null `read`.
+      Evidence: R-9 (Codex gpt-6.2-sol, `6fdd3ed`): not met; a listed file the tip replaces with a directory reads as `stale` instead of `removed` (R-9 F-06). The ordinary fixtures still pass.
+      Residual: https://github.com/michielvha/vh-adlc/issues/206
 - [x] AC-05: Without a usable origin or tip (no remote, an unresolvable default branch, a failing
       fetch, a held ref lock, or no merge base with the tip), `context` exits 0, keeps the local reading list, reports every entry `unverified`
       with a reason naming the cause, and its other fields are unchanged.
       Evidence: `bun test tests/vh-adlc/loop/context-freshness.test.ts tests/vh-adlc/loop/glossary.test.ts --timeout 60000` on macOS at f842355: 25 pass, 0 fail. Five cases (no remote, a missing origin without origin/HEAD or the flag, the same with the flag, a held `refs/remotes/origin/main.lock` with origin ahead, an unrelated root commit) each exit 0, report every entry `unverified` with the matching reason, and equal `loopContext` of the clone's working-tree settings. Limitation: the 30-second timeout path is not exercised; it shares the failed-fetch branch of the code.
-- [x] AC-06: After `context` runs in a clone behind the tip, `HEAD`, the current branch, the index, the
+- [ ] AC-06: After `context` runs in a clone behind the tip, `HEAD`, the current branch, the index, the
       working tree and every ref except `refs/remotes/origin/<branch>` are unchanged.
       Evidence: `bun test tests/vh-adlc/loop/context-freshness.test.ts tests/vh-adlc/loop/glossary.test.ts --timeout 60000` on macOS at f842355: 25 pass, 0 fail. "only origin's tracking ref for the default branch moves" compares HEAD, the branch, `status --porcelain=v2`, `write-tree` and `for-each-ref` before and after against an origin with a new tag: only `refs/remotes/origin/main` moved and no tag arrived.
-- [x] AC-07: The seven SDD skills, the orchestrate skill, `references/loop.md` and
+      Evidence: R-9 (Codex gpt-6.2-sol, `6fdd3ed`): not met; a configured extra fetch mapping moves a second tracking ref (R-8 F-02). The ordinary fixtures still pass.
+      Residual: https://github.com/michielvha/vh-adlc/issues/206
+- [ ] AC-07: The seven SDD skills, the orchestrate skill, `references/loop.md` and
       `references/loop-settings.md` direct operations to pass the default branch to `context` and read
       each listed file at its reported version; `references/loop-settings.md` states that the
       conventions revision stays the one resolved from the checkout; and the loop glossary defines
       Instruction freshness.
       Evidence: `bun test tests/vh-adlc/loop/context-freshness.test.ts tests/vh-adlc/loop/glossary.test.ts --timeout 60000` on macOS at f842355: 25 pass, 0 fail. The pointer test passes for all eight skills and `references/loop.md`, the rule test passes for `references/loop-settings.md`, the must-pass and must-fail sentence tests pass, and the glossary tests pass with the Instruction freshness row. `check.test.ts`, `direct-operation-compatibility.test.ts` and `proportional-review.test.ts` passed at f5bd1b0 (139 pass, 1 fail on the then-missing version bump, which f842355 fixed: 111 pass, 0 fail).
+      Evidence: R-9 (Codex gpt-6.2-sol, `6fdd3ed`): not met; the documented command omits `--repo`, which the CLI requires (R-8 F-03). The ordinary fixtures still pass.
+      Residual: https://github.com/michielvha/vh-adlc/issues/206
 - [x] AC-08: In a clone with no `origin/HEAD`, `context` reports a verified tip both with
       `--default-branch` and, through `git ls-remote`, without it.
       Evidence: `bun test tests/vh-adlc/loop/context-freshness.test.ts tests/vh-adlc/loop/glossary.test.ts --timeout 60000` on macOS at f842355: 25 pass, 0 fail. "a clone without origin/HEAD still verifies" deletes the symbolic ref with `git symbolic-ref --delete` and reports origin's tip with `--default-branch main` and without it (through `git ls-remote`), with no entry `unverified`.
@@ -354,6 +366,7 @@ None.
 | 2026-11-27 | R-6 | spec | `9c0d567` | claude-opus-5-5 | procedural | Drift re-review after merging main: 1 nit in Context, applied outside the baseline |
 | 2026-11-27 | R-7 | implementation | `9c0d567` | claude-opus-5-5 | procedural | All eight criteria met after merging main |
 | 2026-11-28 | R-8 | spec | `9381c9a` | gpt-6.2-sol | procedural | Codex drift re-review: 5 blocking, 10 should-fix, 2 nits |
+| 2026-11-28 | R-9 | implementation | `6fdd3ed` | gpt-6.2-sol | procedural | Codex: AC-05 and AC-08 met; six criteria not met on the R-8 edge cases, recorded as residuals in #206 |
 
 ### R-1
 
@@ -718,3 +731,86 @@ SEVERITY: nit
 WHERE: Context (Owner summary and Background, final Current state bullet)
 EVIDENCE: Since R-6, the repository has added `.vh-adlc/loop.yaml` with two reviewer command routes. The empty reading list is still accurate, but the explanation that the repository declares no loop settings is stale. The summary also stops at R-5 even though R-7 records the later implementation review after merging main. The focused tests against a writable scratch copy of the reviewed export reported 33 passed and zero failed.
 PROPOSAL: Say that this repository configures review routes and declares no instruction files, project procedure or lenses. Bring the summary's review history through R-7 and keep the local-origin and timeout limitations.
+
+### R-9
+
+CRITERION: AC-01 In a clone whose listed instruction file and project procedure are behind origin's default branch tip and unchanged locally, `context` reports both as `stale`, and `git show` of each `read` value prints the tip's content.
+VERDICT: not met
+EVIDENCE: Ran `context` at `6fdd3edf` against a local bare origin that updated the project procedure and replaced the listed instruction file with an in-repository symlink. Both entries reported `stale`. `git show` printed the updated procedure and the symlink target's name, `actual-rules.md`. The updated instruction content was `rules v2`.
+
+CRITERION: AC-02 A listed file equal to the tip reports `current` with its path. A listed file the current branch changed since it left the tip, committed or uncommitted, reports `edited` with its path, even when the tip also differs.
+VERDICT: not met
+EVIDENCE: The regular-file test passed at `6fdd3edf`, including committed and uncommitted edits. In a separate fixture, `git ls-tree` showed the same symlink entry at `HEAD` and the tip, and the target contents matched. `context` reported that unchanged listed file as `edited`.
+
+CRITERION: AC-03 When the local settings file is behind the tip, `freshness.settings` is `stale` and the reading list and lenses are the tip's, including a file the tip added that the clone lacks, which reports `stale`.
+VERDICT: not met
+EVIDENCE: Ran `context` at `6fdd3edf` with `export-ignore` on the tip's `.vh-adlc/loop.yaml`. `git show` confirmed that the committed settings listed a new rule file and a lens. `context` reported `settings.state: "stale"` with no error and returned empty `read` and `lenses` arrays. The ordinary tip-settings fixture passed.
+
+CRITERION: AC-04 When the local settings are kept and the tip deleted a listed file the clone left unchanged, that file reports `removed` with a null `read`.
+VERDICT: not met
+EVIDENCE: Ran `context` at `6fdd3edf` in a clone that kept its own settings. The tip deleted `rules.md` and added `rules.md/notes.txt`. Git reported the deletion, and `git cat-file -t` identified the tip path as a tree. `context` returned `stale` with `<tip>:rules.md`. The deletion fixture without a replacement directory passed.
+
+CRITERION: AC-05 Without a usable origin or tip (no remote, an unresolvable default branch, a failing fetch, a held ref lock, or no merge base with the tip), `context` exits 0, keeps the local reading list, reports every entry `unverified` with a reason naming the cause, and its other fields are unchanged.
+VERDICT: met
+EVIDENCE: At `6fdd3edf`, all five cases passed in `context-freshness.test.ts`, including the comparisons against the local list, lenses and lens text. `plugin-version.test.ts` passed, and a separate failed-fetch run returned the same `plugin` object as a verified run. Controlled stalls in branch discovery and fetch each returned in about 30 seconds with exit 0, local reads and an applicable reason. The origins were local and the stalls used a local SSH shim.
+
+CRITERION: AC-06 After `context` runs in a clone behind the tip, `HEAD`, the current branch, the index, the working tree and every ref except `refs/remotes/origin/<branch>` are unchanged.
+VERDICT: not met
+EVIDENCE: The ordinary clone and new-tag fixture passed at `6fdd3edf`. In a separate behind-tip clone with a second configured tracking destination for `main`, `context` exited 0 and advanced `refs/remotes/origin/main`, but also created `refs/remotes/origin/mirrored-main`.
+
+CRITERION: AC-07 The seven SDD skills, the orchestrate skill, `references/loop.md` and `references/loop-settings.md` direct operations to pass the default branch to `context` and read each listed file at its reported version; `references/loop-settings.md` states that the conventions revision stays the one resolved from the checkout; and the loop glossary defines Instruction freshness.
+VERDICT: not met
+EVIDENCE: Inspected all eight skills and both references at `6fdd3edf`. The text and glossary checks passed. Running the command shown in the skills and `references/loop.md` with `main` substituted exited 2 with `missing --repo`. Adding `--repo` and the fixture checkout made the same command return the verified tip and a stale file's revision.
+
+CRITERION: AC-08 In a clone with no `origin/HEAD`, `context` reports a verified tip both with `--default-branch` and, through `git ls-remote`, without it.
+VERDICT: met
+EVIDENCE: The no-`origin/HEAD` test passed at `6fdd3edf`. In a separate local bare-origin fixture, I advanced origin before each invocation and verified that neither tip was already in the clone's tracking ref. Both the explicit-branch invocation and the `git ls-remote` fallback returned the new tip and classified the unchanged local instruction as `stale`.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Scope (D-01), Design (Read rule), AC-07, Test Plan row AC-07
+EVIDENCE: D-01 says to “put `--repo` in the documented `context` command”. `cli.ts:90-105` requires that argument before producing a reading list. The prescribed command fails, and the test pattern accepts the incomplete invocation.
+PROPOSAL: Give the complete command in the skills and references. Run that exact command in the proof and open a reported tip version.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: Scope (D-01), Design (Default branch and fetch), AC-06, Test Plan row AC-06
+EVIDENCE: D-01 says to “confine the fetch with `--refmap=`”. The fetch at `freshness.ts:46` supplies a destination refspec and still applies configured mappings. The second tracking ref created in the AC-06 probe contradicts the accepted ref-preservation criterion.
+PROPOSAL: Isolate the fetch from configured destination mappings and verify preservation with an extra mapping in the fixture.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: blocking
+WHERE: Scope (D-01), Design (Settings file, Read rule), `procedure.ts:21-27`, `freshness.ts:60-72`
+EVIDENCE: D-01 defers “check realpath containment for listed paths”. Code inspection shows that `settings.ts:85-90` checks containment in the archived tip, while `contextReport` then classifies those paths against the working tree. The local classifier follows symlinks and can return a path that the read rule opens outside the checkout.
+PROPOSAL: Enforce checkout containment before hashing a local candidate and at the point where the operation opens it.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: blocking
+WHERE: Scope (D-01), Design (Settings file), AC-03, Test Plan row AC-03
+EVIDENCE: D-01 says to “settle the edge cases F-04 to F-08”. `settings.ts:246-255` loads from `git archive`. The AC-03 probe showed that archive attributes can omit valid tracked settings and cause the operation to drop the tip's reading list and lenses without an error.
+PROPOSAL: Load and validate settings against the committed tree independently of archive export attributes.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: blocking
+WHERE: Scope (D-01), Design (States, Read rule), AC-01, AC-02, Test Plan row AC-01 and AC-02
+EVIDENCE: D-01 says to “settle the edge cases F-04 to F-08”. The settings reader accepts in-repository symlinks. `freshness.ts:55-72` compares the working-tree target's content hash with the committed link blob and uses the link blob as a stale read. The two probes showed both a wrong state and a read that supplies no instruction content.
+PROPOSAL: Resolve supported in-repository links consistently for the working tree and committed snapshots. Verify the returned state and the content an operation opens.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (States), AC-04, Test Plan row AC-04
+EVIDENCE: `freshness.ts:55-57` accepts any object ID at the listed path. After Git deletes the file and puts a directory at that path, the tree object is treated as a replacement instruction file.
+PROPOSAL: Check the committed entry's type before classifying it as readable. Add a removal case where the old path becomes a directory.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Settings file), `references/loop-settings.md` (Instruction freshness), Test Plan row AC-03
+EVIDENCE: In the invalid-tip-settings probe, `context` returned the local list and `old-lens` while `freshness.settings.read` pointed to the invalid tip settings. The reference says that field identifies the settings that supplied the list. The report rule requires a notice only for `unverified`, so this fallback has no required notice.
+PROPOSAL: Identify the settings source actually used and require the operation to report the fallback reason.
