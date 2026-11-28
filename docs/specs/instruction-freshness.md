@@ -337,6 +337,10 @@ the plugin removes the field and the rule together, because they ship in one ver
 
 None.
 
+## Deferred
+
+- D-01: Harden context freshness: put `--repo` in the documented `context` command (R-8 F-03); confine the fetch with `--refmap=`, no submodule recursion and no `FETCH_HEAD` write (F-02, F-12); check realpath containment for listed paths (F-01); and settle the edge cases F-04 to F-08, F-10, F-11 and F-13. From: drift re-review R-8. Verdict: pending.
+
 ## Review Log
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
