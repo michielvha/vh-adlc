@@ -49,9 +49,11 @@ Proposed change:
 4. Add a small test for an opened run that loses its host ownership record (`run-directory.ts:180`),
    and make the journey's copied-run step assert the diagnostic only the CLI's ownership check
    (`run-cli.ts:246`) produces.
-5. In every test file that needs the verified binary before another file may have downloaded it,
-   resolve it without `--offline` before the first offline use, so each file passes alone with an
-   empty binary cache.
+5. In the test files that called the installer with `--offline` themselves, and in the two files
+   review R-1 found reading the offline YAML reader before any installer call, resolve the binary
+   without `--offline` before the first offline use, so each of those files passes alone with an empty
+   binary cache. Other test files that reach the offline settings reader without preparing the binary
+   are outside this batch (see the residuals after review R-3).
 
 Required checks:
 
@@ -188,6 +190,34 @@ budget (380 s against 300 s) and six of its tests, and all four `normal-preparat
 The batch lowered both files, but meeting the budgets needs further work beyond the approved proposals. The owner kept
 the medium defaults; the breaches go to the owner as a decision, not into this batch.
 
+### After review R-3
+
+R-2 F-04 decision. The workstream orchestrator, under the owner's delegation, accepted the remaining medium-budget
+breaches as tracked residuals for this PR on 2026-11-28 (ledger [#179](https://github.com/michielvha/vh-adlc/issues/179)):
+`closure-controller.test.ts` at 380 seconds against the 300 second file budget, six of its tests over 30 seconds, and all
+four `normal-preparation` variants over 30 seconds. They stay open against [#170](https://github.com/michielvha/vh-adlc/issues/170)
+for phase 2.
+
+R-3 F-01 (residual). `run-approval.test.ts` and `run-directory.test.ts` also fail alone with an empty cache, because
+they reach the offline YAML reader (`settings.ts:521`) before any installer call; this was true at the task base too.
+The same likely holds for other docs-drift files that read settings, which this batch did not measure. Fixing two more
+files would leave the rest, so the Definition now limits proposal 5 to the files it fixed, and the suite-wide
+dependence goes to #170 phase 2, where one shared preparation step can remove it. CI prepares the binary before the
+checker step, so CI is not affected.
+
+R-3 F-03. The final-head `remote-gui` job failed again, this time in the Go test
+`TestDaemonReplacementRevokesTheSession` (`identity_test.go:262`, connection reset by peer), before the browser checks.
+The batch changes no remote-gui source, test or workflow. The occurrence is added to
+[#188](https://github.com/michielvha/vh-adlc/issues/188), which tracks this job's intermittent failures.
+
+R-3 F-02. Final-head CI run [46102592683](https://github.com/michielvha/vh-adlc/actions/runs/46102592683) for
+`a93ed40e`: the Linux checker passed (4,443 pass, 0 fail) and so did `checker-macos`, `verify` and `paseo-hosts`;
+`remote-gui` failed as described under R-3 F-03. This runner was slow across the whole suite (2,011 seconds against
+1,546 for `654b02fe`, and 56 tests over 30 seconds against 32), so the journeys measured 502 seconds for
+`closure-controller` and 218 for `normal-preparation`, with the same journey files and plugin tree that measured 380 and
+157 seconds one head earlier. Single CI runs vary this much; the before-and-after comparison stands on the paired runs
+above, and the budget residual uses the faster figures only as one observation.
+
 ## Reviews
 
 ### R-1
@@ -262,6 +292,35 @@ EVIDENCE: The directed test strategy sets medium-test budgets at 30 seconds per 
 PROPOSAL: Record the exact-head measurements and take any remaining budget breaches to the owner for a decision. Further optimization needs its own authorization if it exceeds the approved batch.
 ```
 
+### R-3
+
+Target: `a93ed40e15dfb276db5ca9ed440a472bdc68b1e2`.
+Model: gpt-6.2-sol, attested from Codex session log `rollout-2026-11-28T04-23-49-01a2202e-368f-72a3-ae1d-22884c53218f.jsonl` (the reply's own header said `MODEL: unknown`).
+Isolation: procedural, the same separate-operator settings as R-1. The clone's HEAD and status and the owning worktree's HEAD, status and branch were unchanged afterwards.
+
+```text
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: `docs/internal/maintenance/test-value-batch.md:52-60`, proposal 5 and standalone checks
+EVIDENCE: All five listed installer callers passed independently on macOS with Bun 1.4.5 and separate empty binary caches after failing at the task base. The restored `audit/entry.test.ts` passed all five tests at both commits. Two other changed files still depend on a populated cache. With separate empty caches, `run-approval.test.ts` failed 2 of 2 tests and `run-directory.test.ts` failed 25 of 25. Both reached the offline YAML reader at `settings.ts:521` before the verified binary was available. Both passed with a seeded cache.
+PROPOSAL: Prepare the verified binary in test setup before either file reaches the offline reader. Rerun both files alone with separate empty caches.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: `docs/internal/maintenance/test-value-batch.md:63-67`, final-head CI and journey timings
+EVIDENCE: The macOS checker passed at the review target. The required full Linux checker was still running when checked. The sandbox denied `ps`, so I used the retained Mac standalone logs and the completed Linux checker at `654b02fe`, which has identical journey and plugin inputs. Those Linux logs show all 13 journey tests passing, with totals of 380 s and 157 s against the main baseline of 519 s and 183 s. The delegated budget disposition covers the remaining overages. The final-head Linux verdict and timings are still missing. [Final-head run](https://github.com/michielvha/vh-adlc/actions/runs/46102592683), [prior Linux checker](https://github.com/michielvha/vh-adlc/actions/runs/46099403238/job/140838171517), [main baseline](https://github.com/michielvha/vh-adlc/actions/runs/45898546605/job/140191139348), [delegation ledger](https://github.com/michielvha/vh-adlc/issues/179)
+PROPOSAL: Retain the completed Linux checker result and both journey timings for the final candidate before closing maintenance.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: blocking
+WHERE: `docs/internal/maintenance/test-value-batch.md:162-173`, remote-gui failure disposition
+EVIDENCE: The final-head `remote-gui` job failed in `TestDaemonReplacementRevokesTheSession` at `identity_test.go:262` with `connection reset by peer`. The job stopped before the browser checks. The delegated disposition in #188 covers the earlier focus failure. The remote-gui source, tests, and CI workflow match the task base. The task diff contains only declared test and documentation paths, and the review clone’s HEAD, refs, index and worktree status matched their starting state. [Final-head remote-gui job](https://github.com/michielvha/vh-adlc/actions/runs/46102592683/job/140848160424), [tracked focus failure](https://github.com/michielvha/vh-adlc/issues/188#issuecomment-7233038573)
+PROPOSAL: Record the Go test failure and obtain a separate disposition from the workstream orchestrator before completion.
+```
+
 ## State
 
-R-1 and R-2 findings addressed above, except R-2 F-04, which is a residual for the owner. CI for the resulting head is pending; a further review waits on the orchestrator.
+Reviews R-1 to R-3 are stored. Every finding is fixed or recorded as a residual with its disposition: the journey budget breaches (accepted as tracked against #170 under the owner's delegation), the suite-wide offline-reader dependence (#170 phase 2) and the intermittent remote-gui failures (#188). Ready for the owner; CI for this record-only head is reported on the PR.
