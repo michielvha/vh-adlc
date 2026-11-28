@@ -33,7 +33,7 @@ Revisions that only change wording, and review-only runs, keep the current conse
 
 The editor opens each actual image, gains a fourth return line, `Presentation repairs`, whose entries each start with a fixed label such as `irrelevant image:` so tests read the verdict rather than interpret prose, flags long stretches of prose left without a break, and checks that pull quotes don't repeat a point already quoted in the batch or related articles. For comparison articles, the writer picks comparators for the reader's job rather than listing every adjacent tool, as the owner asked when OTF and Atlantis were dropped.
 
-Why there is a conflict: the in-progress blog-authoring spec says to add visuals "only when they solve an explanation problem" and fixes a three-line editor return. This document replaces exactly those two rules. Blog-authoring's Context gets a pointer here; its scope, criteria and status stay unchanged.
+Why there is a conflict: the in-progress blog-authoring spec says to add visuals "only when they solve an explanation problem" and defines the editor's verdict, repairs and exceptions return, which the editor agent writes as three lines. This document replaces exactly those two rules. Blog-authoring's Context gets a pointer here; its scope, criteria and status stay unchanged.
 
 These defaults were set under the owner's standing instruction to take the recommended option. You can reject any of them at acceptance:
 
@@ -49,7 +49,7 @@ These defaults were set under the owner's standing instruction to take the recom
 - A request for both wording changes and new visuals does the wording first, then a presentation revision over the revised prose.
 - Both manifests carry a version above `origin/main`'s when the feature ships: 0.35.0 while main is at 0.34.0, raised again if main moves first.
 
-Proof will come from static contract tests, ten new native Codex scenarios in the existing blog runner, one of which renders the article in a headless browser against a local preview, and a rerun of its nine existing scenarios against the changed package, recorded in the blog evidence README. All nineteen scenarios have run and passed against the 0.34.0 package (nine visual scenarios on macOS, `visual-rendered` on Linux, and the nine existing scenarios); the merges from main since then have not changed what they exercise, and the implementation review decides whether a rerun on the current package is needed. Acceptance authorizes implementing this and committing on `feat/blog-visual-reading`. Pushing to update PR #75 needs a ship request, and merging it needs the owner's separate approval. CI, which runs the Linux-only tests this macOS host cannot pass, is checked at ship on the pushed head and must pass before a merge; it is not part of the implementation review.
+Proof will come from static contract tests, ten new native Codex scenarios in the existing blog runner, one of which renders the article in a headless browser against a local preview, and a rerun of its nine existing scenarios against the changed package, recorded in the blog evidence README. All nineteen scenarios have run and passed against the 0.34.0 package (nine visual scenarios on macOS, `visual-rendered` on Linux, and the nine existing scenarios); those passes were judged by the harness before commit 536bad4 tightened its post-run checks, so the scenarios rerun against the current harness and the 0.35.0 package before the implementation review counts them. Five gaps raised in review are deferred to issue #204 and listed under Deferred. Acceptance authorizes implementing this and committing on `feat/blog-visual-reading`. Pushing to update PR #75 needs a ship request, and merging it needs the owner's separate approval. CI, which runs the Linux-only tests this macOS host cannot pass, is checked at ship on the pushed head and must pass before a merge; it is not part of the implementation review.
 
 Since the acceptance at R-47, drift re-review R-48 found two rules out of date after main moved on, and the owner approved their replacements on 2026-11-24. The fixed version 0.17.0 would have been a downgrade from main's 0.33.0, so the version is now any version above main's. The local test exception for the fixture-lock error no longer applies, so the local suite is now compared with an `origin/main` worktree on the same macOS host.
 
@@ -263,6 +263,14 @@ Each visual fixture's `AGENTS.md` declares the destination's image-with-caption 
 ## Open Questions
 
 None. The defaults in the owner summary were set under the owner's standing instruction of 2026-11-10 to take the recommended option, and are confirmed or rejected at acceptance.
+
+## Deferred
+
+- D-01: An owner request for a text-only long-form article, or a destination that cannot hold a treatment, with quotable notes. Tracked in #204. From: drift re-review R-51. Verdict: pending.
+- D-02: Image entries that cannot name what the image shows or what its caption claims, for an unviewable image or a missing caption. Tracked in #204. From: drift re-review R-51. Verdict: pending.
+- D-03: An owner edit saved to the article or an asset while the editor runs. Tracked in #204. From: drift re-review R-51. Verdict: pending.
+- D-04: Per-article fixed handoff lines in a batch with different outcomes. Tracked in #204. From: drift re-review R-51. Verdict: pending.
+- D-05: A seeded presentation defect that the rendered check must find. Tracked in #204. From: drift re-review R-51. Verdict: pending.
 
 ## Review Log
 
