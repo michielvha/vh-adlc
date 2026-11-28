@@ -166,7 +166,23 @@ incomplete one (rejected). The gate reads records only through `ImplRecords`, so
 covers the gate path the finding exercised. F-02: the Definition's task base is corrected. The
 source and the Definition changed, so a new review is required.
 
+### R-4
+
+Target: `5f319afd00a46457a2dc3300ed81b2cccfef7da2` (pushed head of PR #181).
+Model: gpt-6.2-sol, attested from the Codex session log (thread `01a21ff2-360a-77d0-815d-3e8cf1fee39a`,
+every turn `"model":"gpt-6.2-sol"`); the reply itself said `MODEL: unknown`. Isolation: procedural.
+
+How it ran: the same operator-run procedure and settings as R-3, in a new private clone of the target.
+Afterwards the owning worktree's HEAD, status and index were unchanged, and the clone was clean at
+the target.
+
+```text
+NO FINDINGS
+```
+
 ## State
 
-Review R-3 returned one blocking finding and one nit, both addressed. A new Codex review of the
-resulting commit is pending. The branch is `fix/review-records-trailing-space`.
+Locally complete. The required checks were observed (see Evidence), and the current independent
+Codex review R-4 of `5f319afd` has no findings. The affected source and the Definition have not
+changed since that commit; only R-4 and this State section were appended. The task is published as
+PR #181 on branch `fix/review-records-trailing-space`; merging waits for the owner.
