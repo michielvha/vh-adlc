@@ -28,7 +28,10 @@ the previous spec review's commit and the document diff since it.
   (`${XDG_CACHE_HOME:-$HOME/.cache}/vh-adlc/docs/<sha>/<page>` on Linux,
   `$HOME/Library/Caches/vh-adlc/docs/<sha>/<page>` on macOS). Start with
   `conventions/feature-documents.md`; its Review log section defines the exact record formats you return.
-  If a page cannot be read, return one finding naming it and stop.
+  Read only that cache, never a page from a local clone, a Git object or any other source. You may fill
+  it with `knowledge --page <page>`, using the given plugin pin, when its result names the given revision.
+  If the page still cannot be read there, stop: after any header lines the dispatch asks for, reply with the single line
+  `PAGE NOT CACHED: <page>` and nothing else. The dispatcher reports that as a pending review.
 - You may run the `vh-adlc` binary (`knowledge`, `lint`, `fresh`, `gate`, `next`, `review check`) and the
   repository's own tests to observe evidence. A result you did not observe is not evidence. The command
   comes first, then its arguments and flags, each flag and its value as separate arguments, for example
