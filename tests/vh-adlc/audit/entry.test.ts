@@ -50,7 +50,7 @@ for (const state of ["binary-missing", "docs-empty", "docs-partial", "ready"] as
   writeFileSync(join(bin, "curl"), `#!/bin/sh\nprintf curl > ${shellQuote(marker)}\nexit 88\n`); chmodSync(join(bin, "curl"), 0o700);
   const setup: Record<string, unknown> = { kind: "exact-pinned-blob-cache-seeding", pages: [] };
   if (state !== "binary-missing") {
-    const ensured = Bun.spawnSync(["bash", join(plugin, "scripts/ensure-vh-adlc.sh")], { stdout: "pipe", stderr: "pipe" }); expect(ensured.exitCode).toBe(0);
+    const ensured = Bun.spawnSync(["bash", join(plugin, "scripts/ensure-vh-adlc.sh"), "--offline"], { stdout: "pipe", stderr: "pipe" }); expect(ensured.exitCode).toBe(0);
     const binary = ensured.stdout.toString().trim(), lock = JSON.parse(readFileSync(join(plugin, "vh-adlc.lock.json"), "utf8"));
     const platform = `${process.platform === "darwin" ? "darwin" : "linux"}_${process.arch === "x64" ? "amd64" : "arm64"}`;
     const observed = hash(readFileSync(binary)); expect(observed).toBe(lock.assets[platform].binary_sha256);
