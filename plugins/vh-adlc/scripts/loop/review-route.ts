@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { runOwnedClient } from "../triage/owned-process";
+import { pidNamespaceAvailable, resolvedPath, runOwnedClient, seatbeltAvailable } from "../triage/owned-process";
 import { nulRecords, statusEntries } from "./git-paths";
 import { gitEnvironment, gitReadArguments, readGitWithEnvironment } from "../git-read";
 
@@ -24,7 +24,7 @@ export type ReviewRequest = {
   scratch?: string[]; timeoutMs?: number; env?: Record<string, string>;
   /** Test seam: replaces the confirmation of process cleanup. */
   cleanup?: Cleanup;
-  /** Test seam: `unavailable` simulates a host without a PID namespace boundary. */
+  /** Test seam: `unavailable` simulates a host with neither a PID namespace nor a sandbox-exec write boundary. */
   boundary?: "auto" | "unavailable";
 };
 
@@ -239,6 +239,21 @@ export function removeExport(dir: string) {
 
 /** Splits a reply into its two header lines and the records after them. */
 export function parseReply(reply: string): { model: string; target: string; records: string } | { error: string } {
+  // A reviewer that cannot read a convention page from the cache stops on its own line; that is a pending
+  // review for the dispatcher, never a record, whatever header lines came before it. Replies whose records
+  // open as records do (FINDING:, CRITERION: or NO FINDINGS) are records, even when they quote the marker.
+  // In any other reply a marker line stops the review, matched leniently: any case and spacing, list or quote
+  // markers, emphasis, backticks, a colon, a dash or nothing after the words, code fences, a line of prose
+  // before it and trailing text after it.
+  const lines = reply.split(/\r?\n/).map(text => text.trim()).filter(Boolean).filter(text => !/^(?:MODEL|TARGET): /.test(text));
+  if (!/^(?:FINDING:|CRITERION:|NO FINDINGS)/.test(lines[0] ?? "")) {
+    for (const text of lines) {
+      const stop = /^PAGE\s+NOT\s+CACHED\b[*_`'"]*\s*[:\-\u2013\u2014]?[*_`'"\s]*(.*)$/i.exec(text.replace(/^[\s>*+\-\d.)`'"_]*/, ""));
+      if (!stop) continue;
+      const page = /[A-Za-z0-9_\/-][A-Za-z0-9._\/-]*/.exec(stop[1]!)?.[0]?.replace(/\.+$/, "");
+      return { error: `the reviewer stopped: page not cached: ${page || "unnamed"}` };
+    }
+  }
   // Only the two header lines and the blank lines around them are removed; the records keep their bytes.
   let at = 0;
   const line = (): string | undefined => {
@@ -266,7 +281,7 @@ function substitute(argv: string[], values: Record<string, string>): string[] {
  * Codex's `--json` stream names the thread; its session log under `$HOME/.codex/sessions` records the
  * model that served it. Returns the reply text (the final agent message) and the attested model.
  */
-export function codexSession(stdout: string, home: string): { reply: string; model?: string; error?: string } {
+export function codexSession(stdout: string, home: string, codexHome?: string): { reply: string; model?: string; error?: string } {
   let thread: string | undefined, reply = "";
   for (const line of stdout.split("\n")) {
     let event: { type?: string; thread_id?: string; item?: { type?: string; text?: string } };
@@ -275,7 +290,8 @@ export function codexSession(stdout: string, home: string): { reply: string; mod
     if (event.type === "item.completed" && event.item?.type === "agent_message" && typeof event.item.text === "string") reply = event.item.text;
   }
   if (!thread || !/^[0-9a-f-]{16,}$/i.test(thread)) return { reply, error: "the Codex stream named no thread id, so the served model cannot be attested" };
-  const sessions = join(home, ".codex", "sessions");
+  // Codex keeps its sessions under CODEX_HOME when that is set, else under ~/.codex.
+  const sessions = codexHome ? join(codexHome, "sessions") : join(home, ".codex", "sessions");
   const found: string[] = [];
   const walk = (dir: string) => {
     let names: string[];
@@ -303,12 +319,97 @@ export function modelMatches(requested: string, reported: string): boolean {
   return !/\d/.test(requested) && reported.toLowerCase().split(/[-.]/).includes(requested.toLowerCase());
 }
 
+const NO_BOUNDARY = "no process boundary on this host keeps reviewer processes off the owning worktree after the review "
+  + "(a PID namespace through unshare on Linux, or a sandbox-exec write boundary on macOS, is required)";
+
+/**
+ * The first regular file under `root`, outside `.git` and the scratch directories, that already has a second
+ * hard link. Seatbelt checks the path a write goes through, so such a file could be changed through its
+ * other name.
+ */
+export function protectedLinkCheck(root: string, scratch: string[], extra: string[],
+  hooks: { afterList?: (dir: string) => void } = {}): { linked?: string; changed?: string } {
+  for (const path of extra) {
+    let info;
+    // A fresh repository may have no index yet; any other failure means the metadata changed under the check.
+    try { info = lstatSync(path); } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+      return { changed: path };
+    }
+    if (info.isFile() && info.nlink > 1) return { linked: path };
+  }
+  // Another session may remove or lock a file between the listing and its lstat: that is a retry, not an error.
+  const walk = (path: string): { linked?: string; changed?: string } | undefined => {
+    let names: string[];
+    try { names = readdirSync(join(root, path)); } catch { return { changed: path || "." }; }
+    hooks.afterList?.(path);
+    for (const name of names) {
+      const child = path ? `${path}/${name}` : name;
+      if (child === ".git" || underScratch(child, scratch)) continue;
+      let info;
+      try { info = lstatSync(join(root, child)); } catch { return { changed: child }; }
+      if (info.isDirectory()) { const found = walk(child); if (found) return found; }
+      else if (info.isFile() && info.nlink > 1) return { linked: child };
+    }
+    return undefined;
+  };
+  return walk("") ?? {};
+}
+
+/**
+ * The first scratch allow that would open a protected path: one that resolves to a denied path or a parent
+ * of one, into a Git directory, or, through a symlink, to anywhere inside a denied path. The snapshot skips
+ * a scratch entry by its declared path, not by what it points at.
+ */
+function scratchOverlap(allows: { entry: string; declared: string; resolved: string }[], deny: string[], gitDirs: string[],
+  stores: string[] = []): { entry: string; resolved: string } | undefined {
+  const inside = (path: string, dir: string) => path === dir || dir === "/" || path.startsWith(`${dir}/`);
+  const storeParents = new Set(stores.flatMap(store => {
+    const out: string[] = [];
+    for (let at = dirname(store); ; at = dirname(at)) { if (existsSync(at)) out.push(at); if (dirname(at) === at) return out; }
+  }));
+  for (const { entry, declared, resolved } of allows) {
+    // A scratch allow comes from the candidate commit: it must never reach a credential store.
+    if (stores.some(store => inside(resolved, store) || inside(store, resolved)) || storeParents.has(resolved)) return { entry, resolved };
+    if (deny.some(dir => inside(dir, resolved)) || gitDirs.some(dir => inside(resolved, dir))
+      || resolved !== declared && deny.some(dir => inside(resolved, dir))) return { entry, resolved };
+  }
+  return undefined;
+}
+
+/**
+ * The environment a reviewer CLI gets: an allowlist from the controller's, then `request.env`. The reviewer
+ * runs the candidate's tests, often with network access, so it never inherits the controller's credentials.
+ */
+/** Credential stores under the reviewer's home that the macOS profile refuses to read (owner's choice B, #187). */
+const CREDENTIAL_DIRECTORIES = [".ssh", ".aws", ".kube", ".docker", ".config/gh", ".config/gcloud"];
+const CREDENTIAL_FILES = [".netrc", ".git-credentials"];
+const REVIEWER_ENVIRONMENT = ["PATH", "HOME", "TMPDIR", "USER", "LOGNAME", "SHELL", "LANG", "TERM", "CODEX_HOME",
+  "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_RUNTIME_DIR"];
+function reviewerEnvironment(extra: Record<string, string> | undefined): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [name, value] of Object.entries(process.env))
+    if (typeof value === "string" && (REVIEWER_ENVIRONMENT.includes(name) || name.startsWith("LC_"))) env[name] = value;
+  return { ...env, ...extra };
+}
+
 export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutcome> {
   const repo = realpathSync(request.repo), scratch = (request.scratch ?? []).map(dir => dir.replace(/\/+$/, ""));
   const commit = git(repo, ["rev-parse", "--verify", `${request.commit}^{commit}`]).toString().trim();
   const work = realpathSync(mkdtempSync(join(tmpdir(), "vh-adlc-review-run-")));
   let exportDir: string | undefined, cloneDir: string | undefined;
   try {
+    const namespace = request.boundary !== "unavailable" && pidNamespaceAvailable();
+    const seatbelt = request.boundary !== "unavailable" && !namespace && seatbeltAvailable();
+    if (!namespace && !seatbelt) return { status: "pending", reason: NO_BOUNDARY };
+    // Only Git's output terminator goes: a path may end in a space.
+    const gitDir = git(repo, ["rev-parse", "--absolute-git-dir"]).toString().replace(/\n$/, "");
+    const commonDir = git(repo, ["rev-parse", "--path-format=absolute", "--git-common-dir"]).toString().replace(/\n$/, "");
+    if (seatbelt) {
+      const links = protectedLinkCheck(repo, scratch, [join(gitDir, "index"), join(gitDir, "HEAD")]);
+      if (links.changed) return { status: "pending", reason: `a protected file changed while the link check read it (${links.changed}); retry the review` };
+      if (links.linked) return { status: "pending", reason: `a protected file already has a second hard link, through which a reviewer could change it after the review: ${links.linked}` };
+    }
     if (request.kind === "spec") {
       try { exportDir = exportCommit(repo, commit); } catch (error) { return { status: "pending", reason: (error as Error).message }; }
     } else {
@@ -318,6 +419,24 @@ export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutc
       const checkout = clone.exitCode === 0 ? Bun.spawnSync(["git", "-C", cloneDir, "checkout", "-q", "--detach", commit], { stdout: "pipe", stderr: "pipe" }) : clone;
       if (checkout.exitCode !== 0) return { status: "pending", reason: "the private review clone could not be prepared" };
     }
+    // Under the macOS boundary no reviewer process may write what the before-and-after check judges. The
+    // profile is built from these resolved paths, after no scratch allow is shown to open a protected one.
+    const deny = [repo, gitDir, commonDir, ...(cloneDir ? [cloneDir] : []), ...(exportDir ? [exportDir] : [])].map(resolvedPath);
+    // The fixed credential stores under the home the reviewer gets.
+    // An unset HOME falls back to the account's home; an empty one names no home and no stores.
+    const reviewerHome = request.env?.HOME ?? process.env.HOME ?? homedir();
+    const credentials = reviewerHome
+      ? { directories: CREDENTIAL_DIRECTORIES.map(path => resolvedPath(join(reviewerHome, path))),
+          files: CREDENTIAL_FILES.map(path => resolvedPath(join(reviewerHome, path))) }
+      : { directories: [], files: [] };
+    // Each allow is resolved once: the overlap check and the profile see the same path.
+    const allows = [...scratch.map(entry => ({ entry, declared: join(repo, entry) })),
+      ...(cloneDir ? scratch.map(entry => ({ entry, declared: join(cloneDir!, entry) })) : [])]
+      .map(allow => ({ ...allow, resolved: resolvedPath(allow.declared) }));
+    if (seatbelt) {
+      const overlap = scratchOverlap(allows, deny, [resolvedPath(gitDir), resolvedPath(commonDir)], [...credentials.directories, ...credentials.files]);
+      if (overlap) return { status: "pending", reason: `the review_scratch entry ${overlap.entry} resolves onto a protected path (${overlap.resolved}), so allowing writes there would open it` };
+    }
     const promptFile = join(work, "prompt.md");
     writeFileSync(promptFile, request.prompt);
     chmodSync(promptFile, 0o400);
@@ -325,17 +444,18 @@ export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutc
     const before = snapshot(repo, scratch, "owning"), cloneBefore = cloneDir ? snapshot(cloneDir, scratch, "full") : undefined;
     const stdout = join(work, "stdout"), stderr = join(work, "stderr");
     mkdirSync(dirname(stdout), { recursive: true });
-    const env = Object.fromEntries(Object.entries({ ...process.env, ...request.env }).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+    const env = reviewerEnvironment(request.env);
     let result;
     try {
-      result = await runOwnedClient(argv, { cwd: exportDir ?? cloneDir ?? repo, env, stdout, stderr, pidNamespace: request.boundary !== "unavailable" },
+      const writeDeny = { deny, allow: allows.map(allow => allow.resolved), resolved: true, credentials };
+      result = await runOwnedClient(argv, { cwd: exportDir ?? cloneDir ?? repo, env, stdout, stderr, pidNamespace: namespace, writeDeny },
         { timeout_ms: request.timeoutMs ?? 15 * 60_000, grace_ms: 500, reap_ms: 2_000 });
     } catch (error) { return { status: "pending", reason: `the reviewer command could not start: ${(error as Error).message}` }; }
     const cleanup = request.cleanup ? await request.cleanup(result) : result;
     const raw = readFileSync(stdout, "utf8");
-    const attestation = request.route.model_attestation === "codex-session" ? codexSession(raw, request.env?.HOME ?? process.env.HOME ?? homedir()) : undefined;
+    const attestation = request.route.model_attestation === "codex-session" ? codexSession(raw, request.env?.HOME ?? process.env.HOME ?? homedir(), request.env?.CODEX_HOME ?? process.env.CODEX_HOME) : undefined;
     const reply = attestation ? attestation.reply : raw;
-    if (result.boundary !== "pid-namespace") return { status: "pending", reason: "no process boundary on this host could confirm that every reviewer process stopped (a PID namespace through unshare is required)", reply: readFileSync(stdout, "utf8") };
+    if (result.boundary === "marker") return { status: "pending", reason: NO_BOUNDARY, reply: readFileSync(stdout, "utf8") };
     if (!cleanup.confirmed) return { status: "pending", reason: `process cleanup could not confirm every reviewer process stopped (${cleanup.survivors.join(", ") || "group"})`, reply };
     const after = snapshot(repo, scratch, "owning"), cloneAfter = cloneDir ? snapshot(cloneDir, scratch, "full") : undefined;
     const changed = [...Object.keys(before).filter(key => before[key] !== after[key]),

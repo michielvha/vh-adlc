@@ -13,15 +13,28 @@ Before dispatching, read the reviewer role's route:
   `references/loop-settings.md` describes. First it caches, at the dispatched docs revision, every
   convention page the reviewer will read: the revision's own `AGENTS.md`, `conventions/feature-documents.md`
   and each page that
-  `AGENTS.md` at X or at the revision routes to. A page that cannot be cached leaves the review pending
+  `AGENTS.md` at X or at the revision routes to. The revision's `AGENTS.md` routes through its relative
+  Markdown links too, root pages such as `README.md` included, and a root page it links adds the pages
+  that page links, one level deep; a broken link there leaves every review at that revision pending.
+  A page that cannot be cached leaves the review pending
   before the CLI starts, because a command-route reviewer often cannot fetch one itself. Then: a spec review reads a read-only export of X and is launched
   from it; an implementation review runs in a private clone of X. Afterwards the clone, and the owning
-  worktree's files, index, HEAD and branch, must be unchanged outside `review_scratch`. A route with `model_attestation: codex-session` takes the served model from
+  worktree's files, index, HEAD and branch, must be unchanged outside `review_scratch`. The CLI runs
+  inside the process boundary [loop-settings.md](loop-settings.md) describes: a PID namespace on Linux, a
+  `sandbox-exec` write profile on macOS; without one the review stays pending. A route with `model_attestation: codex-session` takes the served model from
   Codex's own session log, so a `MODEL: unknown` self-report is accepted only when that attested model
   matches the request. Its JSON `status` is `ready` or `pending`. On `ready`, store its `records`
   under `### R-<n>` with a Review Log row naming its `model` and isolation `procedural`, then run
   `review check` against the same text. On `pending`, store nothing and report a line that starts with
-  `review pending`, followed by its `reason`, with the raw `reply` in the handoff.
+  `review pending`, followed by its `reason`, with the raw `reply` in the handoff. A reviewer that cannot
+  read a page from the cache, after its own `knowledge` call for that revision where it can make one,
+  replies `PAGE NOT CACHED: <page>` instead of records and never reads it from a local clone. The
+  command route returns `pending` when a reply whose records don't open with `FINDING:`, `CRITERION:` or
+  `NO FINDINGS` has that line in any case and spacing, allowing list or quote markers, emphasis,
+  backticks, a colon, a dash or nothing after the words, code fences, a line of prose before it and
+  trailing text after it. A record that quotes the line stays a
+  record. A host dispatch also stores
+  nothing and reports `review pending` with that page.
 
 For a spec review, both routes take its scope from one computation:
 `bun scripts/loop/cli.ts review-scope --repo <dir> --document <doc> --commit <X>` prints the previous spec
