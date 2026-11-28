@@ -1,0 +1,90 @@
+# mutant D: plugins/vh-adlc/scripts/docs-drift/run-cli.ts
+# from: } else if (run.origin !== "original") {
+# to:   } else if (false) {
+# command: bun test --timeout 1200000 tests/vh-adlc/docs-drift/zz-np-before.test.ts -t owned candidate: prepare-protocol$
+# source diff:
+diff --git a/plugins/vh-adlc/scripts/docs-drift/run-cli.ts b/plugins/vh-adlc/scripts/docs-drift/run-cli.ts
+index ed12985e..fb0b3e3d 100644
+--- a/plugins/vh-adlc/scripts/docs-drift/run-cli.ts
++++ b/plugins/vh-adlc/scripts/docs-drift/run-cli.ts
+@@ -243,7 +243,7 @@ export async function runDirectoryMain(argv: string[]): Promise<number> {
+               ...(reviewed.pending_reference ? { pending_publication: reviewed.pending_reference } : {}),
+               ...(reviewed.worker ? { assessment_worker: reviewed.worker } : {}), ...(reviewed.reviewer ? { assessment_reviewer: reviewed.reviewer } : {}) } }).artifacts;
+         }
+-      } else if (run.origin !== "original") {
++      } else if (false) {
+         report.outcome = "setup-required";
+         report.diagnostics = ["The original host ownership record is required for executing stages. Use resume --action inspect to observe this copy."];
+       } else if (options.command === "scan") {
+# run:
+bun test v1.4.5 (a7733435c)
+
+tests/vh-adlc/docs-drift/zz-np-before.test.ts:
+77 |   expect(missingApproval.report).toMatchObject({ outcome: "setup-required" });
+78 |   const copy = join(f.root, "copied-prepared-run"); cpSync(directory, copy, { recursive: true });
+79 |   const copied = await invoke("publish", copy);
+80 |   expect(copied.result.exit_code).toBe(2);
+81 |   // A missing approval also asks for setup, so assert the refusal only the ownership check gives.
+82 |   expect(copied.report).toMatchObject({ outcome: "setup-required",
+                             ^
+error: expect(received).toMatchObject(expected)
+
+  {
++   "authority": "none",
++   "bun_version": "1.4.5",
++   "command": "publish",
++   "component": {
++     "diagnostics": [],
++     "expected": {
++       "component_sha256": "91bd3f9d4bc59d58d426fb10a6141d7149e9f84448eb48471e9932685fa0d29f",
++       "plugin_version": "0.34.0",
++       "source_commit": "5ab3eb8e6bae083e1b32708eeb32172fc3aed73e",
++     },
++     "matched": true,
++   },
+    "diagnostics": [
+-     "The original host ownership record is required for executing stages. Use resume --action inspect to observe this copy.",
++     "docs-drift run original host ownership required",
+    ],
+-   "outcome": "setup-required",
++   "outcome": "incomplete",
++   "run_directory": "/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-drift-publish-3xE7fm/copied-prepared-run",
++   "schema_version": 1,
++   "source_commit": "066cfaa629218911038ad872aabd63e5ce2030b7",
++   "stage": "verify",
++   "stage_artifacts": {
++     "candidate": {
++       "path": "candidate-e4b16676-3473-4899-9e6b-2623e3b9505d.json",
++       "sha256": "3f60c6717eef8ce9a7b2ade790c303d1632e06d02d7b1ba8cc39744ffefd3f32",
++     },
++     "candidate_review": {
++       "path": "candidate-review-e4b16676-3473-4899-9e6b-2623e3b9505d.json",
++       "sha256": "89f7a391a1d4243b79bad79e9187db83b3cdf3a1323b530be7e985f85a2e6f7c",
++     },
++     "candidate_verification": {
++       "path": "candidate-verification-48f3d97e-c0f7-4210-b762-927e5bc11380.json",
++       "sha256": "4980475899078aa0a869543b4f87bc8c809cb67c9441843334e7586bf3d311cb",
++     },
++     "reviewed_plan": {
++       "path": "reviewed-plan-e4b16676-3473-4899-9e6b-2623e3b9505d.json",
++       "sha256": "9f746171f124cb74d7c686164e77fe3b0210c0ac3a62d86b7513f7759e65d10d",
++     },
++     "reviewer_capture": {
++       "path": "native-role-y84U8a/capture.json",
++       "sha256": "88963977a0ba52968acd226d85318517087378583eb4cd6a817c76f1ed2050af",
++     },
++   },
+  }
+
+- Expected  - 2
++ Received  + 40
+
+      at <anonymous> (/Users/michielvh/code/vh-adlc/.claude/worktrees/test-value-audit/tests/vh-adlc/docs-drift/zz-np-before.test.ts:82:25)
+(fail) normal prepare retains the original worker selection and edits only its owned candidate: prepare-protocol [34836.98ms]
+Preserved failed normal preparation fixtures ["/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-flat-native-2fHogz","/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-drift-publish-3xE7fm"]
+
+ 0 pass
+ 3 filtered out
+ 1 fail
+ 33 expect() calls
+Ran 1 test across 1 file. [34.85s]

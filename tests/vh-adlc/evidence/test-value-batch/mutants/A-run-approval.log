@@ -1,0 +1,57 @@
+# mutant A: plugins/vh-adlc/scripts/docs-drift/run-approval.ts
+# from: if (!existsSync(join(run.directory, "approval.yaml"))) throw new SetupRequired
+# to:   if (false) throw new SetupRequired
+# command: bun test --timeout 1200000 tests/vh-adlc/docs-drift/run-approval.test.ts
+# source diff:
+diff --git a/plugins/vh-adlc/scripts/docs-drift/run-approval.ts b/plugins/vh-adlc/scripts/docs-drift/run-approval.ts
+index 38182c88..f2d56bd9 100644
+--- a/plugins/vh-adlc/scripts/docs-drift/run-approval.ts
++++ b/plugins/vh-adlc/scripts/docs-drift/run-approval.ts
+@@ -23,7 +23,7 @@ export function recordRunApproval(options: { repo: string; run: RunDirectory; ma
+   }
+   if (latestRunArtifact(run, "journal")) throw Error("Original operation approval is missing");
+   const source = run.manifest.source_commit, settings = loadCommittedSettings(repo, source).settings;
+-  if (!existsSync(join(run.directory, "approval.yaml"))) throw new SetupRequired("Retain exact approval.yaml for the displayed manifest before publication.");
++  if (false) throw new SetupRequired("Retain exact approval.yaml for the displayed manifest before publication.");
+   const request = readArtifact(join(run.directory, "approval.yaml"));
+   if (request.length > settings.reports.max_entry_bytes) throw Error("Bounded publication approval required");
+   const payload: unknown = collectionReaders().yaml(request);
+# run:
+bun test v1.4.5 (a7733435c)
+
+tests/vh-adlc/docs-drift/run-approval.test.ts:
+40 |   const run = createRunDirectory({ repo: f.repo, source, directory, origins: join(f.root, "origins"), entry: "interactive" });
+41 |   const manifest = structuredClone(f.plan.manifest);
+42 |   manifest.bindings.source_commit = source; manifest.bindings.settings_sha256 = captureSnapshot(f.repo, source).settings_sha256;
+43 |   let refusal: unknown;
+44 |   try { recordRunApproval({ repo: f.repo, run, manifest, command: "publish" }); } catch (error) { refusal = error; }
+45 |   expect(refusal).toBeInstanceOf(SetupRequired);
+                       ^
+error: expect(received).toBeInstanceOf(expected)
+
+Expected constructor: [class SetupRequired extends Error]
+Received value: 256 |   const stat = lstatSync(directory);
+257 |   if (!stat.isDirectory() || stat.isSymbolicLink() || realpathSync(directory) !== directory || (stat.mode & 0o077) !== 0
+258 |     || (process.getuid && stat.uid !== process.getuid())) fail("unsafe private directory");
+259 | }
+260 | export function readArtifact(path: string): Buffer {
+261 |   const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+                   ^
+ENOENT: no such file or directory, open '/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-drift-publish-UBGKbc/run/approval.yaml'
+    path: "/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-drift-publish-UBGKbc/run/approval.yaml",
+ syscall: "open",
+   errno: -2,
+    code: "ENOENT"
+
+      at readArtifact (/Users/michielvh/code/vh-adlc/.claude/worktrees/test-value-audit/plugins/vh-adlc/scripts/docs-drift/journal.ts:261:14)
+      at recordRunApproval (/Users/michielvh/code/vh-adlc/.claude/worktrees/test-value-audit/plugins/vh-adlc/scripts/docs-drift/run-approval.ts:27:19)
+      at <anonymous> (/Users/michielvh/code/vh-adlc/.claude/worktrees/test-value-audit/tests/vh-adlc/docs-drift/run-approval.test.ts:44:9)
+
+
+      at <anonymous> (/Users/michielvh/code/vh-adlc/.claude/worktrees/test-value-audit/tests/vh-adlc/docs-drift/run-approval.test.ts:45:19)
+(fail) publication without a retained approval.yaml asks for setup and records no approval [977.29ms]
+
+ 1 pass
+ 1 fail
+ 5 expect() calls
+Ran 2 tests across 1 file. [3.32s]

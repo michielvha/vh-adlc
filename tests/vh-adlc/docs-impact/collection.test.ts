@@ -1,4 +1,4 @@
-import { afterAll, expect, test } from "bun:test";
+import { afterAll, beforeAll, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -7,6 +7,12 @@ import { collectImpact, resolveRoots } from "../../../plugins/vh-adlc/scripts/do
 
 const made: string[] = [];
 afterAll(() => { for (const root of made) rmSync(root, { recursive: true, force: true }); });
+// Collection reads settings through the offline YAML reader, which needs the verified binary in the cache;
+// download it here when it is missing, so this file does not depend on another file having installed it.
+beforeAll(() => {
+  const ensured = Bun.spawnSync(["bash", join(import.meta.dir, "../../../plugins/vh-adlc/scripts/ensure-vh-adlc.sh")], { stdout: "pipe", stderr: "pipe" });
+  if (ensured.exitCode !== 0) throw Error("verified vh-adlc binary unavailable: " + ensured.stderr.toString());
+});
 const declaration = 'Documentation impact roots: ["docs/"]\n';
 const guide = (pattern = "src/**") => `---\ncovers: ['${pattern}']\n---\nA guide.\n`;
 function put(root: string, path: string, value: string) { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), value); }
@@ -71,7 +77,7 @@ test("ordinary feature coverage and the actual pinned freshness matcher agree on
   const root = fixture({ "docs/specs/feature.md": feature, "src/deep/a.ts": "old\n", "src/q1.ts": "old\n", "src/a.ts": "old\n", "area/sub/app.ts": "old\n" }, declaration + 'Feature documents: docs/specs/\n');
   for (const name of ["src/deep/a.ts", "src/q1.ts", "src/a.ts", "area/sub/app.ts"]) put(root, name, "changed\n");
   const plugin = join(import.meta.dir, '../../../plugins/vh-adlc');
-  const ensured = Bun.spawnSync(['bash', join(plugin, 'scripts/ensure-vh-adlc.sh'), '--offline'], { stdout: 'pipe', stderr: 'pipe' }); expect(ensured.exitCode).toBe(0);
+  const ensured = Bun.spawnSync(['bash', join(plugin, 'scripts/ensure-vh-adlc.sh')], { stdout: 'pipe', stderr: 'pipe' }); expect(ensured.exitCode).toBe(0);
   const pin = readFileSync(join(plugin, 'knowledge.md'), 'utf8').match(/\b[a-f0-9]{40}\b/u)?.[0]; if (!pin) throw Error('missing plugin pin');
   const args = [ensured.stdout.toString().trim(), 'fresh', 'docs/specs/feature.md', '--repo', root, '--plugin-pin', pin];
   const before = Bun.spawnSync(args, { stdout: 'pipe', stderr: 'pipe' });
@@ -93,7 +99,7 @@ test('an ordinary covered doc repair still makes the actual feature review stale
   const reviewed = git(root, 'rev-parse', 'HEAD');
   const row = `| 2026-11-05 | R-1 | implementation | \`${reviewed}\` | fixture | procedural | Fixture review. |\n`;
   put(root, 'docs/specs/feature.md', feature + row + '\n### R-1\n\nCRITERION: AC-01 The first end state, wrapped onto a second line.\nVERDICT: met\nEVIDENCE: fixture\n\nCRITERION: AC-02 The second end state.\nVERDICT: met\nEVIDENCE: fixture\n'); commit(root);
-  const plugin = join(import.meta.dir, '../../../plugins/vh-adlc'), ensured = Bun.spawnSync(['bash', join(plugin, 'scripts/ensure-vh-adlc.sh'), '--offline'], { stdout: 'pipe', stderr: 'pipe' }); expect(ensured.exitCode).toBe(0);
+  const plugin = join(import.meta.dir, '../../../plugins/vh-adlc'), ensured = Bun.spawnSync(['bash', join(plugin, 'scripts/ensure-vh-adlc.sh')], { stdout: 'pipe', stderr: 'pipe' }); expect(ensured.exitCode).toBe(0);
   const pin = readFileSync(join(plugin, 'knowledge.md'), 'utf8').match(/\b[a-f0-9]{40}\b/u)?.[0]; if (!pin) throw Error('missing pin');
   const fresh = () => { const run = Bun.spawnSync([ensured.stdout.toString().trim(), 'fresh', 'docs/specs/feature.md', '--repo', root, '--plugin-pin', pin], { stdout: 'pipe', stderr: 'pipe' }); return JSON.parse(run.stdout.toString()); };
   expect(fresh().data.implementation_review.stale).toBe(false);

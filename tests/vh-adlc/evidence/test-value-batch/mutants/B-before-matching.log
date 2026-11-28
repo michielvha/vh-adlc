@@ -1,0 +1,43 @@
+# mutant B: plugins/vh-adlc/scripts/docs-drift/run-approval.ts
+# from: if (approved.manifest_sha256 !== manifestDigest(manifest)) throw Error("Approval must bind
+# to:   if (false) throw Error("Approval must bind
+# command: bun test --timeout 1200000 tests/vh-adlc/docs-drift/zz-np-before.test.ts -t owned candidate: matching$
+# source diff:
+diff --git a/plugins/vh-adlc/scripts/docs-drift/run-approval.ts b/plugins/vh-adlc/scripts/docs-drift/run-approval.ts
+index 38182c88..83b3183b 100644
+--- a/plugins/vh-adlc/scripts/docs-drift/run-approval.ts
++++ b/plugins/vh-adlc/scripts/docs-drift/run-approval.ts
+@@ -29,7 +29,7 @@ export function recordRunApproval(options: { repo: string; run: RunDirectory; ma
+   const payload: unknown = collectionReaders().yaml(request);
+   const procedure = payload !== null && typeof payload === "object" && Object.hasOwn(payload, "procedure");
+   const approved = exactRecord(payload, ["manifest_sha256", procedure ? "procedure" : "request"], "approval.yaml requires the exact manifest_sha256 and its actual request or procedure");
+-  if (approved.manifest_sha256 !== manifestDigest(manifest)) throw Error("Approval must bind the exact displayed manifest");
++  if (false) throw Error("Approval must bind the exact displayed manifest");
+   const retain = createRunArtifactWriter(run, settings.reports.max_entry_bytes);
+   let origin: { kind: "owner-request"; artifact: { path: string; sha256: string } }
+     | { kind: "adopted-procedure"; commit: string; path: string; sha256: string };
+# run:
+bun test v1.4.5 (a7733435c)
+
+tests/vh-adlc/docs-drift/zz-np-before.test.ts:
+90 |     expect(missingRole.result.exit_code).toBe(2);
+91 |     expect(missingRole.report).toMatchObject({ outcome: "incomplete" });
+92 |   } finally { renameSync(unavailable, rolePath); }
+93 |   writeFileSync(join(directory, "approval.yaml"), "manifest_sha256: " + "f".repeat(64) + "\nrequest: Approve another synthetic batch\n", { mode: 0o600 });
+94 |   const wrongApproval = await invoke("publish");
+95 |   expect(wrongApproval.result.exit_code).toBe(2);
+                                              ^
+error: expect(received).toBe(expected)
+
+Expected: 2
+Received: 0
+
+      at <anonymous> (/Users/michielvh/code/vh-adlc/.claude/worktrees/test-value-audit/tests/vh-adlc/docs-drift/zz-np-before.test.ts:95:42)
+(fail) normal prepare retains the original worker selection and edits only its owned candidate: matching [96040.75ms]
+Preserved failed normal preparation fixtures ["/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-flat-native-XqV8qs","/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-drift-publish-M86oGU"]
+
+ 0 pass
+ 3 filtered out
+ 1 fail
+ 40 expect() calls
+Ran 1 test across 1 file. [96.06s]

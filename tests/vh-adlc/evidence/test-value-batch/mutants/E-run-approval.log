@@ -1,0 +1,25 @@
+# mutant E: plugins/vh-adlc/scripts/docs-drift/run-directory.ts
+# from: for (const reference of Object.values(stage.artifacts)) readBoundArtifact({ source_repo: options.repo, artifact_root: scope.directory, reference });
+# to:   void stage;
+# command: bun test --timeout 1200000 tests/vh-adlc/docs-drift/run-approval.test.ts
+# source diff:
+diff --git a/plugins/vh-adlc/scripts/docs-drift/run-directory.ts b/plugins/vh-adlc/scripts/docs-drift/run-directory.ts
+index 5b4cc061..51b32083 100644
+--- a/plugins/vh-adlc/scripts/docs-drift/run-directory.ts
++++ b/plugins/vh-adlc/scripts/docs-drift/run-directory.ts
+@@ -134,7 +134,7 @@ export function readRunDirectory(input: RunOptions): RunDirectory {
+   const stages = files.map((file, index) => {
+     if (file !== String(index + 1).padStart(10, "0") + ".json") fail("stage sequence changed");
+     const bytes = readArtifact(join(stageDirectory, file)), stage = stageRecord(record(bytes), manifest, index + 1, digest);
+-    for (const reference of Object.values(stage.artifacts)) readBoundArtifact({ source_repo: options.repo, artifact_root: scope.directory, reference });
++    void stage;
+     digest = sha256(bytes);
+     return stage;
+   });
+# run:
+bun test v1.4.5 (a7733435c)
+
+ 2 pass
+ 0 fail
+ 7 expect() calls
+Ran 2 tests across 1 file. [3.21s]

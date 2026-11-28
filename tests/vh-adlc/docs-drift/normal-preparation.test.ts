@@ -72,28 +72,34 @@ test.each(["matching", "caller-change", "mixed-plans", "prepare-protocol"])("nor
   const manifest = final?.artifacts.reviewed_plan;
   if (!manifest) throw Error("Exact reviewed manifest required");
   const callsBeforeRefusals = readFileSync(service.calls), roleCalls = readFileSync(join(directory, "synthetic-role-order.jsonl"));
-  const missingApproval = await invoke("publish");
-  expect(missingApproval.result.exit_code).toBe(2);
-  expect(missingApproval.report).toMatchObject({ outcome: "setup-required" });
-  const copy = join(f.root, "copied-prepared-run"); cpSync(directory, copy, { recursive: true });
-  const copied = await invoke("publish", copy);
-  expect(copied.result.exit_code).toBe(2);
-  expect(copied.report).toMatchObject({ outcome: "setup-required" });
-  const reviewer = final?.artifacts.reviewer_capture;
-  if (!reviewer) throw Error("Original reviewer capture required");
-  const rolePath = join(directory, reviewer.path), unavailable = rolePath + ".unavailable";
-  renameSync(rolePath, unavailable);
-  try {
-    const missingRole = await invoke("publish");
-    expect(missingRole.result.exit_code).toBe(2);
-    expect(missingRole.report).toMatchObject({ outcome: "incomplete" });
-  } finally { renameSync(unavailable, rolePath); }
-  writeFileSync(join(directory, "approval.yaml"), "manifest_sha256: " + "f".repeat(64) + "\nrequest: Approve another synthetic batch\n", { mode: 0o600 });
-  const wrongApproval = await invoke("publish");
-  expect(wrongApproval.result.exit_code).toBe(2);
-  expect(wrongApproval.report).toMatchObject({ outcome: "incomplete" });
-  expect(readFileSync(service.calls)).toEqual(callsBeforeRefusals);
-  expect(readFileSync(service.statePath)).toEqual(nativeBefore); expect(git(origin, "for-each-ref")).toBe(refs);
+  // The refusals do not depend on the variant, and mutation showed every variant killing the same
+  // refusal mutants, so they run once. See docs/internal/maintenance/test-value-batch.md.
+  if (fault === "matching") {
+    const missingApproval = await invoke("publish");
+    expect(missingApproval.result.exit_code).toBe(2);
+    expect(missingApproval.report).toMatchObject({ outcome: "setup-required" });
+    const copy = join(f.root, "copied-prepared-run"); cpSync(directory, copy, { recursive: true });
+    const copied = await invoke("publish", copy);
+    expect(copied.result.exit_code).toBe(2);
+    // A missing approval also asks for setup, so assert the refusal only the ownership check gives.
+    expect(copied.report).toMatchObject({ outcome: "setup-required",
+      diagnostics: ["The original host ownership record is required for executing stages. Use resume --action inspect to observe this copy."] });
+    const reviewer = final?.artifacts.reviewer_capture;
+    if (!reviewer) throw Error("Original reviewer capture required");
+    const rolePath = join(directory, reviewer.path), unavailable = rolePath + ".unavailable";
+    renameSync(rolePath, unavailable);
+    try {
+      const missingRole = await invoke("publish");
+      expect(missingRole.result.exit_code).toBe(2);
+      expect(missingRole.report).toMatchObject({ outcome: "incomplete" });
+    } finally { renameSync(unavailable, rolePath); }
+    writeFileSync(join(directory, "approval.yaml"), "manifest_sha256: " + "f".repeat(64) + "\nrequest: Approve another synthetic batch\n", { mode: 0o600 });
+    const wrongApproval = await invoke("publish");
+    expect(wrongApproval.result.exit_code).toBe(2);
+    expect(wrongApproval.report).toMatchObject({ outcome: "incomplete" });
+    expect(readFileSync(service.calls)).toEqual(callsBeforeRefusals);
+    expect(readFileSync(service.statePath)).toEqual(nativeBefore); expect(git(origin, "for-each-ref")).toBe(refs);
+  }
   writeFileSync(join(directory, "approval.yaml"), "manifest_sha256: " + manifest.sha256 + "\nrequest: Approve this exact synthetic publication batch\n", { mode: 0o600 });
   const head = git(preparation.prepared.checkout, "rev-parse", "HEAD");
   git(origin, "fetch", "--no-write-fetch-head", preparation.prepared.checkout, head);

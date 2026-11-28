@@ -102,6 +102,14 @@ test("missing host ownership leaves the surviving directory observation-only", (
   expect(() => appendRunStage(run, { command: "publish", state: "pending", artifacts: {} })).toThrow("original");
 });
 
+test("an opened original run stops executing once its host ownership record is gone", () => {
+  const f = fixture(), run = createRunDirectory(f.input);
+  expect(run.origin).toBe("original");
+  rmSync(f.input.origins, { recursive: true });
+  expect(() => appendRunStage(run, { command: "publish", state: "pending", artifacts: {} })).toThrow("docs-drift run original host ownership required");
+  expect(readRunDirectory(f.input).stages).toEqual([]);
+});
+
 test("an existing external origin alias preserves opened-run ownership and stage appends", () => {
   const f = fixture(), alias = join(f.root, "origin-alias"), run = createRunDirectory(f.input);
   symlinkSync(f.input.origins, alias);

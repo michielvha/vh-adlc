@@ -8,7 +8,7 @@ import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const repo = resolve(import.meta.dir, "../..");
-const setup = Bun.spawnSync(["bash", join(repo, "plugins/vh-adlc/scripts/ensure-vh-adlc.sh"), "--offline"], { stdout: "pipe", stderr: "pipe" });
+const setup = Bun.spawnSync(["bash", join(repo, "plugins/vh-adlc/scripts/ensure-vh-adlc.sh")], { stdout: "pipe", stderr: "pipe" });
 if (setup.exitCode !== 0) throw new Error("verified cached binary required for review convergence checks");
 const binary = setup.stdout.toString().trim();
 

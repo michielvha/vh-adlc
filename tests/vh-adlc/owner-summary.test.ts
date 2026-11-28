@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 
 const repo = resolve(import.meta.dir, "../..");
 const pin = "0e52f51f01b84eda75a976763c42d8ec0a07b544";
-const setup = Bun.spawnSync(["bash", join(repo, "plugins/vh-adlc/scripts/ensure-vh-adlc.sh"), "--offline"], { stdout: "pipe", stderr: "pipe" });
+const setup = Bun.spawnSync(["bash", join(repo, "plugins/vh-adlc/scripts/ensure-vh-adlc.sh")], { stdout: "pipe", stderr: "pipe" });
 if (setup.exitCode !== 0) throw new Error("verified cached binary required for Owner summary compatibility tests");
 const binary = setup.stdout.toString().trim();
 const retained = process.env.VH_OWNER_SUMMARY_TRIAL_DIR;

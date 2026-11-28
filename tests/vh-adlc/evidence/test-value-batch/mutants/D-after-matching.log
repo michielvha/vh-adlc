@@ -1,0 +1,90 @@
+# mutant D: plugins/vh-adlc/scripts/docs-drift/run-cli.ts
+# from: } else if (run.origin !== "original") {
+# to:   } else if (false) {
+# command: bun test --timeout 1200000 tests/vh-adlc/docs-drift/normal-preparation.test.ts -t owned candidate: matching$
+# source diff:
+diff --git a/plugins/vh-adlc/scripts/docs-drift/run-cli.ts b/plugins/vh-adlc/scripts/docs-drift/run-cli.ts
+index ed12985e..fb0b3e3d 100644
+--- a/plugins/vh-adlc/scripts/docs-drift/run-cli.ts
++++ b/plugins/vh-adlc/scripts/docs-drift/run-cli.ts
+@@ -243,7 +243,7 @@ export async function runDirectoryMain(argv: string[]): Promise<number> {
+               ...(reviewed.pending_reference ? { pending_publication: reviewed.pending_reference } : {}),
+               ...(reviewed.worker ? { assessment_worker: reviewed.worker } : {}), ...(reviewed.reviewer ? { assessment_reviewer: reviewed.reviewer } : {}) } }).artifacts;
+         }
+-      } else if (run.origin !== "original") {
++      } else if (false) {
+         report.outcome = "setup-required";
+         report.diagnostics = ["The original host ownership record is required for executing stages. Use resume --action inspect to observe this copy."];
+       } else if (options.command === "scan") {
+# run:
+bun test v1.4.5 (a7733435c)
+
+tests/vh-adlc/docs-drift/normal-preparation.test.ts:
+80 |     expect(missingApproval.report).toMatchObject({ outcome: "setup-required" });
+81 |     const copy = join(f.root, "copied-prepared-run"); cpSync(directory, copy, { recursive: true });
+82 |     const copied = await invoke("publish", copy);
+83 |     expect(copied.result.exit_code).toBe(2);
+84 |     // A missing approval also asks for setup, so assert the refusal only the ownership check gives.
+85 |     expect(copied.report).toMatchObject({ outcome: "setup-required",
+                               ^
+error: expect(received).toMatchObject(expected)
+
+  {
++   "authority": "none",
++   "bun_version": "1.4.5",
++   "command": "publish",
++   "component": {
++     "diagnostics": [],
++     "expected": {
++       "component_sha256": "91bd3f9d4bc59d58d426fb10a6141d7149e9f84448eb48471e9932685fa0d29f",
++       "plugin_version": "0.34.0",
++       "source_commit": "d088fa7486093ce3bdb707a40ded4bfd389aa85a",
++     },
++     "matched": true,
++   },
+    "diagnostics": [
+-     "The original host ownership record is required for executing stages. Use resume --action inspect to observe this copy.",
++     "docs-drift run original host ownership required",
+    ],
+-   "outcome": "setup-required",
++   "outcome": "incomplete",
++   "run_directory": "/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-drift-publish-WIKaZ1/copied-prepared-run",
++   "schema_version": 1,
++   "source_commit": "77f00e0732368d1cec2121036da2c0908da40d8a",
++   "stage": "verify",
++   "stage_artifacts": {
++     "candidate": {
++       "path": "candidate-aabbb019-2734-469b-818b-b512ffbe9155.json",
++       "sha256": "ea71cadca967fcecb37bed30468eeb9a34c8d95ba22ad24fa46df3f2b5e1d744",
++     },
++     "candidate_review": {
++       "path": "candidate-review-aabbb019-2734-469b-818b-b512ffbe9155.json",
++       "sha256": "f67d0e935fbcedf12fd5645ae717247076cb62b5a82e74fdc2a487666e7a25b7",
++     },
++     "candidate_verification": {
++       "path": "candidate-verification-f6b2b8fb-89bc-4a10-92df-14d6b5d1f3cb.json",
++       "sha256": "3f222ec6a4fcb50c2cc6512d0e47d63911c2e2d2121d82e9bd7e9825fa91d2e5",
++     },
++     "reviewed_plan": {
++       "path": "reviewed-plan-aabbb019-2734-469b-818b-b512ffbe9155.json",
++       "sha256": "06cd3accae888629c977edf45d36a64b5152c8371380d19a0f3e8720514cab08",
++     },
++     "reviewer_capture": {
++       "path": "native-role-Iudxx7/capture.json",
++       "sha256": "c8a1a6ec437216d88de96c25ce9c4f8df64f6907c734063d26e1920c785a2bf2",
++     },
++   },
+  }
+
+- Expected  - 2
++ Received  + 40
+
+      at <anonymous> (/Users/michielvh/code/vh-adlc/.claude/worktrees/test-value-audit/tests/vh-adlc/docs-drift/normal-preparation.test.ts:85:27)
+(fail) normal prepare retains the original worker selection and edits only its owned candidate: matching [34774.40ms]
+Preserved failed normal preparation fixtures ["/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-flat-native-XLtoRJ","/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-drift-publish-WIKaZ1"]
+
+ 0 pass
+ 3 filtered out
+ 1 fail
+ 33 expect() calls
+Ran 1 test across 1 file. [34.79s]

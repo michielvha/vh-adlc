@@ -1,0 +1,89 @@
+# mutant E: plugins/vh-adlc/scripts/docs-drift/run-directory.ts
+# from: for (const reference of Object.values(stage.artifacts)) readBoundArtifact({ source_repo: options.repo, artifact_root: scope.directory, reference });
+# to:   void stage;
+# command: bun test --timeout 1200000 tests/vh-adlc/docs-drift/zz-np-before.test.ts -t owned candidate: prepare-protocol$
+# source diff:
+diff --git a/plugins/vh-adlc/scripts/docs-drift/run-directory.ts b/plugins/vh-adlc/scripts/docs-drift/run-directory.ts
+index 5b4cc061..51b32083 100644
+--- a/plugins/vh-adlc/scripts/docs-drift/run-directory.ts
++++ b/plugins/vh-adlc/scripts/docs-drift/run-directory.ts
+@@ -134,7 +134,7 @@ export function readRunDirectory(input: RunOptions): RunDirectory {
+   const stages = files.map((file, index) => {
+     if (file !== String(index + 1).padStart(10, "0") + ".json") fail("stage sequence changed");
+     const bytes = readArtifact(join(stageDirectory, file)), stage = stageRecord(record(bytes), manifest, index + 1, digest);
+-    for (const reference of Object.values(stage.artifacts)) readBoundArtifact({ source_repo: options.repo, artifact_root: scope.directory, reference });
++    void stage;
+     digest = sha256(bytes);
+     return stage;
+   });
+# run:
+bun test v1.4.5 (a7733435c)
+
+tests/vh-adlc/docs-drift/zz-np-before.test.ts:
+86 |   const rolePath = join(directory, reviewer.path), unavailable = rolePath + ".unavailable";
+87 |   renameSync(rolePath, unavailable);
+88 |   try {
+89 |     const missingRole = await invoke("publish");
+90 |     expect(missingRole.result.exit_code).toBe(2);
+91 |     expect(missingRole.report).toMatchObject({ outcome: "incomplete" });
+                                    ^
+error: expect(received).toMatchObject(expected)
+
+  {
+-   "outcome": "incomplete",
++   "authority": "none",
++   "bun_version": "1.4.5",
++   "command": "publish",
++   "component": {
++     "diagnostics": [],
++     "expected": {
++       "component_sha256": "fdde56bf1abb2dce660977060a3dff386149aaa15268178e3e2a0856bffaacaf",
++       "plugin_version": "0.34.0",
++       "source_commit": "3cf9255006b0d3f538012fa15dfcf48313705040",
++     },
++     "matched": true,
++   },
++   "diagnostics": [
++     "Retain exact approval.yaml for the displayed manifest before publication.",
++   ],
++   "outcome": "setup-required",
++   "run_directory": "/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-drift-publish-wUq91m/run",
++   "schema_version": 1,
++   "source_commit": "b59ecaaf5684be3bcfc74b39e1f9363e8e5e7962",
++   "stage": "verify",
++   "stage_artifacts": {
++     "candidate": {
++       "path": "candidate-b809fd65-1c6f-4871-bd65-edf1e8d718b4.json",
++       "sha256": "af65cde0aaaf7eb4a900a11f26a4d4548733b0f7f925447acfac934f36059884",
++     },
++     "candidate_review": {
++       "path": "candidate-review-b809fd65-1c6f-4871-bd65-edf1e8d718b4.json",
++       "sha256": "085ae369e6b8c840c319d41a6786ab3c4c8a12710dd5df6f226262c8a34a3894",
++     },
++     "candidate_verification": {
++       "path": "candidate-verification-166e9878-f733-4a95-91fc-5423c3b0d700.json",
++       "sha256": "7ca2a8e0760730592b1af3720e743b4fdfb872b07f9416170dc9891c8667edc5",
++     },
++     "reviewed_plan": {
++       "path": "reviewed-plan-b809fd65-1c6f-4871-bd65-edf1e8d718b4.json",
++       "sha256": "bf86a547de459ce383b029ff15b1e276c191fc9895b75624d714c4c35fca10d6",
++     },
++     "reviewer_capture": {
++       "path": "native-role-J4ZrXC/capture.json",
++       "sha256": "45e8960b9730d189795c60825e7d851be6c9a0b15846694af21ffe2265cd3388",
++     },
++   },
+  }
+
+- Expected  - 1
++ Received  + 42
+
+      at <anonymous> (/Users/michielvh/code/vh-adlc/.claude/worktrees/test-value-audit/tests/vh-adlc/docs-drift/zz-np-before.test.ts:91:32)
+(fail) normal prepare retains the original worker selection and edits only its owned candidate: prepare-protocol [35139.76ms]
+Preserved failed normal preparation fixtures ["/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-flat-native-x5Jzzt","/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-drift-publish-wUq91m"]
+
+ 0 pass
+ 3 filtered out
+ 1 fail
+ 37 expect() calls
+Ran 1 test across 1 file. [35.16s]

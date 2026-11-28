@@ -1,0 +1,97 @@
+# mutant B: plugins/vh-adlc/scripts/docs-drift/run-approval.ts
+# from: if (approved.manifest_sha256 !== manifestDigest(manifest)) throw Error("Approval must bind
+# to:   if (false) throw Error("Approval must bind
+# command: bun test --timeout 1200000 tests/vh-adlc/docs-drift/run-approval.test.ts
+# source diff:
+diff --git a/plugins/vh-adlc/scripts/docs-drift/run-approval.ts b/plugins/vh-adlc/scripts/docs-drift/run-approval.ts
+index 38182c88..83b3183b 100644
+--- a/plugins/vh-adlc/scripts/docs-drift/run-approval.ts
++++ b/plugins/vh-adlc/scripts/docs-drift/run-approval.ts
+@@ -29,7 +29,7 @@ export function recordRunApproval(options: { repo: string; run: RunDirectory; ma
+   const payload: unknown = collectionReaders().yaml(request);
+   const procedure = payload !== null && typeof payload === "object" && Object.hasOwn(payload, "procedure");
+   const approved = exactRecord(payload, ["manifest_sha256", procedure ? "procedure" : "request"], "approval.yaml requires the exact manifest_sha256 and its actual request or procedure");
+-  if (approved.manifest_sha256 !== manifestDigest(manifest)) throw Error("Approval must bind the exact displayed manifest");
++  if (false) throw Error("Approval must bind the exact displayed manifest");
+   const retain = createRunArtifactWriter(run, settings.reports.max_entry_bytes);
+   let origin: { kind: "owner-request"; artifact: { path: string; sha256: string } }
+     | { kind: "adopted-procedure"; commit: string; path: string; sha256: string };
+# run:
+bun test v1.4.5 (a7733435c)
+
+tests/vh-adlc/docs-drift/run-approval.test.ts:
+24 |   if (!original) throw Error("Original exact approval required");
+25 |   const bytes = readFileSync(join(directory, original.path));
+26 |   const effect = manifest.effects.find(effect => effect.kind === "pr-create");
+27 |   if (!effect) throw Error("Synthetic publication required");
+28 |   effect.payload.title = "Newly reviewed title";
+29 |   expect(() => recordRunApproval({ repo: f.repo, run: first, manifest, command: "publish" })).toThrow("exact displayed manifest");
+                                                                                                   ^
+error: expect(received).toThrow(expected)
+
+Expected substring: "exact displayed manifest"
+
+Received function did not throw
+Received value: {
+  authority: "none",
+  origin: "original",
+  directory: "/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-drift-publish-PeVBVb/run",
+  manifest: {
+    schema_version: 1,
+    kind: "docs-drift-run",
+    id: "cb7f4134-ee1f-4d91-90d1-ae8cc985145a",
+    nonce: "a5ecefe4-4c15-4b15-9243-500db5931271",
+    directory: "/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-drift-publish-PeVBVb/run",
+    device: "16777234",
+    inode: "77501046",
+    source_repo: "/private/var/folders/sm/8hfqw9_97pgfmhlfs2t7k66c0000gn/T/vh-drift-publish-PeVBVb/source",
+    source_commit: "7dd4fd2472c685bb1dfeec7f63b1320945d17a4f",
+    settings_sha256: "e22d8867abfb28897c91ff4ba94479a024f492409c1bf7431422c33dd705f3df",
+    read_set_sha256: "eeb2356fa11f7ef0596821f61aa8a449047e03a094ce8faba4e0206263434773",
+    entry: "interactive",
+    mode: "audit",
+    proposals: [],
+    bun_version: "1.4.5",
+  },
+  stages: [
+    {
+      schema_version: 1,
+      kind: "docs-drift-run-stage",
+      run_id: "cb7f4134-ee1f-4d91-90d1-ae8cc985145a",
+      revision: 1,
+      previous_sha256: "07727a1c39f19c1e840a369970a23530579e3d3d0e2d64c725582b541bd4ab57",
+      command: "publish",
+      state: "pending",
+      artifacts: {
+        approval: {
+          path: "publication-authority-28f1eb07-5193-4334-979a-32ae10b000b8.json",
+          sha256: "ff5184de29c1fd5d841b811fca719886b944a1416952f94948b3f6efa67ce852",
+        },
+      },
+    },
+    {
+      schema_version: 1,
+      kind: "docs-drift-run-stage",
+      run_id: "cb7f4134-ee1f-4d91-90d1-ae8cc985145a",
+      revision: 2,
+      previous_sha256: "cd9a879c2355d22a72dd610f6868bf7e1f06e19d240ee32a08e3725c6c35c4ef",
+      command: "publish",
+      state: "pending",
+      artifacts: {
+        approval: {
+          path: "publication-authority-2d7176b5-20da-40fb-8885-2e6e779febdd.json",
+          sha256: "f5cc68a37a8ca27e995385eef97c8ca9d42dc225568be9f9c68b0ed58032c704",
+        },
+      },
+    }
+  ],
+  digest: "1e84a3ddde190c1e8df972ffae693c6e961dd3ea4b2b723fe78b4b367122151a",
+}
+
+      at <anonymous> (/Users/michielvh/code/vh-adlc/.claude/worktrees/test-value-audit/tests/vh-adlc/docs-drift/run-approval.test.ts:29:95)
+(fail) re-preparation before dispatch needs fresh exact approval and preserves the earlier request [2059.94ms]
+
+ 1 pass
+ 1 fail
+ 4 expect() calls
+Ran 2 tests across 1 file. [3.06s]
