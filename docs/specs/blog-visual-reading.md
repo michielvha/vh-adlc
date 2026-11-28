@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Re-entered after the R-50 acceptance; implementing the tasks test-first."
+status: draft
+status_description: "Narrow revision after R-51 and R-52: widen three Test Plan patterns that reject correct output, covers additions."
 branch: feat/blog-visual-reading
 issue: null
 goal: "Long-form articles reach the owner with a checked visual reading pass, and the editor reviews presentation as well as prose."
